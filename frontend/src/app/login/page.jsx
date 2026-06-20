@@ -3,7 +3,7 @@
 export default function Home() {
   return (
   <div>
-    aqui va a trabajar el david
+    jorge weno pal pico de los primos
   </div>
   );
 }
