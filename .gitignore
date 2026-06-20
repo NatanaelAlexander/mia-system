@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build / cache
+dist/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno (secretos)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE (opcional; quita lo que quieras versionar)
+.idea/
+*.swp
+*.swo
+
+# Docker / misc
+.cache/
