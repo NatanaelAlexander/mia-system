@@ -1,24 +1,19 @@
 export const Login = () => {
   return (
-    <div class="flex justify-center items-center h-screen w-full bg-linear-to-br from-[#addff1] to-[#003152]">
+    <div class="flex justify-center items-center h-screen w-full bg-slate-950">
       { /* contenedor */ }
       <div class=" grid md:grid-cols-2">
         {/* contenedor izquierdo */}
-        <div class="p-10 md:flex md:items-center md:justify-center">
+        <div className="p-16 rounded-3xl md:flex md:items-center md:justify-center">
           <img
             src="./login/crm.webp"
             alt="imagen login"
-            class="w-full h-auto"
+            className="w-full h-auto rounded-3xl shadow-2xl hover:scale-105 transition-all duration-700"
           />
         </div>
         {/* contenedor derecho */}
-        <div className="flex min-h-full flex-col flex-end px-6 py-12 lg:px-8">
+        <div className="w-[450px] bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-10 flex min-h-full flex-col items-center justify-center lg:px-8">
           <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-            <img
-              alt="Your Company"
-              src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500"
-              className="mx-auto h-10 w-auto"
-            />
             <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-white">
               Iniciar sesión
             </h2>
