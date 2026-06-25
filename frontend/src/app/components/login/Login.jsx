@@ -1,10 +1,14 @@
 export const Login = () => {
   return (
-    <div class="flex justify-center items-center h-screen w-full bg-slate-950">
+    <div className=" relative flex justify-center items-center h-screen w-screen overflow-hidden bg-slate-950">
+      {/* blur izquiero */}
+      <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full bg-blue-500/20 blur-[150px]"/>
+      {/* blur derecho */}
+      <div className="absolute bottom-[-200px] right-[-200px] w-[500px] h-[500px] rounded-full bg-violet-500/20 blur-[150px]"/>
       { /* contenedor */ }
-      <div class=" grid md:grid-cols-2">
+      <div className=" grid md:grid-cols-2">
         {/* contenedor izquierdo */}
-        <div className="p-16 rounded-3xl md:flex md:items-center md:justify-center">
+        <div className="hidden lg:flex p-16 rounded-3xl md:flex md:items-center md:justify-center">
           <img
             src="./login/crm.webp"
             alt="imagen login"
@@ -13,6 +17,7 @@ export const Login = () => {
         </div>
         {/* contenedor derecho */}
         <div className="w-[450px] bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-10 flex min-h-full flex-col items-center justify-center lg:px-8">
+            <img src="./login/team_prime_dg.PNG" className="h-20 w-auto mx-auto"/>
           <div className="sm:mx-auto sm:w-full sm:max-w-sm">
             <h2 className="mt-10 text-center text-2xl/9 font-bold tracking-tight text-white">
               Iniciar sesión
