@@ -1,9 +1,7 @@
-
+import { Login } from "@/app/components/login/Login";
 
 export default function Home() {
   return (
-  <div>
-    jorge weno pal pico de los primos
-  </div>
+<Login/>
   );
 }
