@@ -7,6 +7,7 @@ import { CompaniesModule } from './companies/companies.module';
 import { AssetsModule } from './assets/assets.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuditModule } from './audit/audit.module';
+import { TicketsModule } from './tickets/tickets.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuditModule } from './audit/audit.module';
     AssetsModule,
     ProjectsModule,
     AuditModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

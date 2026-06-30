@@ -252,7 +252,7 @@ export class ProjectsService {
     return asset;
   }
 
-  private async findProjectRowById(id: string): Promise<Project> {
+  async findProjectRowById(id: string): Promise<Project> {
     const { rows } = await this.db.query<Project>(SQL_FIND_PROJECT_BY_ID, [id]);
 
     if (!rows[0]) {

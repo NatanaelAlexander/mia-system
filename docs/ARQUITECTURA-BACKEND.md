@@ -220,15 +220,14 @@ backend/src/
 │   ├── dto/
 │   └── exceptions/
 │
-├── tickets/                             ← (pendiente)
+├── tickets/                             ← ✅ implementado
 │   ├── tickets.module.ts
 │   ├── tickets.controller.ts
 │   ├── tickets.service.ts
-│   ├── ticket-comments.service.ts       ← solo si el dominio lo requiere
-│   ├── dto/
-│   ├── exceptions/
 │   ├── queries/
-│   └── types/
+│   ├── types/
+│   ├── dto/
+│   └── exceptions/
 │
 └── audit/                               ← ✅ implementado (solo internal, lectura)
     ├── audit.module.ts
@@ -288,7 +287,7 @@ backend/src/
 | companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ (+ audit en todas las APIs) |
 | projects | projects, projects_assets | ✓ | stub | ✅ (+ audit en todas las APIs) |
 | assets | assets | ✓ | — | ✅ |
-| tickets | tickets, catálogos, comments | ✓ | ✓ | pendiente |
+| tickets | tickets, catálogos, comments, assets | ✓ | ✓ | ✅ (+ audit en todas las APIs) |
 | audit | audit_logs | ✓ | — | ✅ (lectura; log() listo para conectar) |
 
 ---
