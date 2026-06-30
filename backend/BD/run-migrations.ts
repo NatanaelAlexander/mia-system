@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
+import { resolveDatabaseUrl } from '../src/common/database/database-url';
 
 const MIGRATIONS = [
   'users',
@@ -35,43 +36,6 @@ function logInfo(message: string): void {
   console.log(`${colors.cyan}[INFO]${colors.reset} ${message}`);
 }
 
-function loadEnvFile(envPath: string): void {
-  if (!existsSync(envPath)) return;
-
-  const content = readFileSync(envPath, 'utf-8');
-
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex === -1) continue;
-
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
-
-function resolveDatabaseUrl(): string {
-  const inDocker = existsSync('/.dockerenv');
-  const user = process.env.POSTGRES_USER ?? 'mia_user';
-  const password = process.env.POSTGRES_PASSWORD ?? 'changeme_dev_only';
-  const database = process.env.POSTGRES_DB ?? 'mia_system';
-  const port = process.env.POSTGRES_PORT ?? '5432';
-  const host = inDocker ? 'bd_main' : 'localhost';
-
-  if (process.env.DATABASE_URL) {
-    if (inDocker) return process.env.DATABASE_URL;
-    return process.env.DATABASE_URL.replace('@bd_main:', `@${host}:`);
-  }
-
-  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
-}
-
 async function runMigration(
   client: Client,
   sqlFile: string,
@@ -101,9 +65,15 @@ async function runMigration(
 }
 
 async function main(): Promise<void> {
-  loadEnvFile(join(rootDir, '.env'));
+  let databaseUrl: string;
 
-  const databaseUrl = resolveDatabaseUrl();
+  try {
+    databaseUrl = resolveDatabaseUrl(rootDir);
+  } catch (error) {
+    logErr(error instanceof Error ? error.message : 'DATABASE_URL inválida');
+    process.exit(1);
+  }
+
   const databaseName = process.env.POSTGRES_DB ?? 'mia_system';
 
   logInfo(`Base de datos: ${databaseName}`);
