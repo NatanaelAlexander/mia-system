@@ -202,17 +202,23 @@ backend/src/
 │   ├── queries/
 │   └── types/
 │
-├── projects/                            ← (pendiente)
-│   ├── projects.module.ts
-│   ├── projects.controller.ts           → /api/internal/projects, /api/portal/projects
-│   ├── projects.service.ts
-│   ├── dto/
-│   ├── exceptions/
+├── assets/                              ← ✅ implementado
+│   ├── assets.module.ts
+│   ├── assets.controller.ts
+│   ├── assets.service.ts
 │   ├── queries/
-│   └── types/
+│   ├── types/
+│   ├── dto/
+│   └── exceptions/
 │
-├── assets/                              ← (pendiente)
-│   └── … (misma estructura)
+├── projects/                            ← ✅ implementado
+│   ├── projects.module.ts
+│   ├── projects.controller.ts
+│   ├── projects.service.ts
+│   ├── queries/
+│   ├── types/
+│   ├── dto/
+│   └── exceptions/
 │
 ├── tickets/                             ← (pendiente)
 │   ├── tickets.module.ts
@@ -280,8 +286,8 @@ backend/src/
 | auth | users, roles | — | — | pendiente |
 | users | users, users_roles, job_titles | ✓ | — | pendiente |
 | companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ |
-| projects | projects, projects_assets | ✓ | ✓ | pendiente |
-| assets | assets | ✓ | ✓ | pendiente |
+| projects | projects, projects_assets | ✓ | stub | ✅ |
+| assets | assets | ✓ | — | ✅ |
 | tickets | tickets, catálogos, comments | ✓ | ✓ | pendiente |
 | audit | audit_logs | ✓ | — | pendiente |
 
