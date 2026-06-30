@@ -57,7 +57,8 @@ docker ps
 ```bash
 cp .env.example .env
 ```
-Resumen humano: copia y pega el .env.example bajo la misma ruta, pero con el nuevo nombre de ".env"
+
+Resumen humano: copia y pega el `.env.example` bajo la misma ruta, pero con el nuevo nombre de `.env`.
 
 Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
 
@@ -69,7 +70,7 @@ Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
 docker compose down
 ```
 
-Libera memoria, puertos y evita conflictos con contenedores viejos.
+Libera memoria, puertos y evita conflictos con contenedores viejos. **No borra los datos de Postgres** (quedan en el volumen `mia_pg_data`).
 
 ### Paso 3 — Levantar todo
 
@@ -84,6 +85,29 @@ Levanta `bd_main` (Postgres), `api` (Nest) y `frontend` (Next). Verás los logs 
 Parar: `Ctrl + C`.
 
 > Si cambiaste dependencias o Dockerfiles: `docker compose down` y otra vez `docker compose up --build`.
+
+### Paso 4 — Migraciones de base de datos (primera vez o tras `down -v`)
+
+**`docker compose up --build` no corre las migraciones solo.** Con el stack arriba, en **otra terminal**:
+
+**Windows y Linux:**
+
+```bash
+# Esquema (tablas)
+docker compose exec api pnpm run migrate
+
+# Datos iniciales (roles, estados, admin, cliente)
+docker compose exec api pnpm run migrate:data
+```
+
+| Comando | Qué hace |
+|---------|----------|
+| `pnpm run migrate` | Crea las tablas (`backend/BD/migration/`) |
+| `pnpm run migrate:data` | Inserta catálogos y usuarios dev (`backend/BD/data-migration/`) |
+
+Solo hace falta repetirlos si borraste la BD (`docker compose down -v`) o si cambiaste los `.sql`.
+
+Detalle: `backend/BD/README.md`.
 
 ### URLs con el proyecto levantado
 
@@ -102,6 +126,8 @@ Parar: `Ctrl + C`.
 | Acción | Comando |
 |--------|---------|
 | Levantar | `docker compose up --build` |
+| Migrar esquema (tablas) | `docker compose exec api pnpm run migrate` |
+| Migrar datos iniciales | `docker compose exec api pnpm run migrate:data` |
 | Detener | `docker compose down` |
 | Reset total (incluye datos de Postgres) | `docker compose down -v` |
 | Estado | `docker compose ps` |
@@ -114,7 +140,20 @@ Parar: `Ctrl + C`.
 
 ## 4. Base de datos
 
-Servicio Docker: `bd_main`. Datos en volumen `mia_pg_data` (local, no va a Git).
+Servicio Docker: `bd_main`. Datos en volumen `mia_pg_data` (local en tu PC).
+
+### Datos, Git y `docker compose down`
+
+| Qué haces | ¿Qué pasa con los datos de la BD? |
+|-----------|-----------------------------------|
+| `docker compose down` | **Se conservan** |
+| `Ctrl + C` / volver a `up --build` | **Se conservan** |
+| `git push` | **No se suben** (Git no ve el volumen Docker) |
+| `docker compose down -v` | **Se borran** (reset total) |
+
+En Git van el **esquema** (`backend/BD/migration/*.sql`) y `.env.example`. No van `.env` ni las filas que insertes en desarrollo.
+
+**Lo que crees en la BD (usuarios de prueba, tickets, empresas, etc.) vive solo en tu computador**, dentro del volumen Docker `mia_pg_data`. Eso **no se sube al repositorio** con `git add`, `git commit` ni `git push`. Cada persona del equipo tiene su propia BD local; nadie más ve tus datos de desarrollo salvo que tú se los compartas por otro medio.
 
 | Desde | Host | Puerto | DB |
 |-------|------|--------|-----|
@@ -127,7 +166,9 @@ El backend **no** usa `localhost` para Postgres:
 DATABASE_URL=postgresql://mia_user:TU_PASSWORD@bd_main:5432/mia_system
 ```
 
-Migraciones SQL: `backend/BD/migration/`.
+Migraciones SQL: `backend/BD/migration/` y `backend/BD/data-migration/`. Guía completa: `backend/BD/README.md`.
+
+Zona horaria del stack: `America/Santiago` (configurable con `TZ` y `PGTZ` en `.env`). Postgres guarda `TIMESTAMPTZ` en UTC y lo muestra en hora Chile.
 
 ```bash
 docker compose exec bd_main psql -U mia_user -d mia_system
@@ -164,7 +205,11 @@ mia-system/
 ├── docker-compose.yml
 ├── .env.example
 ├── backend/              ← NestJS
-│   └── BD/migration/     ← SQL (en Git)
+│   └── BD/               ← migraciones
+│       ├── migration/    ← esquema (CREATE)
+│       ├── data-migration/ ← datos (INSERT)
+│       ├── run-migrations.ts
+│       └── run-data-migrations.ts
 └── frontend/             ← Next.js
     └── pnpm.sh           ← instalar paquetes sin pnpm local
 ```
@@ -173,50 +218,10 @@ mia-system/
 
 ## 7. Problemas frecuentes
 
-<<<<<<< Updated upstream
-### "Cannot connect to the Docker daemon" / Docker no responde
-
-Docker no está encendido. Vuelve a la sección **Windows** o **Linux** y enciende Docker antes de seguir.
-
-### No puedo guardar archivos en el editor (solo Linux)
-
-A veces Docker deja archivos como `root`. Con el proyecto **parado** (`docker compose down`):
-
-```bash
-docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project
-```
-
-### El hot reload no funciona en Windows (pero en Linux sí)
-
-**Por qué:** Docker en Windows no avisa bien al contenedor cuando guardás un archivo. Además, Next.js 16 usa **Turbopack** por defecto, y Turbopack **no detecta cambios** dentro de Docker en Windows.
-
-**Qué hicimos en el proyecto:** el frontend arranca con `next dev --webpack` y polling activado (`WATCHPACK_POLLING`, `CHOKIDAR_USEPOLLING`).
-
-Tu colega debe **bajar y volver a levantar** después de actualizar el repo:
-
-```bash
-docker compose down
-docker compose up --build
-```
-
-**Recomendaciones extra para Windows:**
-
-1. Clonar el repo **dentro de WSL** (ej. `\\wsl$\Ubuntu\home\...`), no en `C:\Users\...`.
-2. Abrir el proyecto desde **WSL** en VS Code / Cursor (`code .` desde bash de WSL).
-3. Si aún falla, refrescar la página una vez tras el primer arranque.
-
-### Cambié dependencias y el contenedor no las ve
-
-```bash
-docker compose down
-docker compose up --build
-```
-=======
 | Problema | Solución |
 |----------|----------|
 | Docker no responde (Windows) | Abrir Docker Desktop, esperar *Engine running* |
 | Docker no responde (Linux) | `sudo systemctl start docker` |
 | Permisos de archivos (Linux) | Con el proyecto parado: `docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project` |
-| Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL |
+| Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL; el frontend usa `next dev --webpack` con polling |
 | Dependencias no se ven | `docker compose down` → `docker compose up --build` |
->>>>>>> Stashed changes
