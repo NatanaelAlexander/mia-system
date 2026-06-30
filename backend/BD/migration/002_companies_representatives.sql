@@ -1,16 +1,7 @@
--- Feature: companies
+-- Refactor: legal_representatives como persona; company_representatives N:M empresa ↔ representante
 
-CREATE TABLE IF NOT EXISTS companies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(255) NOT NULL,
-  tax_id VARCHAR(50) NOT NULL UNIQUE,
-  address TEXT,
-  phone_number VARCHAR(50),
-  email VARCHAR(255),
-  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+DROP TABLE IF EXISTS legal_representatives CASCADE;
+DROP TABLE IF EXISTS company_representatives CASCADE;
 
 CREATE TABLE IF NOT EXISTS legal_representatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,16 +22,8 @@ CREATE TABLE IF NOT EXISTS company_representatives (
   PRIMARY KEY (company_id, legal_representative_id)
 );
 
-CREATE TABLE IF NOT EXISTS users_companies (
-  user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
-  PRIMARY KEY (user_id, company_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_companies_tax_id ON companies (tax_id);
 CREATE INDEX IF NOT EXISTS idx_legal_representatives_identification
   ON legal_representatives (identification_number);
-CREATE INDEX IF NOT EXISTS idx_company_representatives_company_id ON company_representatives (company_id);
+
 CREATE INDEX IF NOT EXISTS idx_company_representatives_legal_rep
   ON company_representatives (legal_representative_id);
-CREATE INDEX IF NOT EXISTS idx_users_companies_company_id ON users_companies (company_id);
