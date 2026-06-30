@@ -86,6 +86,29 @@ Parar: `Ctrl + C`.
 
 > Si cambiaste dependencias o Dockerfiles: `docker compose down` y otra vez `docker compose up --build`.
 
+### Paso 4 — Migraciones de base de datos (primera vez o tras `down -v`)
+
+**`docker compose up --build` no corre las migraciones solo.** Con el stack arriba, en **otra terminal**:
+
+**Windows y Linux:**
+
+```bash
+# Esquema (tablas)
+docker compose exec api pnpm run migrate
+
+# Datos iniciales (roles, estados, admin, cliente)
+docker compose exec api pnpm run migrate:data
+```
+
+| Comando | Qué hace |
+|---------|----------|
+| `pnpm run migrate` | Crea las tablas (`backend/BD/migration/`) |
+| `pnpm run migrate:data` | Inserta catálogos y usuarios dev (`backend/BD/data-migration/`) |
+
+Solo hace falta repetirlos si borraste la BD (`docker compose down -v`) o si cambiaste los `.sql`.
+
+Detalle: `backend/BD/README.md`.
+
 ### URLs con el proyecto levantado
 
 | Servicio | URL |
@@ -103,6 +126,8 @@ Parar: `Ctrl + C`.
 | Acción | Comando |
 |--------|---------|
 | Levantar | `docker compose up --build` |
+| Migrar esquema (tablas) | `docker compose exec api pnpm run migrate` |
+| Migrar datos iniciales | `docker compose exec api pnpm run migrate:data` |
 | Detener | `docker compose down` |
 | Reset total (incluye datos de Postgres) | `docker compose down -v` |
 | Estado | `docker compose ps` |
@@ -141,7 +166,7 @@ El backend **no** usa `localhost` para Postgres:
 DATABASE_URL=postgresql://mia_user:TU_PASSWORD@bd_main:5432/mia_system
 ```
 
-Migraciones SQL: `backend/BD/migration/`. Cómo ejecutarlas: `backend/BD/README.md`.
+Migraciones SQL: `backend/BD/migration/` y `backend/BD/data-migration/`. Guía completa: `backend/BD/README.md`.
 
 Zona horaria del stack: `America/Santiago` (configurable con `TZ` y `PGTZ` en `.env`). Postgres guarda `TIMESTAMPTZ` en UTC y lo muestra en hora Chile.
 
@@ -180,9 +205,11 @@ mia-system/
 ├── docker-compose.yml
 ├── .env.example
 ├── backend/              ← NestJS
-│   └── BD/               ← migraciones y script
-│       ├── migration/    ← SQL por feature (en Git)
-│       └── run-migrations.ts
+│   └── BD/               ← migraciones
+│       ├── migration/    ← esquema (CREATE)
+│       ├── data-migration/ ← datos (INSERT)
+│       ├── run-migrations.ts
+│       └── run-data-migrations.ts
 └── frontend/             ← Next.js
     └── pnpm.sh           ← instalar paquetes sin pnpm local
 ```

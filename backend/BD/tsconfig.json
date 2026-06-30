@@ -4,5 +4,5 @@
     "module": "CommonJS",
     "moduleResolution": "node"
   },
-  "include": ["run-migrations.ts"]
+  "include": ["run-migrations.ts", "run-data-migrations.ts"]
 }
