@@ -20,6 +20,7 @@ import {
   EmailUsuarioDuplicadoException,
   NoPuedesDesactivarTuCuentaException,
   RolNoEncontradoException,
+  SoloPuedesModificarTuPerfilException,
   UsuarioNoEncontradoException,
   VinculoUsuarioEmpresaNoEncontradoException,
 } from './exceptions/users.exceptions';
@@ -51,12 +52,16 @@ import {
   USER_COLUMNS,
 } from './queries/users.queries';
 import {
-  FilterUsersInput,
   JobTitleOption,
   RoleOption,
   User,
   UserDetail,
 } from './types/user.types';
+
+interface UpdateUserOptions {
+  /** true = admin con `users:update` puede modificar otro usuario */
+  asAdmin?: boolean;
+}
 
 const AUDIT_TABLE = {
   USERS: 'users',
@@ -130,8 +135,11 @@ export class UsersService {
   async update(
     id: string,
     dto: UpdateUserDto,
-    actorUserId: string | null,
+    actorUserId: string,
+    options: UpdateUserOptions = {},
   ): Promise<UserDetail> {
+    this.assertSelfOrAdmin(id, actorUserId, options.asAdmin === true);
+
     const previous = await this.toUserDetail(await this.findUserById(id));
 
     if (dto.email) {
@@ -289,18 +297,21 @@ export class UsersService {
   }
 
   async updateProfile(
-    userId: string,
+    requesterUserId: string,
     dto: UpdateProfileDto,
   ): Promise<UserDetail> {
-    return this.update(userId, dto, userId);
+    this.assertSelfOrAdmin(requesterUserId, requesterUserId, false);
+    return this.update(requesterUserId, dto, requesterUserId, { asAdmin: false });
   }
 
   async changeOwnPassword(
-    userId: string,
+    requesterUserId: string,
     dto: ChangePasswordDto,
   ): Promise<void> {
+    this.assertSelfOrAdmin(requesterUserId, requesterUserId, false);
+
     const { rows } = await this.db.query<{ id: string }>(SQL_UPDATE_USER_PASSWORD, [
-      userId,
+      requesterUserId,
       dto.newPassword,
       dto.currentPassword,
     ]);
@@ -309,13 +320,13 @@ export class UsersService {
       throw new ContrasenaActualIncorrectaException();
     }
 
-    this.permissionsService.invalidateUser(userId);
+    this.permissionsService.invalidateUser(requesterUserId);
 
     await this.auditService.log({
-      userId,
+      userId: requesterUserId,
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE.USERS,
-      recordId: userId,
+      recordId: requesterUserId,
       newValues: { passwordChanged: true },
     });
   }
@@ -499,6 +510,16 @@ export class UsersService {
     }
 
     return { sets, values };
+  }
+
+  private assertSelfOrAdmin(
+    targetUserId: string,
+    requesterUserId: string,
+    asAdmin: boolean,
+  ): void {
+    if (!asAdmin && targetUserId !== requesterUserId) {
+      throw new SoloPuedesModificarTuPerfilException();
+    }
   }
 
   private asJson(value: object): Record<string, unknown> {

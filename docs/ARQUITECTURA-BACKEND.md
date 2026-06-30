@@ -260,11 +260,13 @@ backend/src/
 | PATCH | `/api/internal/users/:id/contrasena` | `users:update` | `{ "password" }` |
 | POST | `/api/internal/users/vincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
 | POST | `/api/internal/users/desvincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
-| GET/PATCH | `/api/internal/users/perfil` | `@AuthenticatedOnly()` | perfil propio |
-| PATCH | `/api/internal/users/perfil/contrasena` | `@AuthenticatedOnly()` | cambio de clave |
-| GET/PATCH | `/api/portal/users/perfil` | `@AuthenticatedOnly()` | perfil cliente |
+| GET/PATCH | `/api/internal/users/perfil` | `@AuthenticatedOnly()` + solo `sub` del token |
+| PATCH | `/api/internal/users/perfil/contrasena` | `@AuthenticatedOnly()` + solo `sub` del token |
+| GET/PATCH | `/api/portal/users/perfil` | `@AuthenticatedOnly()` + solo `sub` del token |
 
 Desactivar usuario = `is_active = false` (nunca DELETE físico). Roles al cambiar disparan `permissions_version` vía trigger.
+
+**Perfil propio:** si el UUID del usuario a modificar no coincide con el del token → `403 Solo puedes modificar los datos de tu propio usuario`. El CRUD admin (`PATCH /internal/users/:id`) requiere `users:update` y sí puede modificar a otros.
 
 ---
 

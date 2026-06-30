@@ -42,3 +42,12 @@ export class NoPuedesDesactivarTuCuentaException extends AppException {
     super('No puedes desactivar tu propia cuenta', HttpStatus.BAD_REQUEST);
   }
 }
+
+export class SoloPuedesModificarTuPerfilException extends AppException {
+  constructor() {
+    super(
+      'Solo puedes modificar los datos de tu propio usuario',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+}

@@ -102,7 +102,7 @@ export class InternalUsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserDto,
   ) {
-    return this.usersService.update(id, dto, actorUserId);
+    return this.usersService.update(id, dto, actorUserId, { asAdmin: true });
   }
 
   @Delete(':id')
