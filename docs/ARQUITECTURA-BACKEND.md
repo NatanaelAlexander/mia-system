@@ -9,7 +9,7 @@
 | **internal** | Equipo (admin, super_admin) | `/api/internal/*` |
 | **portal** | Clientes externos | `/api/portal/*` |
 
-Un feature = un módulo con su controller, service, dto, entities. Sin capas extra.
+Un feature = un módulo con su controller, service, dto, queries y types. Sin ORM. Sin capas extra.
 
 ---
 
@@ -22,7 +22,7 @@ main.ts  →  ValidationPipe (DTO)  +  AppExceptionFilter
     ↓
 XxxController  →  recibe DTO / params, delega
     ↓
-XxxService  →  reglas de negocio + TypeORM
+XxxService  →  reglas de negocio + ejecuta queries (pg)
     ↓
 PostgreSQL
 ```
@@ -35,24 +35,26 @@ El **controller no maneja errores**. El **service** lanza excepciones del domini
 
 ```
 xxx.controller.ts   →  rutas HTTP (/internal/* y /portal/* declaradas en @Controller)
-xxx.service.ts      →  lógica de negocio + acceso a BD
+xxx.service.ts      →  lógica de negocio; llama queries con parámetros ($1, $2…)
+queries/            →  SQL del dominio (sin concatenar input del usuario)
+types/              →  interfaces (Company, filtros, etc.)
 dto/                →  entrada API + class-validator (mensajes en español)
 exceptions/         →  excepciones a medida del dominio (extienden AppException)
-types/              →  interfaces internas (solo si el service las necesita)
-entities/           →  TypeORM (mapeo a tablas PostgreSQL)
-xxx.module.ts       →  registra controller, service, TypeOrmModule.forFeature
+xxx.module.ts       →  registra controller y service
 ```
+
+Infra compartida: `common/database/DatabaseService` (pool `pg`). Archivos en **Cloudflare R2** vía `common/storage/R2StorageService` (`@aws-sdk/client-s3`). Esquema de tablas en `backend/BD/migration/*.sql`.
 
 ### Qué va en cada capa
 
 | Capa | Responsabilidad | No hace |
 |------|-----------------|---------|
 | **Controller** | Rutas, `@Body()` / `@Param()`, llamar al service | Reglas de negocio, queries SQL |
-| **Service** | Validar reglas, leer/escribir BD, lanzar excepciones | Conocer HTTP, status codes |
+| **Service** | Validar reglas, ejecutar queries parametrizadas, lanzar excepciones | Conocer HTTP, armar SQL con strings del usuario |
+| **queries/** | Sentencias SQL fijas con `$1`, `$2`… | Lógica de negocio |
+| **types/** | Interfaces de filas/objetos internos | Validación HTTP |
 | **DTO** | Validar forma del request | Lógica de negocio |
 | **exceptions/** | Mensajes de error del dominio en español | — |
-| **types/** | Tipos/interfaces para el service | Validación HTTP |
-| **entities/** | Definición de tablas TypeORM | Lógica de negocio |
 
 ---
 
@@ -156,7 +158,8 @@ backend/src/
 │
 ├── common/
 │   ├── database/
-│   │   ├── database.module.ts         ← TypeORM, synchronize: false
+│   │   ├── database.module.ts         ← Pool pg (global)
+│   │   ├── database.service.ts        ← query(text, params)
 │   │   └── database-url.ts            ← DATABASE_URL desde .env
 │   ├── exceptions/
 │   │   └── app.exception.ts
@@ -166,6 +169,11 @@ backend/src/
 │   │   └── validation.factory.ts
 │   ├── swagger/
 │   │   └── setup-swagger.ts           ← /api/docs
+│   ├── storage/
+│   │   ├── storage.module.ts          ← R2 (S3 API)
+│   │   ├── r2-storage.service.ts
+│   │   ├── r2.config.ts
+│   │   └── r2.types.ts
 │   ├── guards/                          ← (pendiente)
 │   ├── decorators/                      ← (pendiente)
 │   └── types/                           ← (pendiente: auth-user, etc.)
@@ -174,56 +182,91 @@ backend/src/
 │   ├── companies.module.ts
 │   ├── companies.controller.ts
 │   ├── companies.service.ts
-│   ├── dto/
-│   ├── exceptions/
+│   ├── queries/
 │   ├── types/
-│   └── entities/
+│   ├── dto/
+│   └── exceptions/
 │
-├── auth/                                ← (pendiente)
+├── auth/                                ← ✅ login + refresh JWT
 │   ├── auth.module.ts
 │   ├── auth.controller.ts               → /api/auth/*
 │   ├── auth.service.ts
-│   └── dto/
+│   ├── auth.config.ts
+│   ├── queries/
+│   ├── types/
+│   ├── dto/
+│   └── exceptions/
 │
-├── users/                               ← (pendiente)
+├── users/                               ← ✅ CRUD internal + perfil
 │   ├── users.module.ts
 │   ├── users.controller.ts              → /api/internal/users
 │   ├── users.service.ts
 │   ├── dto/
 │   ├── exceptions/
-│   ├── types/
-│   └── entities/
+│   ├── queries/
+│   └── types/
 │
-├── projects/                            ← (pendiente)
-│   ├── projects.module.ts
-│   ├── projects.controller.ts           → /api/internal/projects, /api/portal/projects
-│   ├── projects.service.ts
+├── assets/                              ← ✅ implementado
+│   ├── assets.module.ts
+│   ├── assets.controller.ts
+│   ├── assets.service.ts
+│   ├── queries/
+│   ├── types/
 │   ├── dto/
-│   ├── exceptions/
+│   └── exceptions/
+│
+├── projects/                            ← ✅ implementado
+│   ├── projects.module.ts
+│   ├── projects.controller.ts
+│   ├── projects.service.ts
+│   ├── queries/
 │   ├── types/
-│   └── entities/
+│   ├── dto/
+│   └── exceptions/
 │
-├── assets/                              ← (pendiente)
-│   └── … (misma estructura)
-│
-├── tickets/                             ← (pendiente)
+├── tickets/                             ← ✅ implementado
 │   ├── tickets.module.ts
 │   ├── tickets.controller.ts
 │   ├── tickets.service.ts
-│   ├── ticket-comments.service.ts       ← solo si el dominio lo requiere
-│   ├── dto/
-│   ├── exceptions/
+│   ├── queries/
 │   ├── types/
-│   └── entities/
+│   ├── dto/
+│   └── exceptions/
 │
-└── audit/                               ← (pendiente, solo internal)
+└── audit/                               ← ✅ implementado (solo internal, lectura)
     ├── audit.module.ts
-    ├── audit.controller.ts              → /api/internal/audit-logs
-    ├── audit.service.ts
+    ├── audit.controller.ts
+    ├── audit.service.ts                  ← log() exportado para conectar después
+    ├── queries/
+    ├── types/
     ├── dto/
-    ├── exceptions/
-    └── entities/
+    └── exceptions/
 ```
+
+---
+
+## Users (internal + perfil)
+
+| Método | Ruta | Permiso / auth | Body |
+|--------|------|----------------|------|
+| GET | `/api/internal/users` | `users:read` | filtros opcionales |
+| GET | `/api/internal/users/detalle` | `users:read` | `{ "id" }` |
+| GET | `/api/internal/users/catalogos/roles` | `users:read` | — |
+| GET | `/api/internal/users/catalogos/cargos` | `users:read` | — |
+| POST | `/api/internal/users` | `users:create` | `CreateUserDto` |
+| PATCH | `/api/internal/users/:id` | `users:update` | `UpdateUserDto` |
+| DELETE | `/api/internal/users/:id` | `users:delete` | — (desactiva) |
+| PATCH | `/api/internal/users/:id/roles` | `users:assign_roles` | `{ "roleIds": [] }` |
+| PATCH | `/api/internal/users/:id/contrasena` | `users:update` | `{ "password" }` |
+| POST | `/api/internal/users/vincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
+| POST | `/api/internal/users/desvincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
+| GET/PATCH | `/api/internal/users/perfil` | `@AuthenticatedOnly()` + solo `sub` del token |
+| PATCH | `/api/internal/users/perfil/contrasena` | `@AuthenticatedOnly()` + solo `sub` del token |
+| GET/PATCH | `/api/portal/users/perfil` | `@AuthenticatedOnly()` + solo `sub` del token |
+
+Desactivar usuario = `is_active = false` (nunca DELETE físico). Roles al cambiar disparan `permissions_version` vía trigger.
+
+**Perfil propio:** si el UUID del usuario a modificar no coincide con el del token → `403 Solo puedes modificar los datos de tu propio usuario`. El CRUD admin (`PATCH /internal/users/:id`) requiere `users:update` y sí puede modificar a otros.
 
 ---
 
@@ -246,11 +289,152 @@ backend/src/
 | POST | `/api/internal/legal-representatives` | `CreateLegalRepresentativeDto` |
 | PATCH | `/api/internal/legal-representatives/:id` | `UpdateLegalRepresentativeDto` |
 
+---
+
+## Auth (login)
+
+Credenciales **solo por body** (nunca en la URL). Rate limit: **5 intentos/min** en login.
+
+| Método | Ruta | Body |
+|--------|------|------|
+| POST | `/api/auth/login` | `{ "email", "password" }` |
+| POST | `/api/auth/refresh` | `{ "refreshToken" }` |
+
+Respuesta: `accessToken`, `refreshToken`, `expiresIn`, `user` (espejo del payload).
+
+### Payload del access token (`JwtAccessPayload`)
+
+Lo que irá en el JWT y lo leerás en guards/middleware con `AuthService.verifyAccessToken()`:
+
+| Claim | Ejemplo | Uso |
+|-------|---------|-----|
+| `sub` | uuid | ID del usuario |
+| `email` | `cliente@mia.local` | Identidad |
+| `firstName` / `lastName` | Cliente / Demo | UI o logs |
+| `roles` | `["cliente"]` | Rol(es) |
+| `surfaces` | `["portal"]` | internal \| portal |
+| `permissions` | `["tickets:read", ...]` | Snapshot para UI (no es fuente de verdad) |
+| `permVersion` | `3` | Debe coincidir con `users.permissions_version` en BD |
+| `type` | `"access"` | Distinguir de refresh |
+| `iat` / `exp` | — | Estándar JWT (automático) |
+
+**No va** contraseña ni datos sensibles. El **refresh token** solo lleva `sub` + `type: "refresh"` (mínimo); al renovar se vuelven a cargar roles/permisos desde BD.
+
+Usuarios de desarrollo (tras `migrate:data`): `admin@mia.local` / `admin`, `cliente@mia.local` / `cliente`.
+
+Variables en `.env`: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN_PORTAL` (default `12h`, rol cliente), `JWT_ACCESS_EXPIRES_IN_INTERNAL` (default `1d`, admin/super_admin), `JWT_REFRESH_EXPIRES_IN`.
+
+### Autorización (permisos desde BD)
+
+Modelo **híbrido** (estándar en APIs enterprise):
+
+1. **Fuente de verdad**: tablas `roles`, `permissions`, `users_roles`, `roles_permissions`.
+2. **En cada request protegida**: `ApiAuthorizationGuard` (global) resuelve permisos desde BD y aplica la política de la ruta.
+3. **En el JWT**: snapshot (`roles`, `permissions`, `permVersion`) para UI y para detectar tokens viejos.
+4. **Invalidación**: columna `users.permissions_version` + triggers en `users_roles` y `roles_permissions`. Si cambias un rol del usuario o los permisos de un rol, la versión sube.
+5. **Token desactualizado**: si `token.permVersion !== BD.permissions_version` → `401` con mensaje *"Renueva la sesión con POST /api/auth/refresh"*. El cliente hace refresh y obtiene permisos nuevos sin re-login.
+
+```mermaid
+sequenceDiagram
+  participant C as Cliente
+  participant G as ApiAuthorizationGuard
+  participant DB as PostgreSQL
+  C->>G: Bearer access (permVersion=2)
+  G->>DB: resolve roles/permisos (version=3)
+  alt version distinta
+    G-->>C: 401 PermisosDesactualizados
+    C->>C: POST /auth/refresh
+  else sin permiso requerido
+    G-->>C: 403 PermisoDenegado
+  else OK
+    G-->>C: 200 + request.authorization
+  end
+```
+
+| Pieza | Archivo |
+|-------|---------|
+| Guard global (JWT + superficie + permisos) | `auth/guards/api-authorization.guard.ts` |
+| Resolver permisos + cache | `auth/permissions/permissions.service.ts` |
+| Convención ruta → permiso | `auth/permissions/route-permission.resolver.ts` |
+| Decoradores por controller | `@AuthorizeSurface`, `@AuthorizeResource` |
+| Rutas públicas | `@Public()` |
+| Overrides puntuales | `@AuthorizeAction` o `@RequirePermissions` |
+| Migración BD | `BD/migration/auth_authorization.sql` |
+
+### Convención (sin decorar cada endpoint)
+
+En el **controller** (una sola vez):
+
+```typescript
+@AuthorizeSurface('internal')
+@AuthorizeResource('companies')
+@Controller('internal/companies')
+export class InternalCompaniesController { ... }
+```
+
+El guard infiere el permiso:
+
+| HTTP | Permiso |
+|------|---------|
+| GET | `{resource}:read` |
+| POST | `{resource}:create` |
+| PATCH | `{resource}:update` |
+| DELETE | `{resource}:delete` |
+
+Rutas compuestas (`comentarios`, `archivos`, `catalogos`, `estado`, …) están centralizadas en `route-permission.resolver.ts` — **un solo archivo** para excepciones, no N controllers.
+
+**Default deny** (patrón edificio-alcazar): si la ruta es `internal/*` o `portal/*` y no se puede resolver permiso → `403 RutaSinPermisoConfigurado`. Sin `@AuthorizeSurface` en controller API → `403 RutaSinAutorizacion`.
+
+Bypass de permisos: `super_admin` o permiso `system:manage`. Usuario activo sin permisos efectivos → `403 UsuarioSinPermisos`.
+
+`@AuthenticatedOnly()` — solo JWT + superficie + versión (p. ej. futuro update-profile).
+
+### Seguridad HTTP y hardening
+
+| Pieza | Archivo / env |
+|-------|----------------|
+| Helmet (headers) | `common/security/setup-security.ts` |
+| CORS | `CORS_ORIGINS` (lista separada por comas) |
+| Rate limit global | `ThrottlerGuard` + `THROTTLE_LIMIT` / `THROTTLE_TTL_MS` |
+| Login / refresh | `@Throttle` más estricto en `auth.controller.ts` |
+| Swagger en prod | `SWAGGER_ENABLED=false` por defecto si `NODE_ENV=production` |
+| Trust proxy | `TRUST_PROXY=true` detrás de nginx/load balancer |
+| Validación RUT | `common/utils/rut.util.ts` → `companies.service` |
+| Validación uploads | `common/utils/upload-validation.util.ts` → `assets.service` |
+| Verificar roles/permisos | `GET /api/internal/admin/authorization/verify` (`system:manage`) |
+
+### Guards
+
+| Pieza | Uso |
+|-------|-----|
+| `ThrottlerGuard` | `APP_GUARD` global (antes del auth guard) |
+| `ApiAuthorizationGuard` | `APP_GUARD`: JWT, superficie, permVersion, permisos, default-deny |
+| `@Public()` | Omite auth (`/api/auth/*`, health) |
+
+Decorador `@CurrentUser()` / `@CurrentUser('sub')` para leer el payload en controllers.
+
+Rutas `/api/auth/*` y `/` son `@Public()`. El resto exige Bearer + `@AuthorizeSurface` + `@AuthorizeResource` en el controller.
+
+Portal ya **no** envía `userId` en body; se toma del token.
+
+---
+
 ### Rutas portal
 
-| Método | Ruta | Estado |
-|--------|------|--------|
-| GET | `/api/portal/companies` | Stub (falta auth + filtro por `users_companies`) |
+Todas las rutas portal validan acceso vía JWT (`@CurrentUser('sub')`) y `users_companies` → `projects` → `tickets`.
+
+| Método | Ruta | Auth | Body |
+|--------|------|------|------|
+| GET | `/api/portal/companies` | Bearer | — |
+| GET | `/api/portal/companies/detalle` | Bearer | `{ "id" }` |
+| GET | `/api/portal/projects` | Bearer | `{ "companyId"? }` |
+| GET | `/api/portal/projects/detalle` | Bearer | `{ "id" }` |
+| GET | `/api/portal/tickets` | Bearer | `{ "projectId"? }` |
+| GET | `/api/portal/tickets/detalle` | Bearer | `{ "id" }` |
+| POST | `/api/portal/tickets` | Bearer | `PortalCreateTicketDto` |
+| GET/POST | `/api/portal/tickets/comentarios` | Bearer | `ticketId`, etc. |
+
+Infra: `common/portal/PortalAccessService` (`userHasCompany`, `userHasProject`, `userHasTicket`).
 
 ### Excepciones del dominio
 
@@ -268,13 +452,13 @@ backend/src/
 
 | Módulo | Tablas principales | Internal | Portal | Estado |
 |--------|-------------------|----------|--------|--------|
-| auth | users, roles | — | — | pendiente |
-| users | users, users_roles, job_titles | ✓ | — | pendiente |
-| companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ |
-| projects | projects, projects_assets | ✓ | ✓ | pendiente |
-| assets | assets | ✓ | ✓ | pendiente |
-| tickets | tickets, catálogos, comments | ✓ | ✓ | pendiente |
-| audit | audit_logs | ✓ | — | pendiente |
+| auth | users, roles, permissions | login, refresh, guards | — | ✅ (+ permisos BD) |
+| users | users, users_roles, job_titles | ✓ | perfil | ✅ CRUD internal + perfil |
+| companies | companies, legal_representatives, company_representatives | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
+| projects | projects, projects_assets | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
+| assets | assets | ✓ | — | ✅ |
+| tickets | tickets, catálogos, comments, assets | ✓ | ✓ | ✅ (+ audit en todas las APIs) |
+| audit | audit_logs | ✓ | — | ✅ (lectura; log() listo para conectar) |
 
 ---
 
@@ -282,28 +466,44 @@ backend/src/
 
 - Un módulo **importa el service** de otro si necesita su lógica; **nunca** su controller.
 - Un **service por dominio**; métodos distintos si internal y portal necesitan comportamiento diferente (`findAll` vs `findAllForUser`).
-- **Auth, JWT y guards**: última fase. Se agregan en `common/guards` sin mezclar lógica de permisos dentro de los services.
-- **BD**: `synchronize: false`. Esquema vía migraciones SQL en `backend/BD/migration/`. Seeds en `backend/BD/data-migration/`.
-- **Credenciales**: solo desde `.env` (`DATABASE_URL`). Sin valores hardcodeados.
+- **Auth**: login/refresh JWT + autorización por permisos en BD (`PermissionsGuard`, `permissions_version`).
+- **BD**: esquema vía migraciones SQL en `backend/BD/migration/`. Acceso en runtime con `pg` y queries parametrizadas (`$1`, `$2`). **Sin ORM.**
+- **Credenciales**: solo desde `.env` (`DATABASE_URL`, `R2_*`). Sin valores hardcodeados.
+
+---
+
+## Assets y Cloudflare R2
+
+Metadata en Postgres (`assets`). El binario en **R2 (bucket privado)**. En `file_path` va el **object key**, no una URL pública.
+
+```
+Upload → R2StorageService.upload() → key privado en R2
+       → INSERT assets (file_path = key)
+
+Download → API valida permisos → getSignedDownloadUrl(key) → URL temporal
+```
+
+Variables: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_SYSTEM`. **Sin** dominio público ni `r2.dev`.
 
 ---
 
 ## Checklist al crear un feature nuevo
 
 1. Crear carpeta `backend/src/xxx/` con la estructura estándar.
-2. `entities/` alineadas a migraciones SQL existentes.
-3. `dto/` con mensajes de validación en español.
-4. `exceptions/` con clases que extienden `AppException`.
-5. `xxx.controller.ts` con rutas `/internal/...` y `/portal/...` según corresponda.
-6. `xxx.service.ts` con la lógica; lanzar excepciones del dominio, no strings sueltos.
-7. Registrar módulo en `app.module.ts`.
+2. Alinear `queries/` con tablas de `backend/BD/migration/`.
+3. `types/` con interfaces de filas que devuelve el SQL.
+4. `dto/` con mensajes de validación en español.
+5. `exceptions/` con clases que extienden `AppException`.
+6. `xxx.controller.ts` con rutas `/internal/...` y `/portal/...` según corresponda.
+7. `xxx.service.ts`: solo valores en `params` de `db.query()`; nunca interpolar input en el SQL.
+8. Registrar módulo en `app.module.ts`.
 
 ---
 
 ## Pendiente global
 
-- [ ] Auth (JWT, login, refresh)
+- [x] Auth login + refresh JWT + guards en internal/portal
 - [ ] Guards: internal, portal, permissions (`module:action`)
 - [ ] Decorators: `@CurrentUser()`, `@RequirePermission()`
-- [ ] Portal companies: filtrar por `users_companies`
+- [x] Portal companies/projects/tickets: filtrar por `users_companies`
 - [x] Swagger en `/api/docs`

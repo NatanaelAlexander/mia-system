@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Company } from './entities/company.entity';
-import { LegalRepresentative } from './entities/legal-representative.entity';
-import { CompanyRepresentative } from './entities/company-representative.entity';
+import { AuthModule } from '../auth/auth.module';
+import { AuditModule } from '../audit/audit.module';
 import { CompaniesService } from './companies.service';
 import {
   InternalCompaniesController,
@@ -11,9 +9,7 @@ import {
 } from './companies.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Company, LegalRepresentative, CompanyRepresentative]),
-  ],
+  imports: [AuthModule, AuditModule],
   controllers: [
     InternalCompaniesController,
     InternalLegalRepresentativesController,

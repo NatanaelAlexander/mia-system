@@ -5,10 +5,13 @@ import { resolveDatabaseUrl } from '../src/common/database/database-url';
 
 const MIGRATIONS = [
   'users',
+  'auth_authorization',
+  'refresh_sessions',
   'companies',
   'assets',
   'projects',
   'tickets',
+  'ticket_comments_internal',
   'audit_logs',
 ] as const;
 

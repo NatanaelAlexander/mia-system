@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { ThrottlerException } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ErrorResponse } from '../exceptions/app.exception';
 
@@ -28,6 +29,14 @@ function extraerMensaje(body: string | object): string | string[] {
 export class AppExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+
+    if (exception instanceof ThrottlerException) {
+      response.status(HttpStatus.TOO_MANY_REQUESTS).json({
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        mensaje: 'Demasiados intentos. Espera un momento e inténtalo de nuevo.',
+      } satisfies ErrorResponse);
+      return;
+    }
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
