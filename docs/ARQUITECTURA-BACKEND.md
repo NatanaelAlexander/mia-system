@@ -120,6 +120,31 @@ No hay carpetas `internal/` ni `portal/` dentro del feature. No hay RouterModule
 
 Prefix global en `main.ts`: `api` → ruta final `/api/internal/companies`.
 
+### Convención GET
+
+Los **GET que necesitan filtros** (id, companyId, etc.) **no usan parámetros en la URL**. Reciben un DTO por **body**:
+
+| Antes | Ahora |
+|-------|-------|
+| `GET /internal/companies/:id` | `GET /internal/companies/detalle` + body `{ "id": "uuid" }` |
+| `GET /internal/companies/:id/representatives` | `GET /internal/companies/representantes` + body `{ "companyId": "uuid" }` |
+
+Los GET de listado sin filtros (`GET /internal/companies`) no llevan body.
+
+`PATCH`, `DELETE` y `POST` con recurso puntual pueden seguir usando `:id` en la URL.
+
+---
+
+## Swagger
+
+Documentación interactiva en **`/api/docs`** (JSON en `/api/docs/json`).
+
+- DTOs con `@ApiProperty` → request body documentado y probabile desde la UI.
+- `dto/responses/` → schemas de respuesta.
+- `@ApiOperation`, `@ApiBody`, `@ApiOkResponse` en cada endpoint.
+
+Configuración: `common/swagger/setup-swagger.ts`, se llama desde `main.ts`.
+
 ---
 
 ## Árbol de carpetas (actual + pendiente)
@@ -139,6 +164,8 @@ backend/src/
 │   │   └── app-exception.filter.ts
 │   ├── pipes/
 │   │   └── validation.factory.ts
+│   ├── swagger/
+│   │   └── setup-swagger.ts           ← /api/docs
 │   ├── guards/                          ← (pendiente)
 │   ├── decorators/                      ← (pendiente)
 │   └── types/                           ← (pendiente: auth-user, etc.)
@@ -204,20 +231,20 @@ backend/src/
 
 ### Rutas internal
 
-| Método | Ruta |
-|--------|------|
-| GET | `/api/internal/companies` |
-| GET | `/api/internal/companies/:id` |
-| POST | `/api/internal/companies` |
-| PATCH | `/api/internal/companies/:id` |
-| DELETE | `/api/internal/companies/:id` (soft: inactive) |
-| GET | `/api/internal/companies/:id/representatives` |
-| POST | `/api/internal/companies/:id/representatives` |
-| DELETE | `/api/internal/companies/:id/representatives/:legalRepresentativeId` |
-| GET | `/api/internal/legal-representatives` |
-| GET | `/api/internal/legal-representatives/:id` |
-| POST | `/api/internal/legal-representatives` |
-| PATCH | `/api/internal/legal-representatives/:id` |
+| Método | Ruta | Body |
+|--------|------|------|
+| GET | `/api/internal/companies` | — |
+| GET | `/api/internal/companies/detalle` | `{ "id": "uuid" }` |
+| POST | `/api/internal/companies` | `CreateCompanyDto` |
+| PATCH | `/api/internal/companies/:id` | `UpdateCompanyDto` |
+| DELETE | `/api/internal/companies/:id` | — (soft: inactive) |
+| GET | `/api/internal/companies/representantes` | `{ "companyId": "uuid" }` |
+| POST | `/api/internal/companies/:id/representatives` | `LinkRepresentativeDto` |
+| DELETE | `/api/internal/companies/:id/representatives/:legalRepresentativeId` | — |
+| GET | `/api/internal/legal-representatives` | — |
+| GET | `/api/internal/legal-representatives/detalle` | `{ "id": "uuid" }` |
+| POST | `/api/internal/legal-representatives` | `CreateLegalRepresentativeDto` |
+| PATCH | `/api/internal/legal-representatives/:id` | `UpdateLegalRepresentativeDto` |
 
 ### Rutas portal
 
@@ -279,4 +306,4 @@ backend/src/
 - [ ] Guards: internal, portal, permissions (`module:action`)
 - [ ] Decorators: `@CurrentUser()`, `@RequirePermission()`
 - [ ] Portal companies: filtrar por `users_companies`
-- [ ] Swagger (opcional, no bloqueante)
+- [x] Swagger en `/api/docs`

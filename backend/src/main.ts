@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AppExceptionFilter } from './common/filters/app-exception.filter';
 import { factoryValidacion } from './common/pipes/validation.factory';
+import { setupSwagger } from './common/swagger/setup-swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,6 +18,8 @@ async function bootstrap() {
       exceptionFactory: factoryValidacion,
     }),
   );
+
+  setupSwagger(app);
 
   await app.listen(process.env.PORT ?? 3000);
 }
