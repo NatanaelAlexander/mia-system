@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthAdminController } from './auth-admin.controller';
 import { AuthAdminService } from './auth-admin.service';
 import { AuthService } from './auth.service';
+import { RefreshSessionsService } from './refresh-sessions.service';
 import { ApiAuthorizationGuard } from './guards/api-authorization.guard';
 import { InternalSurfaceGuard } from './guards/internal-surface.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -26,6 +27,7 @@ import { PermissionsService } from './permissions/permissions.service';
     AuthService,
     AuthAdminService,
     PermissionsService,
+    RefreshSessionsService,
     ApiAuthorizationGuard,
     JwtAuthGuard,
     InternalSurfaceGuard,
@@ -35,6 +37,7 @@ import { PermissionsService } from './permissions/permissions.service';
   exports: [
     AuthService,
     PermissionsService,
+    RefreshSessionsService,
     ApiAuthorizationGuard,
     JwtModule,
     JwtAuthGuard,

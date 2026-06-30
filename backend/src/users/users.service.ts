@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuditAction } from '../audit/types/audit.types';
 import { AuditService } from '../audit/audit.service';
 import { PermissionsService } from '../auth/permissions/permissions.service';
+import { AuthService } from '../auth/auth.service';
 import { EmpresaNoEncontradaException } from '../companies/exceptions/companies.exceptions';
 import { DatabaseService } from '../common/database/database.service';
 import {
@@ -76,6 +77,7 @@ export class UsersService {
     private readonly db: DatabaseService,
     private readonly auditService: AuditService,
     private readonly permissionsService: PermissionsService,
+    private readonly authService: AuthService,
   ) {}
 
   async findAll(filters: FilterUsersDto = {}): Promise<User[]> {
@@ -196,6 +198,9 @@ export class UsersService {
       throw new UsuarioNoEncontradoException();
     }
 
+    this.permissionsService.invalidateUser(id);
+    await this.authService.revokeAllSessionsForUser(id);
+
     await this.auditService.log({
       userId: actorUserId,
       action: AuditAction.SOFT_DELETE,
@@ -286,6 +291,7 @@ export class UsersService {
     }
 
     this.permissionsService.invalidateUser(id);
+    await this.authService.revokeAllSessionsForUser(id);
 
     await this.auditService.log({
       userId: actorUserId,
@@ -321,6 +327,7 @@ export class UsersService {
     }
 
     this.permissionsService.invalidateUser(requesterUserId);
+    await this.authService.revokeAllSessionsForUser(requesterUserId);
 
     await this.auditService.log({
       userId: requesterUserId,

@@ -55,3 +55,8 @@ export class AuthTokensResponseDto {
   @ApiProperty({ type: AuthUserResponseDto })
   user: AuthUserResponseDto;
 }
+
+export class AuthOkResponseDto {
+  @ApiProperty({ example: true })
+  ok: true;
+}

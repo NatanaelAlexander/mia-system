@@ -103,4 +103,8 @@ export function assertRefreshTokenPayload(
   if (!isUuidV4(claims.sub)) {
     throw new RefreshTokenInvalidoException();
   }
+
+  if (!isUuidV4(claims.sid)) {
+    throw new RefreshTokenInvalidoException();
+  }
 }

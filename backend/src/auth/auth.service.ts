@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../common/database/database.service';
 import {
   AuthConfig,
@@ -23,6 +24,7 @@ import {
   refreshTokenVerifyOptions,
 } from './jwt-token.util';
 import { PermissionsService } from './permissions/permissions.service';
+import { RefreshSessionsService } from './refresh-sessions.service';
 import {
   SQL_FIND_USER_BY_EMAIL_AND_PASSWORD,
   SQL_FIND_USER_BY_ID_ACTIVE,
@@ -34,6 +36,7 @@ import {
   JwtAccessPayload,
   JwtRefreshPayload,
 } from './types/auth.types';
+import { SessionClientContext } from './types/refresh-session.types';
 
 const LOGIN_FAILURE_DELAY_MS = 400;
 
@@ -45,6 +48,7 @@ export class AuthService implements OnModuleInit {
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
     private readonly permissionsService: PermissionsService,
+    private readonly refreshSessions: RefreshSessionsService,
   ) {}
 
   onModuleInit(): void {
@@ -71,7 +75,11 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async login(email: string, password: string): Promise<AuthLoginResult> {
+  async login(
+    email: string,
+    password: string,
+    context: SessionClientContext = {},
+  ): Promise<AuthLoginResult> {
     this.ensureConfigured();
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -91,7 +99,7 @@ export class AuthService implements OnModuleInit {
       throw new CredencialesInvalidasException();
     }
 
-    const tokens = await this.issueTokens(user, authorization);
+    const tokens = await this.issueTokens(user, authorization, context);
 
     return {
       ...tokens,
@@ -99,23 +107,19 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  async refresh(refreshToken: string): Promise<AuthLoginResult> {
+  async refresh(
+    refreshToken: string,
+    context: SessionClientContext = {},
+  ): Promise<AuthLoginResult> {
     this.ensureConfigured();
 
-    let payload: JwtRefreshPayload;
-    try {
-      const verified = await this.jwtService.verifyAsync(
-        refreshToken,
-        refreshTokenVerifyOptions(this.config.refreshSecret),
-      );
-      assertRefreshTokenPayload(verified);
-      payload = verified;
-    } catch (error) {
-      if (error instanceof RefreshTokenInvalidoException) {
-        throw error;
-      }
-      throw new RefreshTokenInvalidoException();
-    }
+    const payload = await this.verifyRefreshToken(refreshToken);
+
+    await this.refreshSessions.assertValidForRefresh(
+      refreshToken,
+      payload.sid,
+      payload.sub,
+    );
 
     const user = await this.findActiveUserById(payload.sub);
     if (!user) {
@@ -131,12 +135,71 @@ export class AuthService implements OnModuleInit {
       throw new RefreshTokenInvalidoException();
     }
 
-    const tokens = await this.issueTokens(user, authorization);
+    const tokens = await this.issueTokens(user, authorization, context, {
+      rotateFromSessionId: payload.sid,
+    });
 
     return {
       ...tokens,
       user: this.buildUserResponse(user, authorization),
     };
+  }
+
+  /**
+   * Cierra la sesión revocando el refresh token en servidor.
+   * Idempotente: siempre responde ok (el cliente debe borrar tokens locales).
+   */
+  async logout(refreshToken: string): Promise<{ ok: true }> {
+    this.ensureConfigured();
+
+    const payload = this.decodeRefreshTokenLoose(refreshToken);
+    if (!payload?.sid || !payload.sub) {
+      return { ok: true };
+    }
+
+    await this.refreshSessions.revokeSession(payload.sid, payload.sub);
+    return { ok: true };
+  }
+
+  /** Revoca todas las sesiones refresh del usuario (cerrar sesión en todos los dispositivos). */
+  async logoutAll(userId: string): Promise<{ ok: true }> {
+    this.ensureConfigured();
+    await this.refreshSessions.revokeAllForUser(userId);
+    return { ok: true };
+  }
+
+  /** Usado tras cambio de contraseña o desactivación de cuenta. */
+  async revokeAllSessionsForUser(userId: string): Promise<void> {
+    await this.refreshSessions.revokeAllForUser(userId);
+  }
+
+  private async verifyRefreshToken(
+    refreshToken: string,
+  ): Promise<JwtRefreshPayload> {
+    try {
+      const verified = await this.jwtService.verifyAsync(
+        refreshToken,
+        refreshTokenVerifyOptions(this.config.refreshSecret),
+      );
+      assertRefreshTokenPayload(verified);
+      return verified;
+    } catch (error) {
+      if (error instanceof RefreshTokenInvalidoException) {
+        throw error;
+      }
+      throw new RefreshTokenInvalidoException();
+    }
+  }
+
+  private decodeRefreshTokenLoose(
+    refreshToken: string,
+  ): Partial<JwtRefreshPayload> | null {
+    const decoded = this.jwtService.decode(refreshToken);
+    if (!decoded || typeof decoded === 'string') {
+      return null;
+    }
+
+    return decoded as Partial<JwtRefreshPayload>;
   }
 
   private async findUserByCredentials(
@@ -181,11 +244,15 @@ export class AuthService implements OnModuleInit {
     authorization: NonNullable<
       Awaited<ReturnType<PermissionsService['resolveAuthorization']>>
     >,
+    context: SessionClientContext = {},
+    options: { rotateFromSessionId?: string } = {},
   ): Promise<AuthTokens> {
     const accessPayload = this.buildAccessPayload(user, authorization);
+    const sessionId = randomUUID();
 
     const refreshPayload: JwtRefreshPayload = {
       sub: user.id,
+      sid: sessionId,
       type: 'refresh',
     };
 
@@ -208,6 +275,22 @@ export class AuthService implements OnModuleInit {
       this.jwtService.signAsync(accessPayload, accessSignOptions),
       this.jwtService.signAsync(refreshPayload, refreshSignOptions),
     ]);
+
+    await this.refreshSessions.createSession(
+      sessionId,
+      user.id,
+      refreshToken,
+      this.config.refreshExpiresIn,
+      context,
+    );
+
+    if (options.rotateFromSessionId) {
+      await this.refreshSessions.revokeSession(
+        options.rotateFromSessionId,
+        user.id,
+        sessionId,
+      );
+    }
 
     return {
       accessToken,

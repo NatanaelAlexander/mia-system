@@ -26,6 +26,7 @@ export interface JwtAccessPayload {
 
 export interface JwtRefreshPayload {
   sub: string;
+  sid: string;
   type: 'refresh';
 }
 
