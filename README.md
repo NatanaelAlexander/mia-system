@@ -2,6 +2,12 @@
 
 Backend **NestJS**, frontend **Next.js**, base de datos **PostgreSQL**. Todo corre con Docker.
 
+Documentación adicional:
+
+- Requerimientos: `docs/REQUERIMIENTOS.md`
+- Arquitectura backend: `docs/ARQUITECTURA-BACKEND.md`
+- Migraciones BD: `backend/BD/README.md`
+
 ---
 
 ## 1. Requisitos previos
@@ -58,9 +64,7 @@ docker ps
 cp .env.example .env
 ```
 
-Resumen humano: copia y pega el `.env.example` bajo la misma ruta, pero con el nuevo nombre de `.env`.
-
-Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
+Edita `.env` si quieres cambiar contraseñas. `DATABASE_URL` debe usar el mismo usuario, contraseña y base que `POSTGRES_*`. No se sube a Git.
 
 ### Paso 2 — Bajar contenedores anteriores
 
@@ -84,7 +88,7 @@ Levanta `bd_main` (Postgres), `api` (Nest) y `frontend` (Next). Verás los logs 
 
 Parar: `Ctrl + C`.
 
-> Si cambiaste dependencias o Dockerfiles: `docker compose down` y otra vez `docker compose up --build`.
+> Si cambiaste dependencias (`package.json`) o Dockerfiles: `docker compose down` y otra vez `docker compose up --build`. Si el API no encuentra un paquete nuevo: `docker compose exec api pnpm install` y `docker compose restart api`.
 
 ### Paso 4 — Migraciones de base de datos (primera vez o tras `down -v`)
 
@@ -107,16 +111,23 @@ docker compose exec api pnpm run migrate:data
 
 Solo hace falta repetirlos si borraste la BD (`docker compose down -v`) o si cambiaste los `.sql`.
 
-Detalle: `backend/BD/README.md`.
+Usuarios de desarrollo (tras `migrate:data`):
+
+| Email | Contraseña | Rol |
+|-------|------------|-----|
+| `admin@mia.local` | `admin` | admin |
+| `cliente@mia.local` | `cliente` | cliente |
 
 ### URLs con el proyecto levantado
 
-| Servicio | URL |
-|----------|-----|
-| API | http://localhost:3000 |
-| Swagger (documentación API) | http://localhost:3000/api/docs |
-| Frontend | http://localhost:3001 |
-| Postgres (desde tu PC) | `localhost:5432` |
+| Servicio | URL | Notas |
+|----------|-----|-------|
+| Health check (API) | http://localhost:3000/ | Respuesta simple; sin prefijo `/api` |
+| API REST (base) | http://localhost:3000/api | Ej: `/api/internal/companies` |
+| Swagger | http://localhost:3000/api/docs | Documentación y prueba de endpoints |
+| OpenAPI JSON | http://localhost:3000/api/docs/json | Esquema para herramientas |
+| Frontend | http://localhost:3001 | Next.js |
+| Postgres (desde tu PC) | `localhost:5432` | Usuario/DB según `.env` (`mia_user` / `mia_system` por defecto) |
 
 ---
 
@@ -129,6 +140,7 @@ Detalle: `backend/BD/README.md`.
 | Levantar | `docker compose up --build` |
 | Migrar esquema (tablas) | `docker compose exec api pnpm run migrate` |
 | Migrar datos iniciales | `docker compose exec api pnpm run migrate:data` |
+| Instalar deps del API (si falla compilación) | `docker compose exec api pnpm install` |
 | Detener | `docker compose down` |
 | Reset total (incluye datos de Postgres) | `docker compose down -v` |
 | Estado | `docker compose ps` |
@@ -154,30 +166,51 @@ Servicio Docker: `bd_main`. Datos en volumen `mia_pg_data` (local en tu PC).
 
 En Git van el **esquema** (`backend/BD/migration/*.sql`) y `.env.example`. No van `.env` ni las filas que insertes en desarrollo.
 
-**Lo que crees en la BD (usuarios de prueba, tickets, empresas, etc.) vive solo en tu computador**, dentro del volumen Docker `mia_pg_data`. Eso **no se sube al repositorio** con `git add`, `git commit` ni `git push`. Cada persona del equipo tiene su propia BD local; nadie más ve tus datos de desarrollo salvo que tú se los compartas por otro medio.
+**Lo que crees en la BD (usuarios de prueba, tickets, empresas, etc.) vive solo en tu computador**, dentro del volumen Docker `mia_pg_data`. Eso **no se sube al repositorio** con `git add`, `git commit` ni `git push`.
 
 | Desde | Host | Puerto | DB |
 |-------|------|--------|-----|
-| Backend (`api`) | `bd_main` | `5432` | `mia_system` |
-| Tu PC (DBeaver, etc.) | `localhost` | `5432` | `mia_system` |
+| Backend (`api`) | `bd_main` | `5432` | valor de `POSTGRES_DB` en `.env` |
+| Tu PC (DBeaver, etc.) | `localhost` | `POSTGRES_PORT` en `.env` (default `5432`) | valor de `POSTGRES_DB` en `.env` |
 
-El backend **no** usa `localhost` para Postgres:
+El backend **dentro de Docker** no usa `localhost` para Postgres:
 
 ```text
-DATABASE_URL=postgresql://mia_user:TU_PASSWORD@bd_main:5432/mia_system
+DATABASE_URL=postgresql://POSTGRES_USER:POSTGRES_PASSWORD@bd_main:5432/POSTGRES_DB
 ```
 
-Migraciones SQL: `backend/BD/migration/` y `backend/BD/data-migration/`. Guía completa: `backend/BD/README.md`.
+Migraciones SQL: `backend/BD/migration/` y `backend/BD/data-migration/`.
 
-Zona horaria del stack: `America/Santiago` (configurable con `TZ` y `PGTZ` en `.env`). Postgres guarda `TIMESTAMPTZ` en UTC y lo muestra en hora Chile.
+Zona horaria del stack: `America/Santiago` (configurable con `TZ` y `PGTZ` en `.env`).
 
 ```bash
 docker compose exec bd_main psql -U mia_user -d mia_system
 ```
 
+(Ajusta usuario y DB si cambiaste `.env`.)
+
 ---
 
-## 5. Frontend
+## 5. API y Swagger
+
+- Prefijo global: `/api`
+- Superficies: `/api/internal/*` (equipo) y `/api/portal/*` (clientes)
+- Módulo implementado: **companies** (ver rutas en Swagger)
+- Errores en español: `{ "statusCode": number, "mensaje": string | string[] }`
+- Los **GET con filtros** (por ID, etc.) reciben datos por **body**, no por URL
+
+Ejemplos:
+
+```text
+GET  http://localhost:3000/api/internal/companies
+GET  http://localhost:3000/api/internal/companies/detalle     body: { "id": "uuid" }
+POST http://localhost:3000/api/internal/companies               body: CreateCompanyDto
+GET  http://localhost:3000/api/portal/companies
+```
+
+---
+
+## 6. Frontend
 
 - Tailwind v4 → `frontend/src/app/globals.css`
 - Iconos → `lucide-react`
@@ -199,25 +232,32 @@ En Windows, si falla en PowerShell: `bash frontend/pnpm.sh add <paquete>`.
 
 ---
 
-## 6. Estructura del repo
+## 7. Estructura del repo
 
 ```
 mia-system/
 ├── docker-compose.yml
 ├── .env.example
-├── backend/              ← NestJS
-│   └── BD/               ← migraciones
-│       ├── migration/    ← esquema (CREATE)
-│       ├── data-migration/ ← datos (INSERT)
+├── docs/
+│   ├── REQUERIMIENTOS.md
+│   └── ARQUITECTURA-BACKEND.md
+├── backend/                    ← NestJS
+│   ├── src/
+│   │   ├── main.ts             ← prefix /api, Swagger, validación
+│   │   ├── common/             ← filters, exceptions, swagger, database
+│   │   └── companies/          ← primer módulo (controller, service, dto…)
+│   └── BD/
+│       ├── migration/          ← esquema (CREATE)
+│       ├── data-migration/     ← datos (INSERT)
 │       ├── run-migrations.ts
 │       └── run-data-migrations.ts
-└── frontend/             ← Next.js
-    └── pnpm.sh           ← instalar paquetes sin pnpm local
+└── frontend/                   ← Next.js
+    └── pnpm.sh                 ← instalar paquetes sin pnpm local
 ```
 
 ---
 
-## 7. Problemas frecuentes
+## 8. Problemas frecuentes
 
 | Problema | Solución |
 |----------|----------|
@@ -225,4 +265,7 @@ mia-system/
 | Docker no responde (Linux) | `sudo systemctl start docker` |
 | Permisos de archivos (Linux) | Con el proyecto parado: `docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project` |
 | Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL; el frontend usa `next dev --webpack` con polling |
-| Dependencias no se ven | `docker compose down` → `docker compose up --build` |
+| Dependencias no se ven | `docker compose exec api pnpm install` → `docker compose restart api` |
+| API no compila (`Cannot find module …`) | `docker compose exec api pnpm install` y reiniciar `api` |
+| Swagger 404 | Comprobar que `api` compiló sin errores; URL correcta: http://localhost:3000/api/docs |
+| Error SASL / password Postgres | Revisar que `.env` exista y que `DATABASE_URL` coincida con `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` |

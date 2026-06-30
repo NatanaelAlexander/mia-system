@@ -19,5 +19,6 @@ export function setupSwagger(app: INestApplication): void {
 
   SwaggerModule.setup('docs', app, document, {
     jsonDocumentUrl: 'docs/json',
+    useGlobalPrefix: true,
   });
 }
