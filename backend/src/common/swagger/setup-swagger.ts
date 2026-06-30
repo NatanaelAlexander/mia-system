@@ -6,9 +6,20 @@ export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('mia-system API')
     .setDescription(
-      'API del sistema de gestión. Los GET que requieren filtros reciben datos por body, no por URL.',
+      'API del sistema de gestión. Los GET que requieren filtros reciben datos por body, no por URL. Rutas internal/portal requieren Authorization: Bearer <accessToken>.',
     )
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Access token de POST /api/auth/login',
+      },
+      'access-token',
+    )
+    .addTag('Auth', 'Login y renovación de tokens (JWT)')
+    .addTag('Auth — Admin', 'Herramientas de autorización (system:manage)')
     .addTag('Companies — Internal', 'Gestión interna de empresas y representantes')
     .addTag('Companies — Portal', 'Consultas de empresas para clientes')
     .addTag('Assets — Internal', 'Archivos en R2 (bucket privado)')

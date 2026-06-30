@@ -205,17 +205,17 @@ En BD guardas el **key** de R2 (`file_path`). La descarga pasa por el API (URL f
 
 - Prefijo global: `/api`
 - Superficies: `/api/internal/*` (equipo) y `/api/portal/*` (clientes)
-- Módulo implementado: **companies** (ver rutas en Swagger)
+- **Auth:** `POST /api/auth/login` y `POST /api/auth/refresh`. Rutas internal/portal requieren header `Authorization: Bearer <accessToken>`
+- Access token: **12h** (rol `cliente` / portal), **1d** (admin / super_admin)
 - Errores en español: `{ "statusCode": number, "mensaje": string | string[] }`
 - Los **GET con filtros** (por ID, etc.) reciben datos por **body**, no por URL
 
 Ejemplos:
 
 ```text
-GET  http://localhost:3000/api/internal/companies
-GET  http://localhost:3000/api/internal/companies/detalle     body: { "id": "uuid" }
-POST http://localhost:3000/api/internal/companies               body: CreateCompanyDto
-GET  http://localhost:3000/api/portal/companies
+POST http://localhost:3000/api/auth/login          body: { "email": "admin@mia.local", "password": "admin" }
+GET  http://localhost:3000/api/internal/companies    header: Authorization: Bearer <token>
+GET  http://localhost:3000/api/portal/companies      header: Authorization: Bearer <token>
 ```
 
 ---

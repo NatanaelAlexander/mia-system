@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
@@ -21,6 +22,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
+import {
+  AuthorizeResource,
+  AuthorizeSurface,
+} from '../auth/decorators/authorize.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AssetResponseDto } from '../assets/dto/responses/asset-response.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -32,8 +38,12 @@ import {
   UploadProjectAssetDto,
 } from './dto/project-assets.dto';
 import { ProjectResponseDto } from './dto/responses/project-response.dto';
+import { PortalFilterProjectsDto } from './dto/portal-filter-projects.dto';
 import { ProjectsService } from './projects.service';
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('internal')
+@AuthorizeResource('projects')
 @ApiTags('Projects — Internal')
 @Controller('internal/projects')
 export class InternalProjectsController {
@@ -137,16 +147,36 @@ export class InternalProjectsController {
   }
 }
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('portal')
+@AuthorizeResource('projects')
 @ApiTags('Projects — Portal')
 @Controller('portal/projects')
 export class PortalProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
-  /** Pendiente auth: filtrar por empresa del usuario */
   @Get()
-  @ApiOperation({ summary: 'Listar proyectos (portal)' })
+  @ApiOperation({
+    summary: 'Listar proyectos del cliente',
+    description: 'Solo proyectos de empresas vinculadas al usuario autenticado.',
+  })
+  @ApiBody({ type: PortalFilterProjectsDto, required: false })
   @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
-  findAll() {
-    return this.projectsService.findAllForPortal();
+  findAll(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalFilterProjectsDto = {},
+  ) {
+    return this.projectsService.findAllForPortal(userId, dto.companyId);
+  }
+
+  @Get('detalle')
+  @ApiOperation({ summary: 'Obtener proyecto del cliente por ID' })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: ProjectResponseDto })
+  findOne(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.projectsService.findByIdForPortal(userId, dto.id);
   }
 }

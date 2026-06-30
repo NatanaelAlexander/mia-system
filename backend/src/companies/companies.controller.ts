@@ -9,6 +9,7 @@ import {
   Post,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -16,13 +17,18 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  AuthorizeResource,
+  AuthorizeSurface,
+} from '../auth/decorators/authorize.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.dto';
 import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.dto';
 import { LinkRepresentativeDto } from './dto/link-representative.dto';
-import { FindByIdDto } from './dto/find-by-id.dto';
 import { GetCompanyRepresentativesDto } from './dto/get-company-representatives.dto';
 import {
   CompanyRepresentativeResponseDto,
@@ -30,6 +36,9 @@ import {
   LegalRepresentativeResponseDto,
 } from './dto/responses/companies-response.dto';
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('internal')
+@AuthorizeResource('companies')
 @ApiTags('Companies — Internal')
 @Controller('internal/companies')
 export class InternalCompaniesController {
@@ -120,6 +129,9 @@ export class InternalCompaniesController {
   }
 }
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('internal')
+@AuthorizeResource('companies')
 @ApiTags('Companies — Internal')
 @Controller('internal/legal-representatives')
 export class InternalLegalRepresentativesController {
@@ -164,6 +176,9 @@ export class InternalLegalRepresentativesController {
   }
 }
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('portal')
+@AuthorizeResource('companies')
 @ApiTags('Companies — Portal')
 @Controller('portal/companies')
 export class PortalCompaniesController {
@@ -172,10 +187,21 @@ export class PortalCompaniesController {
   @Get()
   @ApiOperation({
     summary: 'Listar empresas del cliente',
-    description: 'Pendiente auth: filtrar por users_companies del usuario logueado.',
+    description: 'Solo empresas vinculadas al usuario autenticado.',
   })
   @ApiOkResponse({ type: CompanyResponseDto, isArray: true })
-  findAll() {
-    return this.companiesService.findAllActive();
+  findAll(@CurrentUser('sub') userId: string) {
+    return this.companiesService.findAllForPortal(userId);
+  }
+
+  @Get('detalle')
+  @ApiOperation({ summary: 'Obtener empresa del cliente por ID' })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: CompanyResponseDto })
+  findOne(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.companiesService.findByIdForPortal(userId, dto.id);
   }
 }

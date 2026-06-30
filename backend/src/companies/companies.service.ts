@@ -1,18 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { AuditAction } from '../audit/types/audit.types';
 import { AuditService } from '../audit/audit.service';
+import { PortalAccessService } from '../common/portal/portal-access.service';
+import { formatRut, validateRut } from '../common/utils/rut.util';
 import { DatabaseService } from '../common/database/database.service';
 import {
   EmpresaNoEncontradaException,
   RepresentanteLegalNoEncontradoException,
   RepresentanteYaVinculadoException,
   RutEmpresaDuplicadoException,
+  RutInvalidoException,
   VinculoEmpresaRepresentanteNoEncontradoException,
 } from './exceptions/companies.exceptions';
 import {
   SQL_DEACTIVATE_COMPANY,
   SQL_EXISTS_COMPANY_BY_TAX_ID,
   SQL_FIND_ALL_ACTIVE_COMPANIES,
+  SQL_FIND_COMPANIES_FOR_PORTAL_USER,
   SQL_FIND_COMPANY_BY_ID_ACTIVE,
   SQL_INSERT_COMPANY,
   COMPANY_COLUMNS,
@@ -68,6 +72,7 @@ export class CompaniesService {
   constructor(
     private readonly db: DatabaseService,
     private readonly auditService: AuditService,
+    private readonly portalAccess: PortalAccessService,
   ) {}
 
   async findAll(): Promise<Company[]> {
@@ -97,11 +102,12 @@ export class CompaniesService {
   }
 
   async create(dto: CreateCompanyDto): Promise<Company> {
-    await this.ensureTaxIdAvailable(dto.taxId);
+    const taxId = this.normalizeTaxId(dto.taxId);
+    await this.ensureTaxIdAvailable(taxId);
 
     const { rows } = await this.db.query<Company>(SQL_INSERT_COMPANY, [
       dto.name,
-      dto.taxId,
+      taxId,
       dto.address ?? null,
       dto.phoneNumber ?? null,
       dto.email ?? null,
@@ -125,6 +131,7 @@ export class CompaniesService {
     const previous = await this.findActiveCompanyById(id);
 
     if (dto.taxId) {
+      dto.taxId = this.normalizeTaxId(dto.taxId);
       await this.ensureTaxIdAvailable(dto.taxId, id);
     }
 
@@ -189,17 +196,38 @@ export class CompaniesService {
     return deactivated;
   }
 
-  async findAllActive(): Promise<Company[]> {
-    const { rows } = await this.db.query<Company>(SQL_FIND_ALL_ACTIVE_COMPANIES, [
-      CompanyStatus.ACTIVE,
-    ]);
+  async findAllForPortal(userId: string): Promise<Company[]> {
+    const { rows } = await this.db.query<Company>(
+      SQL_FIND_COMPANIES_FOR_PORTAL_USER,
+      [userId, CompanyStatus.ACTIVE],
+    );
 
     await this.auditRead(AUDIT_TABLE.COMPANIES, null, {
       scope: 'portal_list',
+      userId,
       resultCount: rows.length,
     });
 
     return rows;
+  }
+
+  async findByIdForPortal(userId: string, id: string): Promise<CompanyDetail> {
+    const hasAccess = await this.portalAccess.userHasCompany(userId, id);
+    if (!hasAccess) {
+      throw new EmpresaNoEncontradaException();
+    }
+
+    const company = await this.findActiveCompanyById(id);
+    const representativeLinks = await this.fetchCompanyRepresentatives(id);
+    const detail = { ...company, representativeLinks };
+
+    await this.auditRead(AUDIT_TABLE.COMPANIES, id, {
+      scope: 'portal_detail',
+      userId,
+      representativeCount: representativeLinks.length,
+    });
+
+    return detail;
   }
 
   async findAllLegalRepresentatives(): Promise<LegalRepresentative[]> {
@@ -515,6 +543,14 @@ export class CompaniesService {
 
   private asJson(value: object): Record<string, unknown> {
     return { ...value } as Record<string, unknown>;
+  }
+
+  private normalizeTaxId(taxId: string): string {
+    if (!validateRut(taxId)) {
+      throw new RutInvalidoException();
+    }
+
+    return formatRut(taxId);
   }
 
   private async ensureTaxIdAvailable(

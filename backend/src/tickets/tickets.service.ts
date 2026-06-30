@@ -3,17 +3,22 @@ import { Asset } from '../assets/types/asset.types';
 import { AssetsService } from '../assets/assets.service';
 import { AuditAction } from '../audit/types/audit.types';
 import { AuditService } from '../audit/audit.service';
+import { PortalAccessService } from '../common/portal/portal-access.service';
 import { DatabaseService } from '../common/database/database.service';
 import { ProjectsService } from '../projects/projects.service';
 import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { FilterTicketsDto } from './dto/filter-tickets.dto';
+import {
+  PortalCreateTicketCommentDto,
+  PortalCreateTicketDto,
+} from './dto/portal-tickets.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import {
+  ArchivoYaVinculadoAlTicketException,
   CategoriaTicketNoEncontradaException,
   ComentarioTicketNoEncontradoException,
-  ArchivoYaVinculadoAlTicketException,
   EstadoPagoNoEncontradoException,
   EstadoTicketNoEncontradoException,
   PrioridadTicketNoEncontradaException,
@@ -21,6 +26,7 @@ import {
   VinculoComentarioArchivoNoEncontradoException,
   VinculoTicketArchivoNoEncontradoException,
 } from './exceptions/tickets.exceptions';
+import { ProyectoNoEncontradoException } from '../projects/exceptions/projects.exceptions';
 import {
   SQL_FIND_ALL_PAYMENT_STATUSES,
   SQL_FIND_ALL_TICKET_CATEGORIES,
@@ -53,6 +59,7 @@ import {
 } from './queries/ticket-status-history.queries';
 import {
   SQL_FIND_ALL_TICKETS,
+  SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER,
   SQL_FIND_TICKET_BY_ID,
   SQL_INSERT_TICKET,
   SQL_UPDATE_TICKET_STATUS,
@@ -82,6 +89,7 @@ export class TicketsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly auditService: AuditService,
+    private readonly portalAccess: PortalAccessService,
     private readonly projectsService: ProjectsService,
     private readonly assetsService: AssetsService,
   ) {}
@@ -140,17 +148,30 @@ export class TicketsService {
     return rows;
   }
 
-  async findAllForPortal(filters: FilterTicketsDto = {}): Promise<Ticket[]> {
-    const { rows } = await this.db.query<Ticket>(SQL_FIND_ALL_TICKETS, [
-      false,
-      TicketStatusName.DRAFT,
-      filters.projectId ?? null,
-    ]);
+  async findAllForPortal(
+    userId: string,
+    projectId?: string,
+  ): Promise<Ticket[]> {
+    if (projectId) {
+      const hasAccess = await this.portalAccess.userHasProject(
+        userId,
+        projectId,
+      );
+      if (!hasAccess) {
+        throw new TicketNoEncontradoException();
+      }
+    }
+
+    const { rows } = await this.db.query<Ticket>(
+      SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER,
+      [userId, TicketStatusName.DRAFT, projectId ?? null],
+    );
 
     await this.auditRead(AUDIT_TABLE.TICKETS, null, {
       scope: 'portal_list',
+      userId,
+      projectId: projectId ?? null,
       resultCount: rows.length,
-      projectId: filters.projectId ?? null,
     });
 
     return rows;
@@ -164,16 +185,39 @@ export class TicketsService {
     return ticket;
   }
 
-  async findByIdForPortal(id: string): Promise<Ticket> {
+  async findByIdForPortal(userId: string, id: string): Promise<Ticket> {
+    const hasAccess = await this.portalAccess.userHasTicket(userId, id);
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
     const ticket = await this.findTicketRowById(id);
 
     if (ticket.statusName === TicketStatusName.DRAFT) {
       throw new TicketNoEncontradoException();
     }
 
-    await this.auditRead(AUDIT_TABLE.TICKETS, id, { scope: 'portal_detail' });
+    await this.auditRead(AUDIT_TABLE.TICKETS, id, {
+      scope: 'portal_detail',
+      userId,
+    });
 
     return ticket;
+  }
+
+  async createForPortal(
+    userId: string,
+    dto: PortalCreateTicketDto,
+  ): Promise<Ticket> {
+    const hasAccess = await this.portalAccess.userHasProject(
+      userId,
+      dto.projectId,
+    );
+    if (!hasAccess) {
+      throw new ProyectoNoEncontradoException();
+    }
+
+    return this.create({ ...dto, userId });
   }
 
   async create(dto: CreateTicketDto): Promise<Ticket> {
@@ -382,7 +426,15 @@ export class TicketsService {
     return rows;
   }
 
-  async getCommentsForPortal(ticketId: string): Promise<TicketComment[]> {
+  async getCommentsForPortal(
+    userId: string,
+    ticketId: string,
+  ): Promise<TicketComment[]> {
+    const hasAccess = await this.portalAccess.userHasTicket(userId, ticketId);
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
     const ticket = await this.findTicketRowById(ticketId);
 
     if (ticket.statusName === TicketStatusName.DRAFT) {
@@ -395,6 +447,7 @@ export class TicketsService {
 
     await this.auditRead(AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
       scope: 'portal_list_by_ticket',
+      userId,
       resultCount: rows.length,
     });
 
@@ -423,14 +476,28 @@ export class TicketsService {
     return comment;
   }
 
-  async addCommentForPortal(dto: CreateTicketCommentDto): Promise<TicketComment> {
-    const ticket = await this.findTicketRowById(dto.ticketId);
+  async addCommentForPortal(
+    userId: string,
+    dto: PortalCreateTicketCommentDto,
+  ): Promise<TicketComment> {
+    const hasAccess = await this.portalAccess.userHasTicket(
+      userId,
+      dto.ticketId,
+    );
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
 
+    const ticket = await this.findTicketRowById(dto.ticketId);
     if (ticket.statusName === TicketStatusName.DRAFT) {
       throw new TicketNoEncontradoException();
     }
 
-    return this.addComment(dto);
+    return this.addComment({
+      ticketId: dto.ticketId,
+      userId,
+      comment: dto.comment,
+    });
   }
 
   async getTicketAssets(ticketId: string): Promise<Asset[]> {

@@ -4,6 +4,7 @@ import { Asset } from '../assets/types/asset.types';
 import { AuditAction } from '../audit/types/audit.types';
 import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
+import { PortalAccessService } from '../common/portal/portal-access.service';
 import { DatabaseService } from '../common/database/database.service';
 import {
   ArchivoYaVinculadoAlProyectoException,
@@ -20,6 +21,7 @@ import {
   PROJECT_COLUMNS,
   SQL_DEACTIVATE_PROJECT,
   SQL_FIND_ALL_ACTIVE_PROJECTS,
+  SQL_FIND_PROJECTS_FOR_PORTAL_USER,
   SQL_FIND_PROJECT_BY_ID,
   SQL_INSERT_PROJECT,
 } from './queries/projects.queries';
@@ -37,6 +39,7 @@ export class ProjectsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly auditService: AuditService,
+    private readonly portalAccess: PortalAccessService,
     private readonly companiesService: CompaniesService,
     private readonly assetsService: AssetsService,
   ) {}
@@ -54,17 +57,46 @@ export class ProjectsService {
     return rows;
   }
 
-  async findAllForPortal(): Promise<Project[]> {
-    const { rows } = await this.db.query<Project>(SQL_FIND_ALL_ACTIVE_PROJECTS, [
-      ProjectStatus.ACTIVE,
-    ]);
+  async findAllForPortal(
+    userId: string,
+    companyId?: string,
+  ): Promise<Project[]> {
+    if (companyId) {
+      const hasAccess = await this.portalAccess.userHasCompany(userId, companyId);
+      if (!hasAccess) {
+        throw new ProyectoNoEncontradoException();
+      }
+    }
+
+    const { rows } = await this.db.query<Project>(
+      SQL_FIND_PROJECTS_FOR_PORTAL_USER,
+      [userId, ProjectStatus.ACTIVE, companyId ?? null],
+    );
 
     await this.auditRead(AUDIT_TABLE.PROJECTS, null, {
       scope: 'portal_list',
+      userId,
+      companyId: companyId ?? null,
       resultCount: rows.length,
     });
 
     return rows;
+  }
+
+  async findByIdForPortal(userId: string, id: string): Promise<Project> {
+    const hasAccess = await this.portalAccess.userHasProject(userId, id);
+    if (!hasAccess) {
+      throw new ProyectoNoEncontradoException();
+    }
+
+    const project = await this.findProjectRowById(id);
+
+    await this.auditRead(AUDIT_TABLE.PROJECTS, id, {
+      scope: 'portal_detail',
+      userId,
+    });
+
+    return project;
   }
 
   async findById(id: string): Promise<Project> {

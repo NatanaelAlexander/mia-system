@@ -187,11 +187,15 @@ backend/src/
 │   ├── dto/
 │   └── exceptions/
 │
-├── auth/                                ← (pendiente)
+├── auth/                                ← ✅ login + refresh JWT
 │   ├── auth.module.ts
 │   ├── auth.controller.ts               → /api/auth/*
 │   ├── auth.service.ts
-│   └── dto/
+│   ├── auth.config.ts
+│   ├── queries/
+│   ├── types/
+│   ├── dto/
+│   └── exceptions/
 │
 ├── users/                               ← (pendiente)
 │   ├── users.module.ts
@@ -260,11 +264,152 @@ backend/src/
 | POST | `/api/internal/legal-representatives` | `CreateLegalRepresentativeDto` |
 | PATCH | `/api/internal/legal-representatives/:id` | `UpdateLegalRepresentativeDto` |
 
+---
+
+## Auth (login)
+
+Credenciales **solo por body** (nunca en la URL). Rate limit: **5 intentos/min** en login.
+
+| Método | Ruta | Body |
+|--------|------|------|
+| POST | `/api/auth/login` | `{ "email", "password" }` |
+| POST | `/api/auth/refresh` | `{ "refreshToken" }` |
+
+Respuesta: `accessToken`, `refreshToken`, `expiresIn`, `user` (espejo del payload).
+
+### Payload del access token (`JwtAccessPayload`)
+
+Lo que irá en el JWT y lo leerás en guards/middleware con `AuthService.verifyAccessToken()`:
+
+| Claim | Ejemplo | Uso |
+|-------|---------|-----|
+| `sub` | uuid | ID del usuario |
+| `email` | `cliente@mia.local` | Identidad |
+| `firstName` / `lastName` | Cliente / Demo | UI o logs |
+| `roles` | `["cliente"]` | Rol(es) |
+| `surfaces` | `["portal"]` | internal \| portal |
+| `permissions` | `["tickets:read", ...]` | Snapshot para UI (no es fuente de verdad) |
+| `permVersion` | `3` | Debe coincidir con `users.permissions_version` en BD |
+| `type` | `"access"` | Distinguir de refresh |
+| `iat` / `exp` | — | Estándar JWT (automático) |
+
+**No va** contraseña ni datos sensibles. El **refresh token** solo lleva `sub` + `type: "refresh"` (mínimo); al renovar se vuelven a cargar roles/permisos desde BD.
+
+Usuarios de desarrollo (tras `migrate:data`): `admin@mia.local` / `admin`, `cliente@mia.local` / `cliente`.
+
+Variables en `.env`: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN_PORTAL` (default `12h`, rol cliente), `JWT_ACCESS_EXPIRES_IN_INTERNAL` (default `1d`, admin/super_admin), `JWT_REFRESH_EXPIRES_IN`.
+
+### Autorización (permisos desde BD)
+
+Modelo **híbrido** (estándar en APIs enterprise):
+
+1. **Fuente de verdad**: tablas `roles`, `permissions`, `users_roles`, `roles_permissions`.
+2. **En cada request protegida**: `ApiAuthorizationGuard` (global) resuelve permisos desde BD y aplica la política de la ruta.
+3. **En el JWT**: snapshot (`roles`, `permissions`, `permVersion`) para UI y para detectar tokens viejos.
+4. **Invalidación**: columna `users.permissions_version` + triggers en `users_roles` y `roles_permissions`. Si cambias un rol del usuario o los permisos de un rol, la versión sube.
+5. **Token desactualizado**: si `token.permVersion !== BD.permissions_version` → `401` con mensaje *"Renueva la sesión con POST /api/auth/refresh"*. El cliente hace refresh y obtiene permisos nuevos sin re-login.
+
+```mermaid
+sequenceDiagram
+  participant C as Cliente
+  participant G as ApiAuthorizationGuard
+  participant DB as PostgreSQL
+  C->>G: Bearer access (permVersion=2)
+  G->>DB: resolve roles/permisos (version=3)
+  alt version distinta
+    G-->>C: 401 PermisosDesactualizados
+    C->>C: POST /auth/refresh
+  else sin permiso requerido
+    G-->>C: 403 PermisoDenegado
+  else OK
+    G-->>C: 200 + request.authorization
+  end
+```
+
+| Pieza | Archivo |
+|-------|---------|
+| Guard global (JWT + superficie + permisos) | `auth/guards/api-authorization.guard.ts` |
+| Resolver permisos + cache | `auth/permissions/permissions.service.ts` |
+| Convención ruta → permiso | `auth/permissions/route-permission.resolver.ts` |
+| Decoradores por controller | `@AuthorizeSurface`, `@AuthorizeResource` |
+| Rutas públicas | `@Public()` |
+| Overrides puntuales | `@AuthorizeAction` o `@RequirePermissions` |
+| Migración BD | `BD/migration/auth_authorization.sql` |
+
+### Convención (sin decorar cada endpoint)
+
+En el **controller** (una sola vez):
+
+```typescript
+@AuthorizeSurface('internal')
+@AuthorizeResource('companies')
+@Controller('internal/companies')
+export class InternalCompaniesController { ... }
+```
+
+El guard infiere el permiso:
+
+| HTTP | Permiso |
+|------|---------|
+| GET | `{resource}:read` |
+| POST | `{resource}:create` |
+| PATCH | `{resource}:update` |
+| DELETE | `{resource}:delete` |
+
+Rutas compuestas (`comentarios`, `archivos`, `catalogos`, `estado`, …) están centralizadas en `route-permission.resolver.ts` — **un solo archivo** para excepciones, no N controllers.
+
+**Default deny** (patrón edificio-alcazar): si la ruta es `internal/*` o `portal/*` y no se puede resolver permiso → `403 RutaSinPermisoConfigurado`. Sin `@AuthorizeSurface` en controller API → `403 RutaSinAutorizacion`.
+
+Bypass de permisos: `super_admin` o permiso `system:manage`. Usuario activo sin permisos efectivos → `403 UsuarioSinPermisos`.
+
+`@AuthenticatedOnly()` — solo JWT + superficie + versión (p. ej. futuro update-profile).
+
+### Seguridad HTTP y hardening
+
+| Pieza | Archivo / env |
+|-------|----------------|
+| Helmet (headers) | `common/security/setup-security.ts` |
+| CORS | `CORS_ORIGINS` (lista separada por comas) |
+| Rate limit global | `ThrottlerGuard` + `THROTTLE_LIMIT` / `THROTTLE_TTL_MS` |
+| Login / refresh | `@Throttle` más estricto en `auth.controller.ts` |
+| Swagger en prod | `SWAGGER_ENABLED=false` por defecto si `NODE_ENV=production` |
+| Trust proxy | `TRUST_PROXY=true` detrás de nginx/load balancer |
+| Validación RUT | `common/utils/rut.util.ts` → `companies.service` |
+| Validación uploads | `common/utils/upload-validation.util.ts` → `assets.service` |
+| Verificar roles/permisos | `GET /api/internal/admin/authorization/verify` (`system:manage`) |
+
+### Guards
+
+| Pieza | Uso |
+|-------|-----|
+| `ThrottlerGuard` | `APP_GUARD` global (antes del auth guard) |
+| `ApiAuthorizationGuard` | `APP_GUARD`: JWT, superficie, permVersion, permisos, default-deny |
+| `@Public()` | Omite auth (`/api/auth/*`, health) |
+
+Decorador `@CurrentUser()` / `@CurrentUser('sub')` para leer el payload en controllers.
+
+Rutas `/api/auth/*` y `/` son `@Public()`. El resto exige Bearer + `@AuthorizeSurface` + `@AuthorizeResource` en el controller.
+
+Portal ya **no** envía `userId` en body; se toma del token.
+
+---
+
 ### Rutas portal
 
-| Método | Ruta | Estado |
-|--------|------|--------|
-| GET | `/api/portal/companies` | Stub (falta auth + filtro por `users_companies`) |
+Todas las rutas portal validan acceso vía JWT (`@CurrentUser('sub')`) y `users_companies` → `projects` → `tickets`.
+
+| Método | Ruta | Auth | Body |
+|--------|------|------|------|
+| GET | `/api/portal/companies` | Bearer | — |
+| GET | `/api/portal/companies/detalle` | Bearer | `{ "id" }` |
+| GET | `/api/portal/projects` | Bearer | `{ "companyId"? }` |
+| GET | `/api/portal/projects/detalle` | Bearer | `{ "id" }` |
+| GET | `/api/portal/tickets` | Bearer | `{ "projectId"? }` |
+| GET | `/api/portal/tickets/detalle` | Bearer | `{ "id" }` |
+| POST | `/api/portal/tickets` | Bearer | `PortalCreateTicketDto` |
+| GET/POST | `/api/portal/tickets/comentarios` | Bearer | `ticketId`, etc. |
+
+Infra: `common/portal/PortalAccessService` (`userHasCompany`, `userHasProject`, `userHasTicket`).
 
 ### Excepciones del dominio
 
@@ -282,10 +427,10 @@ backend/src/
 
 | Módulo | Tablas principales | Internal | Portal | Estado |
 |--------|-------------------|----------|--------|--------|
-| auth | users, roles | — | — | pendiente |
+| auth | users, roles, permissions | login, refresh, guards | — | ✅ (+ permisos BD) |
 | users | users, users_roles, job_titles | ✓ | — | pendiente |
-| companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ (+ audit en todas las APIs) |
-| projects | projects, projects_assets | ✓ | stub | ✅ (+ audit en todas las APIs) |
+| companies | companies, legal_representatives, company_representatives | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
+| projects | projects, projects_assets | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
 | assets | assets | ✓ | — | ✅ |
 | tickets | tickets, catálogos, comments, assets | ✓ | ✓ | ✅ (+ audit en todas las APIs) |
 | audit | audit_logs | ✓ | — | ✅ (lectura; log() listo para conectar) |
@@ -296,7 +441,7 @@ backend/src/
 
 - Un módulo **importa el service** de otro si necesita su lógica; **nunca** su controller.
 - Un **service por dominio**; métodos distintos si internal y portal necesitan comportamiento diferente (`findAll` vs `findAllForUser`).
-- **Auth, JWT y guards**: última fase. Se agregan en `common/guards` sin mezclar lógica de permisos dentro de los services.
+- **Auth**: login/refresh JWT + autorización por permisos en BD (`PermissionsGuard`, `permissions_version`).
 - **BD**: esquema vía migraciones SQL en `backend/BD/migration/`. Acceso en runtime con `pg` y queries parametrizadas (`$1`, `$2`). **Sin ORM.**
 - **Credenciales**: solo desde `.env` (`DATABASE_URL`, `R2_*`). Sin valores hardcodeados.
 
@@ -332,8 +477,8 @@ Variables: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BU
 
 ## Pendiente global
 
-- [ ] Auth (JWT, login, refresh)
+- [x] Auth login + refresh JWT + guards en internal/portal
 - [ ] Guards: internal, portal, permissions (`module:action`)
 - [ ] Decorators: `@CurrentUser()`, `@RequirePermission()`
-- [ ] Portal companies: filtrar por `users_companies`
+- [x] Portal companies/projects/tickets: filtrar por `users_companies`
 - [x] Swagger en `/api/docs`

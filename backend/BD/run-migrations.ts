@@ -5,6 +5,7 @@ import { resolveDatabaseUrl } from '../src/common/database/database-url';
 
 const MIGRATIONS = [
   'users',
+  'auth_authorization',
   'companies',
   'assets',
   'projects',

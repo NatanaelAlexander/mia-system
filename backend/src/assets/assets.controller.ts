@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
@@ -20,6 +21,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
+import {
+  AuthorizeResource,
+  AuthorizeSurface,
+} from '../auth/decorators/authorize.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AssetsService } from './assets.service';
 import {
@@ -27,6 +32,9 @@ import {
   AssetResponseDto,
 } from './dto/responses/asset-response.dto';
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('internal')
+@AuthorizeResource('assets')
 @ApiTags('Assets — Internal')
 @Controller('internal/assets')
 export class InternalAssetsController {

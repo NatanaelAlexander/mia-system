@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
@@ -21,6 +22,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
+import {
+  AuthorizeResource,
+  AuthorizeSurface,
+} from '../auth/decorators/authorize.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AssetResponseDto } from '../assets/dto/responses/asset-response.dto';
 import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
@@ -42,6 +48,11 @@ import {
 } from './dto/ticket-assets.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import {
+  PortalCreateTicketCommentDto,
+  PortalCreateTicketDto,
+  PortalFilterTicketsDto,
+} from './dto/portal-tickets.dto';
+import {
   CatalogItemResponseDto,
   TicketCommentResponseDto,
   TicketResponseDto,
@@ -49,6 +60,9 @@ import {
 } from './dto/responses/ticket-response.dto';
 import { TicketsService } from './tickets.service';
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('internal')
+@AuthorizeResource('tickets')
 @ApiTags('Tickets — Internal')
 @Controller('internal/tickets')
 export class InternalTicketsController {
@@ -278,6 +292,9 @@ export class InternalTicketsController {
   }
 }
 
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('portal')
+@AuthorizeResource('tickets')
 @ApiTags('Tickets — Portal')
 @Controller('portal/tickets')
 export class PortalTicketsController {
@@ -286,43 +303,58 @@ export class PortalTicketsController {
   @Get()
   @ApiOperation({
     summary: 'Listar tickets del cliente',
-    description: 'Pendiente auth: filtrar por empresa/proyecto del usuario.',
+    description: 'Solo tickets de proyectos de empresas del usuario autenticado.',
   })
-  @ApiBody({ type: FilterTicketsDto, required: false })
+  @ApiBody({ type: PortalFilterTicketsDto, required: false })
   @ApiOkResponse({ type: TicketResponseDto, isArray: true })
-  findAll(@Body() filters: FilterTicketsDto = {}) {
-    return this.ticketsService.findAllForPortal(filters);
+  findAll(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalFilterTicketsDto = {},
+  ) {
+    return this.ticketsService.findAllForPortal(userId, dto.projectId);
   }
 
   @Get('detalle')
   @ApiOperation({ summary: 'Obtener ticket por ID (portal)' })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: TicketResponseDto })
-  findOne(@Body() dto: FindByIdDto) {
-    return this.ticketsService.findByIdForPortal(dto.id);
+  findOne(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.ticketsService.findByIdForPortal(userId, dto.id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear ticket desde portal' })
-  @ApiBody({ type: CreateTicketDto })
+  @ApiBody({ type: PortalCreateTicketDto })
   @ApiCreatedResponse({ type: TicketResponseDto })
-  create(@Body() dto: CreateTicketDto) {
-    return this.ticketsService.create(dto);
+  create(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalCreateTicketDto,
+  ) {
+    return this.ticketsService.createForPortal(userId, dto);
   }
 
   @Get('comentarios')
   @ApiOperation({ summary: 'Listar comentarios del ticket (portal)' })
   @ApiBody({ type: GetTicketCommentsDto })
   @ApiOkResponse({ type: TicketCommentResponseDto, isArray: true })
-  getComments(@Body() dto: GetTicketCommentsDto) {
-    return this.ticketsService.getCommentsForPortal(dto.ticketId);
+  getComments(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: GetTicketCommentsDto,
+  ) {
+    return this.ticketsService.getCommentsForPortal(userId, dto.ticketId);
   }
 
   @Post('comentarios')
   @ApiOperation({ summary: 'Agregar comentario (portal)' })
-  @ApiBody({ type: CreateTicketCommentDto })
+  @ApiBody({ type: PortalCreateTicketCommentDto })
   @ApiCreatedResponse({ type: TicketCommentResponseDto })
-  addComment(@Body() dto: CreateTicketCommentDto) {
-    return this.ticketsService.addCommentForPortal(dto);
+  addComment(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalCreateTicketCommentDto,
+  ) {
+    return this.ticketsService.addCommentForPortal(userId, dto);
   }
 }

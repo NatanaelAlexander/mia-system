@@ -3,9 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../common/database/database.service';
 import { R2StorageService } from '../common/storage/r2-storage.service';
 import {
+  ArchivoDemasiadoGrandeException,
   ArchivoRequeridoException,
   AssetNoEncontradoException,
   R2NoConfiguradoException,
+  TipoArchivoNoPermitidoException,
 } from './exceptions/assets.exceptions';
 import {
   SQL_DELETE_ASSET,
@@ -14,6 +16,7 @@ import {
   SQL_INSERT_ASSET,
 } from './queries/assets.queries';
 import { Asset, AssetDownloadUrl } from './types/asset.types';
+import { assertValidUpload } from '../common/utils/upload-validation.util';
 
 const DOWNLOAD_URL_TTL_SECONDS = 300;
 
@@ -50,6 +53,24 @@ export class AssetsService {
 
   async uploadFile(input: UploadAssetFileInput): Promise<Asset> {
     if (!input.buffer?.length) {
+      throw new ArchivoRequeridoException();
+    }
+
+    try {
+      assertValidUpload({
+        originalName: input.originalName,
+        mimeType: input.mimeType,
+        size: input.buffer.length,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === 'ARCHIVO_DEMASIADO_GRANDE') {
+          throw new ArchivoDemasiadoGrandeException();
+        }
+        if (error.message === 'TIPO_ARCHIVO_NO_PERMITIDO') {
+          throw new TipoArchivoNoPermitidoException();
+        }
+      }
       throw new ArchivoRequeridoException();
     }
 

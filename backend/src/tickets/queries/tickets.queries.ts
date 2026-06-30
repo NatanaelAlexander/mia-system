@@ -33,6 +33,17 @@ export const SQL_FIND_ALL_TICKETS = `
   ORDER BY t.created_at DESC
 `;
 
+export const SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER = `
+  SELECT ${TICKET_COLUMNS}
+  ${TICKET_FROM_JOIN}
+  INNER JOIN projects p ON p.id = t.project_id
+  INNER JOIN users_companies uc ON uc.company_id = p.company_id
+  WHERE uc.user_id = $1
+    AND ts.name <> $2
+    AND ($3::uuid IS NULL OR t.project_id = $3)
+  ORDER BY t.created_at DESC
+`;
+
 export const SQL_FIND_TICKET_BY_ID = `
   SELECT ${TICKET_COLUMNS}
   ${TICKET_FROM_JOIN}

@@ -15,6 +15,16 @@ export const SQL_FIND_ALL_ACTIVE_PROJECTS = `
   ORDER BY name ASC
 `;
 
+export const SQL_FIND_PROJECTS_FOR_PORTAL_USER = `
+  SELECT ${PROJECT_COLUMNS}
+  FROM projects p
+  INNER JOIN users_companies uc ON uc.company_id = p.company_id
+  WHERE uc.user_id = $1
+    AND p.status = $2
+    AND ($3::uuid IS NULL OR p.company_id = $3)
+  ORDER BY p.name ASC
+`;
+
 export const SQL_FIND_PROJECT_BY_ID = `
   SELECT ${PROJECT_COLUMNS}
   FROM projects

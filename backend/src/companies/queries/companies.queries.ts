@@ -17,6 +17,15 @@ export const SQL_FIND_ALL_ACTIVE_COMPANIES = `
   ORDER BY name ASC
 `;
 
+export const SQL_FIND_COMPANIES_FOR_PORTAL_USER = `
+  SELECT ${COMPANY_COLUMNS}
+  FROM companies c
+  INNER JOIN users_companies uc ON uc.company_id = c.id
+  WHERE uc.user_id = $1
+    AND c.status = $2
+  ORDER BY c.name ASC
+`;
+
 export const SQL_FIND_COMPANY_BY_ID_ACTIVE = `
   SELECT ${COMPANY_COLUMNS}
   FROM companies

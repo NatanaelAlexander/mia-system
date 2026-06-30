@@ -21,3 +21,15 @@ export class ArchivoRequeridoException extends AppException {
     super('Debes enviar un archivo en el campo file', HttpStatus.BAD_REQUEST);
   }
 }
+
+export class ArchivoDemasiadoGrandeException extends AppException {
+  constructor() {
+    super('El archivo supera el tamaño máximo permitido (50 MB)', HttpStatus.BAD_REQUEST);
+  }
+}
+
+export class TipoArchivoNoPermitidoException extends AppException {
+  constructor() {
+    super('Tipo de archivo no permitido', HttpStatus.BAD_REQUEST);
+  }
+}
