@@ -189,23 +189,33 @@ docker compose exec bd_main psql -U mia_user -d mia_system
 
 (Ajusta usuario y DB si cambiaste `.env`.)
 
+### Archivos (Cloudflare R2)
+
+Metadata en Postgres (`assets`). El binario en **R2 (bucket privado)**. Variables en `.env`:
+
+- `R2_ENDPOINT_URL` — API S3
+- `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_SYSTEM` — bucket **sin** acceso público
+
+En BD guardas el **key** de R2 (`file_path`). La descarga pasa por el API (URL firmada temporal).
+
 ---
 
 ## 5. API y Swagger
 
 - Prefijo global: `/api`
 - Superficies: `/api/internal/*` (equipo) y `/api/portal/*` (clientes)
-- Módulo implementado: **companies** (ver rutas en Swagger)
+- **Auth:** `POST /api/auth/login` y `POST /api/auth/refresh`. Rutas internal/portal requieren header `Authorization: Bearer <accessToken>`
+- Access token: **12h** (rol `cliente` / portal), **1d** (admin / super_admin)
 - Errores en español: `{ "statusCode": number, "mensaje": string | string[] }`
 - Los **GET con filtros** (por ID, etc.) reciben datos por **body**, no por URL
 
 Ejemplos:
 
 ```text
-GET  http://localhost:3000/api/internal/companies
-GET  http://localhost:3000/api/internal/companies/detalle     body: { "id": "uuid" }
-POST http://localhost:3000/api/internal/companies               body: CreateCompanyDto
-GET  http://localhost:3000/api/portal/companies
+POST http://localhost:3000/api/auth/login          body: { "email": "admin@mia.local", "password": "admin" }
+GET  http://localhost:3000/api/internal/companies    header: Authorization: Bearer <token>
+GET  http://localhost:3000/api/portal/companies      header: Authorization: Bearer <token>
 ```
 
 ---
@@ -244,8 +254,8 @@ mia-system/
 ├── backend/                    ← NestJS
 │   ├── src/
 │   │   ├── main.ts             ← prefix /api, Swagger, validación
-│   │   ├── common/             ← filters, exceptions, swagger, database
-│   │   └── companies/          ← primer módulo (controller, service, dto…)
+│   │   ├── common/             ← database (pg), filters, exceptions, swagger
+│   │   └── companies/          ← queries + types + controller + service
 │   └── BD/
 │       ├── migration/          ← esquema (CREATE)
 │       ├── data-migration/     ← datos (INSERT)

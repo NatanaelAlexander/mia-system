@@ -1,0 +1,43 @@
+/** Nombres alineados con `permissions.name` en BD (module:action). */
+export const Permission = {
+  UsersRead: 'users:read',
+  UsersCreate: 'users:create',
+  UsersUpdate: 'users:update',
+  UsersDelete: 'users:delete',
+  UsersAssignRoles: 'users:assign_roles',
+  RolesRead: 'roles:read',
+  RolesCreate: 'roles:create',
+  RolesUpdate: 'roles:update',
+  RolesDelete: 'roles:delete',
+  PermissionsRead: 'permissions:read',
+  PermissionsCreate: 'permissions:create',
+  PermissionsUpdate: 'permissions:update',
+  PermissionsDelete: 'permissions:delete',
+  CompaniesRead: 'companies:read',
+  CompaniesCreate: 'companies:create',
+  CompaniesUpdate: 'companies:update',
+  CompaniesDelete: 'companies:delete',
+  ProjectsRead: 'projects:read',
+  ProjectsCreate: 'projects:create',
+  ProjectsUpdate: 'projects:update',
+  ProjectsDelete: 'projects:delete',
+  AssetsRead: 'assets:read',
+  AssetsCreate: 'assets:create',
+  AssetsUpdate: 'assets:update',
+  AssetsDelete: 'assets:delete',
+  TicketsRead: 'tickets:read',
+  TicketsCreate: 'tickets:create',
+  TicketsUpdate: 'tickets:update',
+  TicketsDelete: 'tickets:delete',
+  TicketsChangeStatus: 'tickets:change_status',
+  TicketsAssign: 'tickets:assign',
+  TicketCommentsRead: 'ticket_comments:read',
+  TicketCommentsCreate: 'ticket_comments:create',
+  TicketCommentsReadInternal: 'ticket_comments:read_internal',
+  AuditLogsRead: 'audit_logs:read',
+  SystemManage: 'system:manage',
+} as const;
+
+export type PermissionName = (typeof Permission)[keyof typeof Permission];
+
+export const SUPER_ADMIN_ROLE = 'super_admin';

@@ -6,7 +6,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { CompanyStatus } from '../entities/company.entity';
+import { CompanyStatus } from '../types/company.types';
 
 export class UpdateCompanyDto {
   @IsOptional()

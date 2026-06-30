@@ -25,6 +25,12 @@ export class RutEmpresaDuplicadoException extends AppException {
   }
 }
 
+export class RutInvalidoException extends AppException {
+  constructor() {
+    super('El RUT no es válido', HttpStatus.BAD_REQUEST);
+  }
+}
+
 export class RepresentanteYaVinculadoException extends AppException {
   constructor() {
     super(
