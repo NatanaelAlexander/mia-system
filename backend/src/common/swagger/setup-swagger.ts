@@ -14,6 +14,7 @@ export function setupSwagger(app: INestApplication): void {
     .addTag('Assets — Internal', 'Archivos en R2 (bucket privado)')
     .addTag('Projects — Internal', 'Proyectos y archivos vinculados')
     .addTag('Projects — Portal', 'Consultas de proyectos para clientes')
+    .addTag('Audit — Internal', 'Consulta de audit_logs (solo lectura)')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {

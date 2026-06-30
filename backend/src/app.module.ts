@@ -6,9 +6,17 @@ import { StorageModule } from './common/storage/storage.module';
 import { CompaniesModule } from './companies/companies.module';
 import { AssetsModule } from './assets/assets.module';
 import { ProjectsModule } from './projects/projects.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
-  imports: [DatabaseModule, StorageModule, CompaniesModule, AssetsModule, ProjectsModule],
+  imports: [
+    DatabaseModule,
+    StorageModule,
+    CompaniesModule,
+    AssetsModule,
+    ProjectsModule,
+    AuditModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -230,14 +230,14 @@ backend/src/
 │   ├── queries/
 │   └── types/
 │
-└── audit/                               ← (pendiente, solo internal)
+└── audit/                               ← ✅ implementado (solo internal, lectura)
     ├── audit.module.ts
-    ├── audit.controller.ts              → /api/internal/audit-logs
-    ├── audit.service.ts
-    ├── dto/
-    ├── exceptions/
+    ├── audit.controller.ts
+    ├── audit.service.ts                  ← log() exportado para conectar después
     ├── queries/
-    └── types/
+    ├── types/
+    ├── dto/
+    └── exceptions/
 ```
 
 ---
@@ -289,7 +289,7 @@ backend/src/
 | projects | projects, projects_assets | ✓ | stub | ✅ |
 | assets | assets | ✓ | — | ✅ |
 | tickets | tickets, catálogos, comments | ✓ | ✓ | pendiente |
-| audit | audit_logs | ✓ | — | pendiente |
+| audit | audit_logs | ✓ | — | ✅ (lectura; log() listo para conectar) |
 
 ---
 
