@@ -57,7 +57,8 @@ docker ps
 ```bash
 cp .env.example .env
 ```
-Resumen humano: copia y pega el .env.example bajo la misma ruta, pero con el nuevo nombre de ".env"
+
+Resumen humano: copia y pega el `.env.example` bajo la misma ruta, pero con el nuevo nombre de `.env`.
 
 Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
 
@@ -69,7 +70,7 @@ Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
 docker compose down
 ```
 
-Libera memoria, puertos y evita conflictos con contenedores viejos.
+Libera memoria, puertos y evita conflictos con contenedores viejos. **No borra los datos de Postgres** (quedan en el volumen `mia_pg_data`).
 
 ### Paso 3 — Levantar todo
 
@@ -114,7 +115,20 @@ Parar: `Ctrl + C`.
 
 ## 4. Base de datos
 
-Servicio Docker: `bd_main`. Datos en volumen `mia_pg_data` (local, no va a Git).
+Servicio Docker: `bd_main`. Datos en volumen `mia_pg_data` (local en tu PC).
+
+### Datos, Git y `docker compose down`
+
+| Qué haces | ¿Qué pasa con los datos de la BD? |
+|-----------|-----------------------------------|
+| `docker compose down` | **Se conservan** |
+| `Ctrl + C` / volver a `up --build` | **Se conservan** |
+| `git push` | **No se suben** (Git no ve el volumen Docker) |
+| `docker compose down -v` | **Se borran** (reset total) |
+
+En Git van el **esquema** (`backend/BD/migration/*.sql`) y `.env.example`. No van `.env` ni las filas que insertes en desarrollo.
+
+**Lo que crees en la BD (usuarios de prueba, tickets, empresas, etc.) vive solo en tu computador**, dentro del volumen Docker `mia_pg_data`. Eso **no se sube al repositorio** con `git add`, `git commit` ni `git push`. Cada persona del equipo tiene su propia BD local; nadie más ve tus datos de desarrollo salvo que tú se los compartas por otro medio.
 
 | Desde | Host | Puerto | DB |
 |-------|------|--------|-----|
@@ -173,50 +187,10 @@ mia-system/
 
 ## 7. Problemas frecuentes
 
-<<<<<<< Updated upstream
-### "Cannot connect to the Docker daemon" / Docker no responde
-
-Docker no está encendido. Vuelve a la sección **Windows** o **Linux** y enciende Docker antes de seguir.
-
-### No puedo guardar archivos en el editor (solo Linux)
-
-A veces Docker deja archivos como `root`. Con el proyecto **parado** (`docker compose down`):
-
-```bash
-docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project
-```
-
-### El hot reload no funciona en Windows (pero en Linux sí)
-
-**Por qué:** Docker en Windows no avisa bien al contenedor cuando guardás un archivo. Además, Next.js 16 usa **Turbopack** por defecto, y Turbopack **no detecta cambios** dentro de Docker en Windows.
-
-**Qué hicimos en el proyecto:** el frontend arranca con `next dev --webpack` y polling activado (`WATCHPACK_POLLING`, `CHOKIDAR_USEPOLLING`).
-
-Tu colega debe **bajar y volver a levantar** después de actualizar el repo:
-
-```bash
-docker compose down
-docker compose up --build
-```
-
-**Recomendaciones extra para Windows:**
-
-1. Clonar el repo **dentro de WSL** (ej. `\\wsl$\Ubuntu\home\...`), no en `C:\Users\...`.
-2. Abrir el proyecto desde **WSL** en VS Code / Cursor (`code .` desde bash de WSL).
-3. Si aún falla, refrescar la página una vez tras el primer arranque.
-
-### Cambié dependencias y el contenedor no las ve
-
-```bash
-docker compose down
-docker compose up --build
-```
-=======
 | Problema | Solución |
 |----------|----------|
 | Docker no responde (Windows) | Abrir Docker Desktop, esperar *Engine running* |
 | Docker no responde (Linux) | `sudo systemctl start docker` |
 | Permisos de archivos (Linux) | Con el proyecto parado: `docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project` |
-| Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL |
+| Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL; el frontend usa `next dev --webpack` con polling |
 | Dependencias no se ven | `docker compose down` → `docker compose up --build` |
->>>>>>> Stashed changes
