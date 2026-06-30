@@ -1,6 +1,6 @@
 -- Feature: companies
 
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   tax_id VARCHAR(50) NOT NULL UNIQUE,
@@ -12,7 +12,7 @@ CREATE TABLE companies (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE legal_representatives (
+CREATE TABLE IF NOT EXISTS legal_representatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -21,7 +21,7 @@ CREATE TABLE legal_representatives (
   UNIQUE (company_id, user_id)
 );
 
-CREATE TABLE company_representatives (
+CREATE TABLE IF NOT EXISTS company_representatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
   identification_number VARCHAR(50) NOT NULL,
@@ -29,13 +29,13 @@ CREATE TABLE company_representatives (
   position VARCHAR(100)
 );
 
-CREATE TABLE users_companies (
+CREATE TABLE IF NOT EXISTS users_companies (
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
   PRIMARY KEY (user_id, company_id)
 );
 
-CREATE INDEX idx_companies_tax_id ON companies (tax_id);
-CREATE INDEX idx_legal_representatives_company_id ON legal_representatives (company_id);
-CREATE INDEX idx_company_representatives_company_id ON company_representatives (company_id);
-CREATE INDEX idx_users_companies_company_id ON users_companies (company_id);
+CREATE INDEX IF NOT EXISTS idx_companies_tax_id ON companies (tax_id);
+CREATE INDEX IF NOT EXISTS idx_legal_representatives_company_id ON legal_representatives (company_id);
+CREATE INDEX IF NOT EXISTS idx_company_representatives_company_id ON company_representatives (company_id);
+CREATE INDEX IF NOT EXISTS idx_users_companies_company_id ON users_companies (company_id);

@@ -1,26 +1,26 @@
 -- Feature: tickets
 
-CREATE TABLE ticket_statuses (
+CREATE TABLE IF NOT EXISTS ticket_statuses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE ticket_priorities (
+CREATE TABLE IF NOT EXISTS ticket_priorities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE ticket_categories (
+CREATE TABLE IF NOT EXISTS ticket_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE payment_statuses (
+CREATE TABLE IF NOT EXISTS payment_statuses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE tickets (
+CREATE TABLE IF NOT EXISTS tickets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
@@ -35,7 +35,7 @@ CREATE TABLE tickets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE ticket_comments (
+CREATE TABLE IF NOT EXISTS ticket_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticket_id UUID NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
@@ -43,7 +43,7 @@ CREATE TABLE ticket_comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE ticket_status_history (
+CREATE TABLE IF NOT EXISTS ticket_status_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticket_id UUID NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
   status_id UUID NOT NULL REFERENCES ticket_statuses (id) ON DELETE RESTRICT,
@@ -51,21 +51,21 @@ CREATE TABLE ticket_status_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE ticket_assets (
+CREATE TABLE IF NOT EXISTS ticket_assets (
   ticket_id UUID NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
   asset_id UUID NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
   PRIMARY KEY (ticket_id, asset_id)
 );
 
-CREATE TABLE ticket_comment_assets (
+CREATE TABLE IF NOT EXISTS ticket_comment_assets (
   ticket_comment_id UUID NOT NULL REFERENCES ticket_comments (id) ON DELETE CASCADE,
   asset_id UUID NOT NULL REFERENCES assets (id) ON DELETE CASCADE,
   PRIMARY KEY (ticket_comment_id, asset_id)
 );
 
-CREATE INDEX idx_tickets_project_id ON tickets (project_id);
-CREATE INDEX idx_tickets_user_id ON tickets (user_id);
-CREATE INDEX idx_tickets_assigned_to_id ON tickets (assigned_to_id);
-CREATE INDEX idx_tickets_status_id ON tickets (status_id);
-CREATE INDEX idx_ticket_comments_ticket_id ON ticket_comments (ticket_id);
-CREATE INDEX idx_ticket_status_history_ticket_id ON ticket_status_history (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_project_id ON tickets (project_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_user_id ON tickets (user_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_assigned_to_id ON tickets (assigned_to_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status_id ON tickets (status_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket_id ON ticket_comments (ticket_id);
+CREATE INDEX IF NOT EXISTS idx_ticket_status_history_ticket_id ON ticket_status_history (ticket_id);
