@@ -29,8 +29,34 @@ type PathRule = {
 /** Rutas compuestas (archivos, comentarios, catálogos) que no siguen CRUD simple. */
 const PATH_RULES: PathRule[] = [
   {
-    test: (path, method) => path.includes('catalogos') && method === 'GET',
+    test: (path, method) =>
+      path.includes('tickets') && path.includes('catalogos') && method === 'GET',
     permission: 'tickets:read',
+  },
+  {
+    test: (path, method) =>
+      path.includes('users') && path.includes('catalogos') && method === 'GET',
+    permission: 'users:read',
+  },
+  {
+    test: (path, method) =>
+      path.includes('users') && path.includes('/roles') && method === 'PATCH',
+    permission: 'users:assign_roles',
+  },
+  {
+    test: (path, method) =>
+      path.includes('users') &&
+      path.includes('/contrasena') &&
+      method === 'PATCH',
+    permission: 'users:update',
+  },
+  {
+    test: (path, method) =>
+      path.includes('users') &&
+      (path.includes('vincular-empresa') ||
+        path.includes('desvincular-empresa')) &&
+      method === 'POST',
+    permission: 'users:update',
   },
   {
     test: (path, method) =>

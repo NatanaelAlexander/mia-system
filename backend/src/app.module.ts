@@ -14,6 +14,7 @@ import { AssetsModule } from './assets/assets.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuditModule } from './audit/audit.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TicketsModule } from './tickets/tickets.module';
     ProjectsModule,
     AuditModule,
     TicketsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

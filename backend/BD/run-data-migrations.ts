@@ -6,6 +6,7 @@ import { resolveDatabaseUrl } from '../src/common/database/database-url';
 const DATA_MIGRATIONS = [
   'permissions',
   'roles',
+  'job_titles',
   'tickets',
   'users',
   'companies',

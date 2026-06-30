@@ -197,7 +197,7 @@ backend/src/
 │   ├── dto/
 │   └── exceptions/
 │
-├── users/                               ← (pendiente)
+├── users/                               ← ✅ CRUD internal + perfil
 │   ├── users.module.ts
 │   ├── users.controller.ts              → /api/internal/users
 │   ├── users.service.ts
@@ -242,6 +242,29 @@ backend/src/
     ├── dto/
     └── exceptions/
 ```
+
+---
+
+## Users (internal + perfil)
+
+| Método | Ruta | Permiso / auth | Body |
+|--------|------|----------------|------|
+| GET | `/api/internal/users` | `users:read` | filtros opcionales |
+| GET | `/api/internal/users/detalle` | `users:read` | `{ "id" }` |
+| GET | `/api/internal/users/catalogos/roles` | `users:read` | — |
+| GET | `/api/internal/users/catalogos/cargos` | `users:read` | — |
+| POST | `/api/internal/users` | `users:create` | `CreateUserDto` |
+| PATCH | `/api/internal/users/:id` | `users:update` | `UpdateUserDto` |
+| DELETE | `/api/internal/users/:id` | `users:delete` | — (desactiva) |
+| PATCH | `/api/internal/users/:id/roles` | `users:assign_roles` | `{ "roleIds": [] }` |
+| PATCH | `/api/internal/users/:id/contrasena` | `users:update` | `{ "password" }` |
+| POST | `/api/internal/users/vincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
+| POST | `/api/internal/users/desvincular-empresa` | `users:update` | `{ "userId", "companyId" }` |
+| GET/PATCH | `/api/internal/users/perfil` | `@AuthenticatedOnly()` | perfil propio |
+| PATCH | `/api/internal/users/perfil/contrasena` | `@AuthenticatedOnly()` | cambio de clave |
+| GET/PATCH | `/api/portal/users/perfil` | `@AuthenticatedOnly()` | perfil cliente |
+
+Desactivar usuario = `is_active = false` (nunca DELETE físico). Roles al cambiar disparan `permissions_version` vía trigger.
 
 ---
 
@@ -428,7 +451,7 @@ Infra: `common/portal/PortalAccessService` (`userHasCompany`, `userHasProject`, 
 | Módulo | Tablas principales | Internal | Portal | Estado |
 |--------|-------------------|----------|--------|--------|
 | auth | users, roles, permissions | login, refresh, guards | — | ✅ (+ permisos BD) |
-| users | users, users_roles, job_titles | ✓ | — | pendiente |
+| users | users, users_roles, job_titles | ✓ | perfil | ✅ CRUD internal + perfil |
 | companies | companies, legal_representatives, company_representatives | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
 | projects | projects, projects_assets | ✓ | ✓ | ✅ (+ audit; portal filtrado por usuario) |
 | assets | assets | ✓ | — | ✅ |
