@@ -1,18 +1,9 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Company } from '../../companies/entities/company.entity';
-import { LegalRepresentative } from '../../companies/entities/legal-representative.entity';
-import { CompanyRepresentative } from '../../companies/entities/company-representative.entity';
-import { resolveDatabaseUrl } from './database-url';
+import { Global, Module } from '@nestjs/common';
+import { DatabaseService } from './database.service';
 
+@Global()
 @Module({
-  imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: resolveDatabaseUrl(),
-      entities: [Company, LegalRepresentative, CompanyRepresentative],
-      synchronize: false,
-    }),
-  ],
+  providers: [DatabaseService],
+  exports: [DatabaseService],
 })
 export class DatabaseModule {}

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CompanyStatus } from '../../entities/company.entity';
+import { CompanyStatus } from '../../types/company.types';
 
 export class CompanyResponseDto {
   @ApiProperty({ format: 'uuid' })

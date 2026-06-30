@@ -9,7 +9,7 @@
 | **internal** | Equipo (admin, super_admin) | `/api/internal/*` |
 | **portal** | Clientes externos | `/api/portal/*` |
 
-Un feature = un módulo con su controller, service, dto, entities. Sin capas extra.
+Un feature = un módulo con su controller, service, dto, queries y types. Sin ORM. Sin capas extra.
 
 ---
 
@@ -22,7 +22,7 @@ main.ts  →  ValidationPipe (DTO)  +  AppExceptionFilter
     ↓
 XxxController  →  recibe DTO / params, delega
     ↓
-XxxService  →  reglas de negocio + TypeORM
+XxxService  →  reglas de negocio + ejecuta queries (pg)
     ↓
 PostgreSQL
 ```
@@ -35,24 +35,26 @@ El **controller no maneja errores**. El **service** lanza excepciones del domini
 
 ```
 xxx.controller.ts   →  rutas HTTP (/internal/* y /portal/* declaradas en @Controller)
-xxx.service.ts      →  lógica de negocio + acceso a BD
+xxx.service.ts      →  lógica de negocio; llama queries con parámetros ($1, $2…)
+queries/            →  SQL del dominio (sin concatenar input del usuario)
+types/              →  interfaces (Company, filtros, etc.)
 dto/                →  entrada API + class-validator (mensajes en español)
 exceptions/         →  excepciones a medida del dominio (extienden AppException)
-types/              →  interfaces internas (solo si el service las necesita)
-entities/           →  TypeORM (mapeo a tablas PostgreSQL)
-xxx.module.ts       →  registra controller, service, TypeOrmModule.forFeature
+xxx.module.ts       →  registra controller y service
 ```
+
+Infra compartida: `common/database/DatabaseService` (pool `pg`). Esquema de tablas en `backend/BD/migration/*.sql`.
 
 ### Qué va en cada capa
 
 | Capa | Responsabilidad | No hace |
 |------|-----------------|---------|
 | **Controller** | Rutas, `@Body()` / `@Param()`, llamar al service | Reglas de negocio, queries SQL |
-| **Service** | Validar reglas, leer/escribir BD, lanzar excepciones | Conocer HTTP, status codes |
+| **Service** | Validar reglas, ejecutar queries parametrizadas, lanzar excepciones | Conocer HTTP, armar SQL con strings del usuario |
+| **queries/** | Sentencias SQL fijas con `$1`, `$2`… | Lógica de negocio |
+| **types/** | Interfaces de filas/objetos internos | Validación HTTP |
 | **DTO** | Validar forma del request | Lógica de negocio |
 | **exceptions/** | Mensajes de error del dominio en español | — |
-| **types/** | Tipos/interfaces para el service | Validación HTTP |
-| **entities/** | Definición de tablas TypeORM | Lógica de negocio |
 
 ---
 
@@ -156,7 +158,8 @@ backend/src/
 │
 ├── common/
 │   ├── database/
-│   │   ├── database.module.ts         ← TypeORM, synchronize: false
+│   │   ├── database.module.ts         ← Pool pg (global)
+│   │   ├── database.service.ts        ← query(text, params)
 │   │   └── database-url.ts            ← DATABASE_URL desde .env
 │   ├── exceptions/
 │   │   └── app.exception.ts
@@ -174,10 +177,10 @@ backend/src/
 │   ├── companies.module.ts
 │   ├── companies.controller.ts
 │   ├── companies.service.ts
-│   ├── dto/
-│   ├── exceptions/
+│   ├── queries/
 │   ├── types/
-│   └── entities/
+│   ├── dto/
+│   └── exceptions/
 │
 ├── auth/                                ← (pendiente)
 │   ├── auth.module.ts
@@ -191,8 +194,8 @@ backend/src/
 │   ├── users.service.ts
 │   ├── dto/
 │   ├── exceptions/
-│   ├── types/
-│   └── entities/
+│   ├── queries/
+│   └── types/
 │
 ├── projects/                            ← (pendiente)
 │   ├── projects.module.ts
@@ -200,8 +203,8 @@ backend/src/
 │   ├── projects.service.ts
 │   ├── dto/
 │   ├── exceptions/
-│   ├── types/
-│   └── entities/
+│   ├── queries/
+│   └── types/
 │
 ├── assets/                              ← (pendiente)
 │   └── … (misma estructura)
@@ -213,8 +216,8 @@ backend/src/
 │   ├── ticket-comments.service.ts       ← solo si el dominio lo requiere
 │   ├── dto/
 │   ├── exceptions/
-│   ├── types/
-│   └── entities/
+│   ├── queries/
+│   └── types/
 │
 └── audit/                               ← (pendiente, solo internal)
     ├── audit.module.ts
@@ -222,7 +225,8 @@ backend/src/
     ├── audit.service.ts
     ├── dto/
     ├── exceptions/
-    └── entities/
+    ├── queries/
+    └── types/
 ```
 
 ---
@@ -283,7 +287,7 @@ backend/src/
 - Un módulo **importa el service** de otro si necesita su lógica; **nunca** su controller.
 - Un **service por dominio**; métodos distintos si internal y portal necesitan comportamiento diferente (`findAll` vs `findAllForUser`).
 - **Auth, JWT y guards**: última fase. Se agregan en `common/guards` sin mezclar lógica de permisos dentro de los services.
-- **BD**: `synchronize: false`. Esquema vía migraciones SQL en `backend/BD/migration/`. Seeds en `backend/BD/data-migration/`.
+- **BD**: esquema vía migraciones SQL en `backend/BD/migration/`. Acceso en runtime con `pg` y queries parametrizadas (`$1`, `$2`). **Sin ORM.**
 - **Credenciales**: solo desde `.env` (`DATABASE_URL`). Sin valores hardcodeados.
 
 ---
@@ -291,12 +295,13 @@ backend/src/
 ## Checklist al crear un feature nuevo
 
 1. Crear carpeta `backend/src/xxx/` con la estructura estándar.
-2. `entities/` alineadas a migraciones SQL existentes.
-3. `dto/` con mensajes de validación en español.
-4. `exceptions/` con clases que extienden `AppException`.
-5. `xxx.controller.ts` con rutas `/internal/...` y `/portal/...` según corresponda.
-6. `xxx.service.ts` con la lógica; lanzar excepciones del dominio, no strings sueltos.
-7. Registrar módulo en `app.module.ts`.
+2. Alinear `queries/` con tablas de `backend/BD/migration/`.
+3. `types/` con interfaces de filas que devuelve el SQL.
+4. `dto/` con mensajes de validación en español.
+5. `exceptions/` con clases que extienden `AppException`.
+6. `xxx.controller.ts` con rutas `/internal/...` y `/portal/...` según corresponda.
+7. `xxx.service.ts`: solo valores en `params` de `db.query()`; nunca interpolar input en el SQL.
+8. Registrar módulo en `app.module.ts`.
 
 ---
 

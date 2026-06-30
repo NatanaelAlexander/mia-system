@@ -244,8 +244,8 @@ mia-system/
 ├── backend/                    ← NestJS
 │   ├── src/
 │   │   ├── main.ts             ← prefix /api, Swagger, validación
-│   │   ├── common/             ← filters, exceptions, swagger, database
-│   │   └── companies/          ← primer módulo (controller, service, dto…)
+│   │   ├── common/             ← database (pg), filters, exceptions, swagger
+│   │   └── companies/          ← queries + types + controller + service
 │   └── BD/
 │       ├── migration/          ← esquema (CREATE)
 │       ├── data-migration/     ← datos (INSERT)
