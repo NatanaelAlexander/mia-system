@@ -189,6 +189,16 @@ docker compose exec bd_main psql -U mia_user -d mia_system
 
 (Ajusta usuario y DB si cambiaste `.env`.)
 
+### Archivos (Cloudflare R2)
+
+Metadata en Postgres (`assets`). El binario en **R2 (bucket privado)**. Variables en `.env`:
+
+- `R2_ENDPOINT_URL` — API S3
+- `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_SYSTEM` — bucket **sin** acceso público
+
+En BD guardas el **key** de R2 (`file_path`). La descarga pasa por el API (URL firmada temporal).
+
 ---
 
 ## 5. API y Swagger

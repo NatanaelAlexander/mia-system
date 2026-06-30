@@ -43,7 +43,7 @@ exceptions/         →  excepciones a medida del dominio (extienden AppExceptio
 xxx.module.ts       →  registra controller y service
 ```
 
-Infra compartida: `common/database/DatabaseService` (pool `pg`). Esquema de tablas en `backend/BD/migration/*.sql`.
+Infra compartida: `common/database/DatabaseService` (pool `pg`). Archivos en **Cloudflare R2** vía `common/storage/R2StorageService` (`@aws-sdk/client-s3`). Esquema de tablas en `backend/BD/migration/*.sql`.
 
 ### Qué va en cada capa
 
@@ -169,6 +169,11 @@ backend/src/
 │   │   └── validation.factory.ts
 │   ├── swagger/
 │   │   └── setup-swagger.ts           ← /api/docs
+│   ├── storage/
+│   │   ├── storage.module.ts          ← R2 (S3 API)
+│   │   ├── r2-storage.service.ts
+│   │   ├── r2.config.ts
+│   │   └── r2.types.ts
 │   ├── guards/                          ← (pendiente)
 │   ├── decorators/                      ← (pendiente)
 │   └── types/                           ← (pendiente: auth-user, etc.)
@@ -288,7 +293,22 @@ backend/src/
 - Un **service por dominio**; métodos distintos si internal y portal necesitan comportamiento diferente (`findAll` vs `findAllForUser`).
 - **Auth, JWT y guards**: última fase. Se agregan en `common/guards` sin mezclar lógica de permisos dentro de los services.
 - **BD**: esquema vía migraciones SQL en `backend/BD/migration/`. Acceso en runtime con `pg` y queries parametrizadas (`$1`, `$2`). **Sin ORM.**
-- **Credenciales**: solo desde `.env` (`DATABASE_URL`). Sin valores hardcodeados.
+- **Credenciales**: solo desde `.env` (`DATABASE_URL`, `R2_*`). Sin valores hardcodeados.
+
+---
+
+## Assets y Cloudflare R2
+
+Metadata en Postgres (`assets`). El binario en **R2 (bucket privado)**. En `file_path` va el **object key**, no una URL pública.
+
+```
+Upload → R2StorageService.upload() → key privado en R2
+       → INSERT assets (file_path = key)
+
+Download → API valida permisos → getSignedDownloadUrl(key) → URL temporal
+```
+
+Variables: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_SYSTEM`. **Sin** dominio público ni `r2.dev`.
 
 ---
 
