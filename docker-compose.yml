@@ -69,6 +69,7 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
     depends_on:
       api:
         condition: service_healthy
