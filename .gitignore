@@ -33,3 +33,6 @@ Thumbs.db
 
 # Docker / misc
 .cache/
+
+# Datos locales de Postgres (solo si en el futuro usas bind mount)
+data/postgres/

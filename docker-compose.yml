@@ -1,4 +1,26 @@
 services:
+  bd_main:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mia_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-mia_system}
+    volumes:
+      - mia_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-mia_user} -d ${POSTGRES_DB:-mia_system}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   api:
     build: ./backend
     init: true
@@ -14,6 +36,10 @@ services:
     command: sh -c "pnpm run start:dev"
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - DATABASE_URL=${DATABASE_URL:-postgresql://mia_user:changeme_dev_only@bd_main:5432/mia_system}
+    depends_on:
+      bd_main:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -40,11 +66,16 @@ services:
       - /app/node_modules
       - /app/.next
     # --webpack: Turbopack (default en Next 16) no detecta cambios bien en Docker/Windows.
-    command: sh -c "pnpm exec next dev --webpack --hostname 0.0.0.0 --port 3000"
+    command: sh -c "echo '' && echo '----------------------------------------' && echo '  BD    →  localhost:'$${POSTGRES_PORT:-5432} && echo '----------------------------------------' && echo '  Back  →  http://localhost:3000' && echo '----------------------------------------' && echo '  Front →  http://localhost:3001' && echo '----------------------------------------' && echo '' && pnpm exec next dev --webpack --hostname 0.0.0.0 --port 3000"
     environment:
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=1000
       - WATCHPACK_POLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     depends_on:
       api:
         condition: service_healthy
+
+volumes:
+  mia_pg_data:
