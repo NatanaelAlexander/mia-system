@@ -114,6 +114,7 @@ Detalle: `backend/BD/README.md`.
 | Servicio | URL |
 |----------|-----|
 | API | http://localhost:3000 |
+| Swagger (documentación API) | http://localhost:3000/api/docs |
 | Frontend | http://localhost:3001 |
 | Postgres (desde tu PC) | `localhost:5432` |
 

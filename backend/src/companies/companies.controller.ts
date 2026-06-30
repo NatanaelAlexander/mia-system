@@ -1,0 +1,181 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CompaniesService } from './companies.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.dto';
+import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.dto';
+import { LinkRepresentativeDto } from './dto/link-representative.dto';
+import { FindByIdDto } from './dto/find-by-id.dto';
+import { GetCompanyRepresentativesDto } from './dto/get-company-representatives.dto';
+import {
+  CompanyRepresentativeResponseDto,
+  CompanyResponseDto,
+  LegalRepresentativeResponseDto,
+} from './dto/responses/companies-response.dto';
+
+@ApiTags('Companies — Internal')
+@Controller('internal/companies')
+export class InternalCompaniesController {
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar empresas activas' })
+  @ApiOkResponse({ type: CompanyResponseDto, isArray: true })
+  findAll() {
+    return this.companiesService.findAll();
+  }
+
+  @Get('detalle')
+  @ApiOperation({
+    summary: 'Obtener empresa por ID',
+    description: 'Los GET con filtros reciben datos por body, no por URL.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: CompanyResponseDto })
+  findOne(@Body() dto: FindByIdDto) {
+    return this.companiesService.findById(dto.id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear empresa' })
+  @ApiBody({ type: CreateCompanyDto })
+  @ApiCreatedResponse({ type: CompanyResponseDto })
+  create(@Body() dto: CreateCompanyDto) {
+    return this.companiesService.create(dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar empresa' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiBody({ type: UpdateCompanyDto })
+  @ApiOkResponse({ type: CompanyResponseDto })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    return this.companiesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Desactivar empresa (soft delete)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: CompanyResponseDto })
+  deactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.companiesService.deactivate(id);
+  }
+
+  @Get('representantes')
+  @ApiOperation({
+    summary: 'Listar representantes de una empresa',
+    description: 'Recibe companyId por body.',
+  })
+  @ApiBody({ type: GetCompanyRepresentativesDto })
+  @ApiOkResponse({ type: CompanyRepresentativeResponseDto, isArray: true })
+  getRepresentatives(@Body() dto: GetCompanyRepresentativesDto) {
+    return this.companiesService.getCompanyRepresentatives(dto.companyId);
+  }
+
+  @Post(':id/representatives')
+  @ApiOperation({ summary: 'Vincular representante legal a empresa' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la empresa' })
+  @ApiBody({ type: LinkRepresentativeDto })
+  @ApiCreatedResponse({ type: CompanyRepresentativeResponseDto })
+  linkRepresentative(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkRepresentativeDto,
+  ) {
+    return this.companiesService.linkRepresentativeToCompany(id, dto);
+  }
+
+  @Delete(':id/representatives/:legalRepresentativeId')
+  @ApiOperation({ summary: 'Desvincular representante de empresa' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'legalRepresentativeId', format: 'uuid' })
+  @ApiOkResponse({ description: 'Sin contenido' })
+  unlinkRepresentative(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('legalRepresentativeId', ParseUUIDPipe) legalRepresentativeId: string,
+  ) {
+    return this.companiesService.unlinkRepresentativeFromCompany(
+      id,
+      legalRepresentativeId,
+    );
+  }
+}
+
+@ApiTags('Companies — Internal')
+@Controller('internal/legal-representatives')
+export class InternalLegalRepresentativesController {
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar representantes legales' })
+  @ApiOkResponse({ type: LegalRepresentativeResponseDto, isArray: true })
+  findAll() {
+    return this.companiesService.findAllLegalRepresentatives();
+  }
+
+  @Get('detalle')
+  @ApiOperation({
+    summary: 'Obtener representante legal por ID',
+    description: 'Recibe id por body.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: LegalRepresentativeResponseDto })
+  findOne(@Body() dto: FindByIdDto) {
+    return this.companiesService.findLegalRepresentativeById(dto.id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear representante legal' })
+  @ApiBody({ type: CreateLegalRepresentativeDto })
+  @ApiCreatedResponse({ type: LegalRepresentativeResponseDto })
+  create(@Body() dto: CreateLegalRepresentativeDto) {
+    return this.companiesService.createLegalRepresentative(dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar representante legal' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiBody({ type: UpdateLegalRepresentativeDto })
+  @ApiOkResponse({ type: LegalRepresentativeResponseDto })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateLegalRepresentativeDto,
+  ) {
+    return this.companiesService.updateLegalRepresentative(id, dto);
+  }
+}
+
+@ApiTags('Companies — Portal')
+@Controller('portal/companies')
+export class PortalCompaniesController {
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar empresas del cliente',
+    description: 'Pendiente auth: filtrar por users_companies del usuario logueado.',
+  })
+  @ApiOkResponse({ type: CompanyResponseDto, isArray: true })
+  findAll() {
+    return this.companiesService.findAllActive();
+  }
+}
