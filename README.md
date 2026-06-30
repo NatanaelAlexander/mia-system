@@ -141,7 +141,9 @@ El backend **no** usa `localhost` para Postgres:
 DATABASE_URL=postgresql://mia_user:TU_PASSWORD@bd_main:5432/mia_system
 ```
 
-Migraciones SQL: `backend/BD/migration/`.
+Migraciones SQL: `backend/BD/migration/`. Cómo ejecutarlas: `backend/BD/README.md`.
+
+Zona horaria del stack: `America/Santiago` (configurable con `TZ` y `PGTZ` en `.env`). Postgres guarda `TIMESTAMPTZ` en UTC y lo muestra en hora Chile.
 
 ```bash
 docker compose exec bd_main psql -U mia_user -d mia_system
@@ -178,7 +180,9 @@ mia-system/
 ├── docker-compose.yml
 ├── .env.example
 ├── backend/              ← NestJS
-│   └── BD/migration/     ← SQL (en Git)
+│   └── BD/               ← migraciones y script
+│       ├── migration/    ← SQL por feature (en Git)
+│       └── run-migrations.ts
 └── frontend/             ← Next.js
     └── pnpm.sh           ← instalar paquetes sin pnpm local
 ```
