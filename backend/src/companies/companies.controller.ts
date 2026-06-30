@@ -8,12 +8,12 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CompaniesService } from '../companies.service';
-import { CreateCompanyDto } from '../dto/create-company.dto';
-import { UpdateCompanyDto } from '../dto/update-company.dto';
-import { CreateLegalRepresentativeDto } from '../dto/create-legal-representative.dto';
-import { UpdateLegalRepresentativeDto } from '../dto/update-legal-representative.dto';
-import { LinkRepresentativeDto } from '../dto/link-representative.dto';
+import { CompaniesService } from './companies.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.dto';
+import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.dto';
+import { LinkRepresentativeDto } from './dto/link-representative.dto';
 
 @Controller('internal/companies')
 export class InternalCompaniesController {
@@ -97,5 +97,16 @@ export class InternalLegalRepresentativesController {
     @Body() dto: UpdateLegalRepresentativeDto,
   ) {
     return this.companiesService.updateLegalRepresentative(id, dto);
+  }
+}
+
+@Controller('portal/companies')
+export class PortalCompaniesController {
+  constructor(private readonly companiesService: CompaniesService) {}
+
+  /** Pendiente auth: filtrar por users_companies del usuario logueado */
+  @Get()
+  findAll() {
+    return this.companiesService.findAllActive();
   }
 }

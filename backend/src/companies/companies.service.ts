@@ -1,10 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
+import {
+  EmpresaNoEncontradaException,
+  RepresentanteLegalNoEncontradoException,
+  RepresentanteYaVinculadoException,
+  RutEmpresaDuplicadoException,
+  VinculoEmpresaRepresentanteNoEncontradoException,
+} from './exceptions/companies.exceptions';
 import { Company, CompanyStatus } from './entities/company.entity';
 import { LegalRepresentative } from './entities/legal-representative.entity';
 import { CompanyRepresentative } from './entities/company-representative.entity';
@@ -25,8 +28,6 @@ export class CompaniesService {
     private readonly companyRepsRepo: Repository<CompanyRepresentative>,
   ) {}
 
-  // ——— Companies (internal) ———
-
   async findAll(): Promise<Company[]> {
     return this.companiesRepo.find({
       where: { status: CompanyStatus.ACTIVE },
@@ -37,13 +38,11 @@ export class CompaniesService {
   async findById(id: string): Promise<Company> {
     const company = await this.companiesRepo.findOne({
       where: { id, status: CompanyStatus.ACTIVE },
-      relations: {
-        representativeLinks: { legalRepresentative: true },
-      },
+      relations: { representativeLinks: { legalRepresentative: true } },
     });
 
     if (!company) {
-      throw new NotFoundException('Empresa no encontrada');
+      throw new EmpresaNoEncontradaException();
     }
 
     return company;
@@ -71,15 +70,12 @@ export class CompaniesService {
       await this.ensureTaxIdAvailable(dto.taxId, id);
     }
 
-    Object.assign(company, {
-      name: dto.name ?? company.name,
-      taxId: dto.taxId ?? company.taxId,
-      address: dto.address !== undefined ? dto.address : company.address,
-      phoneNumber:
-        dto.phoneNumber !== undefined ? dto.phoneNumber : company.phoneNumber,
-      email: dto.email !== undefined ? dto.email : company.email,
-      status: dto.status ?? company.status,
-    });
+    if (dto.name !== undefined) company.name = dto.name;
+    if (dto.taxId !== undefined) company.taxId = dto.taxId;
+    if (dto.address !== undefined) company.address = dto.address;
+    if (dto.phoneNumber !== undefined) company.phoneNumber = dto.phoneNumber;
+    if (dto.email !== undefined) company.email = dto.email;
+    if (dto.status !== undefined) company.status = dto.status;
 
     return this.companiesRepo.save(company);
   }
@@ -90,13 +86,9 @@ export class CompaniesService {
     return this.companiesRepo.save(company);
   }
 
-  // ——— Portal (pendiente auth: por ahora lista activas) ———
-
   async findAllActive(): Promise<Company[]> {
     return this.findAll();
   }
-
-  // ——— Legal representatives ———
 
   async findAllLegalRepresentatives(): Promise<LegalRepresentative[]> {
     return this.legalRepsRepo.find({ order: { lastName: 'ASC' } });
@@ -109,7 +101,7 @@ export class CompaniesService {
     });
 
     if (!rep) {
-      throw new NotFoundException('Representante legal no encontrado');
+      throw new RepresentanteLegalNoEncontradoException();
     }
 
     return rep;
@@ -136,16 +128,14 @@ export class CompaniesService {
   ): Promise<LegalRepresentative> {
     const rep = await this.findLegalRepresentativeById(id);
 
-    Object.assign(rep, {
-      firstName: dto.firstName ?? rep.firstName,
-      lastName: dto.lastName ?? rep.lastName,
-      identificationNumber:
-        dto.identificationNumber ?? rep.identificationNumber,
-      email: dto.email !== undefined ? dto.email : rep.email,
-      phoneNumber:
-        dto.phoneNumber !== undefined ? dto.phoneNumber : rep.phoneNumber,
-      userId: dto.userId !== undefined ? dto.userId : rep.userId,
-    });
+    if (dto.firstName !== undefined) rep.firstName = dto.firstName;
+    if (dto.lastName !== undefined) rep.lastName = dto.lastName;
+    if (dto.identificationNumber !== undefined) {
+      rep.identificationNumber = dto.identificationNumber;
+    }
+    if (dto.email !== undefined) rep.email = dto.email;
+    if (dto.phoneNumber !== undefined) rep.phoneNumber = dto.phoneNumber;
+    if (dto.userId !== undefined) rep.userId = dto.userId;
 
     return this.legalRepsRepo.save(rep);
   }
@@ -175,9 +165,7 @@ export class CompaniesService {
     });
 
     if (existing) {
-      throw new ConflictException(
-        'El representante ya está vinculado a esta empresa',
-      );
+      throw new RepresentanteYaVinculadoException();
     }
 
     const link = this.companyRepsRepo.create({
@@ -198,7 +186,7 @@ export class CompaniesService {
     });
 
     if (!link) {
-      throw new NotFoundException('Vínculo empresa-representante no encontrado');
+      throw new VinculoEmpresaRepresentanteNoEncontradoException();
     }
 
     await this.companyRepsRepo.remove(link);
@@ -208,14 +196,11 @@ export class CompaniesService {
     taxId: string,
     excludeId?: string,
   ): Promise<void> {
-    const where = excludeId
-      ? { taxId, id: Not(excludeId) }
-      : { taxId };
-
+    const where = excludeId ? { taxId, id: Not(excludeId) } : { taxId };
     const exists = await this.companiesRepo.exists({ where });
 
     if (exists) {
-      throw new ConflictException('Ya existe una empresa con ese RUT');
+      throw new RutEmpresaDuplicadoException();
     }
   }
 }

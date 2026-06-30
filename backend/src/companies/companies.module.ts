@@ -7,8 +7,8 @@ import { CompaniesService } from './companies.service';
 import {
   InternalCompaniesController,
   InternalLegalRepresentativesController,
-} from './internal/internal-companies.controller';
-import { PortalCompaniesController } from './portal/portal-companies.controller';
+  PortalCompaniesController,
+} from './companies.controller';
 
 @Module({
   imports: [
