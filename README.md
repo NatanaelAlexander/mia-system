@@ -185,6 +185,25 @@ A veces Docker deja archivos como `root`. Con el proyecto **parado** (`docker co
 docker run --rm -v "$PWD:/project" alpine:3.22 chown -R $(id -u):$(id -g) /project
 ```
 
+### El hot reload no funciona en Windows (pero en Linux sí)
+
+**Por qué:** Docker en Windows no avisa bien al contenedor cuando guardás un archivo. Además, Next.js 16 usa **Turbopack** por defecto, y Turbopack **no detecta cambios** dentro de Docker en Windows.
+
+**Qué hicimos en el proyecto:** el frontend arranca con `next dev --webpack` y polling activado (`WATCHPACK_POLLING`, `CHOKIDAR_USEPOLLING`).
+
+Tu colega debe **bajar y volver a levantar** después de actualizar el repo:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+**Recomendaciones extra para Windows:**
+
+1. Clonar el repo **dentro de WSL** (ej. `\\wsl$\Ubuntu\home\...`), no en `C:\Users\...`.
+2. Abrir el proyecto desde **WSL** en VS Code / Cursor (`code .` desde bash de WSL).
+3. Si aún falla, refrescar la página una vez tras el primer arranque.
+
 ### Cambié dependencias y el contenedor no las ve
 
 ```bash
