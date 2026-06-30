@@ -285,8 +285,8 @@ backend/src/
 |--------|-------------------|----------|--------|--------|
 | auth | users, roles | — | — | pendiente |
 | users | users, users_roles, job_titles | ✓ | — | pendiente |
-| companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ |
-| projects | projects, projects_assets | ✓ | stub | ✅ |
+| companies | companies, legal_representatives, company_representatives | ✓ | stub | ✅ (+ audit en todas las APIs) |
+| projects | projects, projects_assets | ✓ | stub | ✅ (+ audit en todas las APIs) |
 | assets | assets | ✓ | — | ✅ |
 | tickets | tickets, catálogos, comments | ✓ | ✓ | pendiente |
 | audit | audit_logs | ✓ | — | ✅ (lectura; log() listo para conectar) |

@@ -147,6 +147,6 @@ export class PortalProjectsController {
   @ApiOperation({ summary: 'Listar proyectos (portal)' })
   @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
   findAll() {
-    return this.projectsService.findAllActive();
+    return this.projectsService.findAllForPortal();
   }
 }

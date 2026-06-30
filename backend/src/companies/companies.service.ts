@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { AuditAction } from '../audit/types/audit.types';
+import { AuditService } from '../audit/audit.service';
 import { DatabaseService } from '../common/database/database.service';
 import {
   EmpresaNoEncontradaException,
@@ -55,21 +57,43 @@ type CompanyRepresentativeRow = {
   lr_updatedAt: Date;
 };
 
+const AUDIT_TABLE = {
+  COMPANIES: 'companies',
+  LEGAL_REPRESENTATIVES: 'legal_representatives',
+  COMPANY_REPRESENTATIVES: 'company_representatives',
+} as const;
+
 @Injectable()
 export class CompaniesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async findAll(): Promise<Company[]> {
     const { rows } = await this.db.query<Company>(SQL_FIND_ALL_ACTIVE_COMPANIES, [
       CompanyStatus.ACTIVE,
     ]);
+
+    await this.auditRead(AUDIT_TABLE.COMPANIES, null, {
+      scope: 'list',
+      resultCount: rows.length,
+    });
+
     return rows;
   }
 
   async findById(id: string): Promise<CompanyDetail> {
     const company = await this.findActiveCompanyById(id);
     const representativeLinks = await this.fetchCompanyRepresentatives(id);
-    return { ...company, representativeLinks };
+    const detail = { ...company, representativeLinks };
+
+    await this.auditRead(AUDIT_TABLE.COMPANIES, id, {
+      scope: 'detail',
+      representativeCount: representativeLinks.length,
+    });
+
+    return detail;
   }
 
   async create(dto: CreateCompanyDto): Promise<Company> {
@@ -84,11 +108,21 @@ export class CompaniesService {
       dto.status ?? CompanyStatus.ACTIVE,
     ]);
 
-    return rows[0];
+    const company = rows[0];
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.CREATE,
+      tableName: AUDIT_TABLE.COMPANIES,
+      recordId: company.id,
+      newValues: this.asJson(company),
+    });
+
+    return company;
   }
 
   async update(id: string, dto: UpdateCompanyDto): Promise<Company> {
-    await this.findActiveCompanyById(id);
+    const previous = await this.findActiveCompanyById(id);
 
     if (dto.taxId) {
       await this.ensureTaxIdAvailable(dto.taxId, id);
@@ -96,7 +130,7 @@ export class CompaniesService {
 
     const { sets, values } = this.buildCompanyUpdate(dto);
     if (sets.length === 0) {
-      return this.findActiveCompanyById(id);
+      return previous;
     }
 
     values.push(id, CompanyStatus.ACTIVE);
@@ -114,10 +148,23 @@ export class CompaniesService {
       throw new EmpresaNoEncontradaException();
     }
 
-    return rows[0];
+    const updated = rows[0];
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.UPDATE,
+      tableName: AUDIT_TABLE.COMPANIES,
+      recordId: id,
+      oldValues: this.asJson(previous),
+      newValues: this.asJson(updated),
+    });
+
+    return updated;
   }
 
   async deactivate(id: string): Promise<Company> {
+    const previous = await this.findActiveCompanyById(id);
+
     const { rows } = await this.db.query<Company>(SQL_DEACTIVATE_COMPANY, [
       CompanyStatus.INACTIVE,
       id,
@@ -128,31 +175,54 @@ export class CompaniesService {
       throw new EmpresaNoEncontradaException();
     }
 
-    return rows[0];
+    const deactivated = rows[0];
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.SOFT_DELETE,
+      tableName: AUDIT_TABLE.COMPANIES,
+      recordId: id,
+      oldValues: this.asJson(previous),
+      newValues: this.asJson(deactivated),
+    });
+
+    return deactivated;
   }
 
   async findAllActive(): Promise<Company[]> {
-    return this.findAll();
+    const { rows } = await this.db.query<Company>(SQL_FIND_ALL_ACTIVE_COMPANIES, [
+      CompanyStatus.ACTIVE,
+    ]);
+
+    await this.auditRead(AUDIT_TABLE.COMPANIES, null, {
+      scope: 'portal_list',
+      resultCount: rows.length,
+    });
+
+    return rows;
   }
 
   async findAllLegalRepresentatives(): Promise<LegalRepresentative[]> {
     const { rows } = await this.db.query<LegalRepresentative>(
       SQL_FIND_ALL_LEGAL_REPRESENTATIVES,
     );
+
+    await this.auditRead(AUDIT_TABLE.LEGAL_REPRESENTATIVES, null, {
+      scope: 'list',
+      resultCount: rows.length,
+    });
+
     return rows;
   }
 
   async findLegalRepresentativeById(id: string): Promise<LegalRepresentative> {
-    const { rows } = await this.db.query<LegalRepresentative>(
-      SQL_FIND_LEGAL_REPRESENTATIVE_BY_ID,
-      [id],
-    );
+    const representative = await this.findLegalRepresentativeRowById(id);
 
-    if (!rows[0]) {
-      throw new RepresentanteLegalNoEncontradoException();
-    }
+    await this.auditRead(AUDIT_TABLE.LEGAL_REPRESENTATIVES, id, {
+      scope: 'detail',
+    });
 
-    return rows[0];
+    return representative;
   }
 
   async createLegalRepresentative(
@@ -170,18 +240,28 @@ export class CompaniesService {
       ],
     );
 
-    return rows[0];
+    const representative = rows[0];
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.CREATE,
+      tableName: AUDIT_TABLE.LEGAL_REPRESENTATIVES,
+      recordId: representative.id,
+      newValues: this.asJson(representative),
+    });
+
+    return representative;
   }
 
   async updateLegalRepresentative(
     id: string,
     dto: UpdateLegalRepresentativeDto,
   ): Promise<LegalRepresentative> {
-    await this.findLegalRepresentativeById(id);
+    const previous = await this.findLegalRepresentativeRowById(id);
 
     const { sets, values } = this.buildLegalRepUpdate(dto);
     if (sets.length === 0) {
-      return this.findLegalRepresentativeById(id);
+      return previous;
     }
 
     values.push(id);
@@ -198,14 +278,32 @@ export class CompaniesService {
       throw new RepresentanteLegalNoEncontradoException();
     }
 
-    return rows[0];
+    const updated = rows[0];
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.UPDATE,
+      tableName: AUDIT_TABLE.LEGAL_REPRESENTATIVES,
+      recordId: id,
+      oldValues: this.asJson(previous),
+      newValues: this.asJson(updated),
+    });
+
+    return updated;
   }
 
   async getCompanyRepresentatives(
     companyId: string,
   ): Promise<CompanyRepresentative[]> {
     await this.findActiveCompanyById(companyId);
-    return this.fetchCompanyRepresentatives(companyId);
+    const representatives = await this.fetchCompanyRepresentatives(companyId);
+
+    await this.auditRead(AUDIT_TABLE.COMPANY_REPRESENTATIVES, companyId, {
+      scope: 'list_by_company',
+      resultCount: representatives.length,
+    });
+
+    return representatives;
   }
 
   async linkRepresentativeToCompany(
@@ -213,7 +311,7 @@ export class CompaniesService {
     dto: LinkRepresentativeDto,
   ): Promise<CompanyRepresentative> {
     await this.findActiveCompanyById(companyId);
-    await this.findLegalRepresentativeById(dto.legalRepresentativeId);
+    await this.findLegalRepresentativeRowById(dto.legalRepresentativeId);
 
     const exists = await this.db.query(SQL_EXISTS_COMPANY_REPRESENTATIVE_LINK, [
       companyId,
@@ -229,17 +327,36 @@ export class CompaniesService {
       [companyId, dto.legalRepresentativeId, dto.position ?? null],
     );
 
-    const legalRepresentative = await this.findLegalRepresentativeById(
+    const legalRepresentative = await this.findLegalRepresentativeRowById(
       dto.legalRepresentativeId,
     );
 
-    return { ...rows[0], legalRepresentative };
+    const link = { ...rows[0], legalRepresentative };
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.ASSIGN,
+      tableName: AUDIT_TABLE.COMPANY_REPRESENTATIVES,
+      recordId: companyId,
+      newValues: {
+        companyId,
+        legalRepresentativeId: dto.legalRepresentativeId,
+        position: dto.position ?? null,
+      },
+    });
+
+    return link;
   }
 
   async unlinkRepresentativeFromCompany(
     companyId: string,
     legalRepresentativeId: string,
   ): Promise<void> {
+    const representatives = await this.fetchCompanyRepresentatives(companyId);
+    const existingLink = representatives.find(
+      (link) => link.legalRepresentativeId === legalRepresentativeId,
+    );
+
     const result = await this.db.query(SQL_DELETE_COMPANY_REPRESENTATIVE, [
       companyId,
       legalRepresentativeId,
@@ -248,6 +365,18 @@ export class CompaniesService {
     if (!result.rowCount) {
       throw new VinculoEmpresaRepresentanteNoEncontradoException();
     }
+
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.UNLINK,
+      tableName: AUDIT_TABLE.COMPANY_REPRESENTATIVES,
+      recordId: companyId,
+      oldValues: {
+        companyId,
+        legalRepresentativeId,
+        position: existingLink?.position ?? null,
+      },
+    });
   }
 
   private async findActiveCompanyById(id: string): Promise<Company> {
@@ -353,6 +482,39 @@ export class CompaniesService {
     }
 
     return { sets, values };
+  }
+
+  private async findLegalRepresentativeRowById(
+    id: string,
+  ): Promise<LegalRepresentative> {
+    const { rows } = await this.db.query<LegalRepresentative>(
+      SQL_FIND_LEGAL_REPRESENTATIVE_BY_ID,
+      [id],
+    );
+
+    if (!rows[0]) {
+      throw new RepresentanteLegalNoEncontradoException();
+    }
+
+    return rows[0];
+  }
+
+  private async auditRead(
+    tableName: string,
+    recordId: string | null,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    await this.auditService.log({
+      userId: null,
+      action: AuditAction.READ,
+      tableName,
+      recordId,
+      newValues: metadata,
+    });
+  }
+
+  private asJson(value: object): Record<string, unknown> {
+    return { ...value } as Record<string, unknown>;
   }
 
   private async ensureTaxIdAvailable(

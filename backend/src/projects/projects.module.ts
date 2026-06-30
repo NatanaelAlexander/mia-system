@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AssetsModule } from '../assets/assets.module';
+import { AuditModule } from '../audit/audit.module';
 import { CompaniesModule } from '../companies/companies.module';
 import {
   InternalProjectsController,
@@ -8,7 +9,7 @@ import {
 import { ProjectsService } from './projects.service';
 
 @Module({
-  imports: [CompaniesModule, AssetsModule],
+  imports: [AuditModule, CompaniesModule, AssetsModule],
   controllers: [InternalProjectsController, PortalProjectsController],
   providers: [ProjectsService],
   exports: [ProjectsService],

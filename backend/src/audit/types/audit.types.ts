@@ -1,9 +1,11 @@
 /** Acciones habituales; en BD es VARCHAR libre. */
 export const AuditAction = {
   CREATE: 'create',
+  READ: 'read',
   UPDATE: 'update',
   SOFT_DELETE: 'soft_delete',
   ASSIGN: 'assign',
+  UNLINK: 'unlink',
   STATUS_CHANGE: 'status_change',
   PERMISSION_CHANGE: 'permission_change',
 } as const;

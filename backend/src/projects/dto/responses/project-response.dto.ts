@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProjectStatus, ProjectType } from '../types/project.types';
+import { ProjectStatus, ProjectType } from '../../types/project.types';
 
 export class ProjectResponseDto {
   @ApiProperty({ format: 'uuid' })
