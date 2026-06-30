@@ -57,6 +57,7 @@ docker ps
 ```bash
 cp .env.example .env
 ```
+Resumen humano: copia y pega el .env.example bajo la misma ruta, pero con el nuevo nombre de ".env"
 
 Edita `.env` si quieres cambiar contraseñas. No se sube a Git.
 
