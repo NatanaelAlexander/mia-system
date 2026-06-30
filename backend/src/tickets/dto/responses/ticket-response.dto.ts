@@ -71,6 +71,11 @@ export class TicketCommentResponseDto {
   @ApiProperty()
   comment: string;
 
+  @ApiProperty({
+    description: 'Si es true, el comentario solo es visible en el panel interno.',
+  })
+  isInternal: boolean;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }

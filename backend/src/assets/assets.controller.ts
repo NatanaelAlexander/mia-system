@@ -25,6 +25,7 @@ import {
   AuthorizeResource,
   AuthorizeSurface,
 } from '../auth/decorators/authorize.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AssetsService } from './assets.service';
 import {
@@ -88,8 +89,11 @@ export class InternalAssetsController {
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
-  upload(@UploadedFile() file: Express.Multer.File) {
-    return this.assetsService.uploadStandaloneFile(file);
+  upload(
+    @CurrentUser('sub') actorUserId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.assetsService.uploadStandaloneFile(file, actorUserId);
   }
 
   @Delete(':id')

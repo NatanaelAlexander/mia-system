@@ -12,13 +12,6 @@ export class CreateTicketDto {
   @IsUUID('4', { message: 'El ID del proyecto no es válido' })
   projectId: string;
 
-  @ApiProperty({
-    format: 'uuid',
-    description: 'Creador del ticket. Pendiente auth: enviar userId manualmente.',
-  })
-  @IsUUID('4', { message: 'El ID del usuario no es válido' })
-  userId: string;
-
   @ApiProperty({ example: 'Error al iniciar sesión' })
   @IsString({ message: 'El título debe ser texto' })
   @MinLength(1)

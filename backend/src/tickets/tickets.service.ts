@@ -51,6 +51,7 @@ import {
 import {
   SQL_FIND_TICKET_COMMENT_BY_ID,
   SQL_FIND_TICKET_COMMENTS,
+  SQL_FIND_TICKET_COMMENTS_PUBLIC,
   SQL_INSERT_TICKET_COMMENT,
 } from './queries/ticket-comments.queries';
 import {
@@ -94,43 +95,46 @@ export class TicketsService {
     private readonly assetsService: AssetsService,
   ) {}
 
-  async findAllStatuses(): Promise<CatalogItem[]> {
+  async findAllStatuses(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_STATUSES);
-    await this.auditRead(AUDIT_TABLE.TICKET_STATUSES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_STATUSES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
     return rows;
   }
 
-  async findAllPriorities(): Promise<CatalogItem[]> {
+  async findAllPriorities(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_PRIORITIES);
-    await this.auditRead(AUDIT_TABLE.TICKET_PRIORITIES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_PRIORITIES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
     return rows;
   }
 
-  async findAllCategories(): Promise<CatalogItem[]> {
+  async findAllCategories(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_CATEGORIES);
-    await this.auditRead(AUDIT_TABLE.TICKET_CATEGORIES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_CATEGORIES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
     return rows;
   }
 
-  async findAllPaymentStatuses(): Promise<CatalogItem[]> {
+  async findAllPaymentStatuses(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_PAYMENT_STATUSES);
-    await this.auditRead(AUDIT_TABLE.PAYMENT_STATUSES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.PAYMENT_STATUSES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
     return rows;
   }
 
-  async findAll(filters: FilterTicketsDto = {}): Promise<Ticket[]> {
+  async findAll(
+    actorUserId: string,
+    filters: FilterTicketsDto = {},
+  ): Promise<Ticket[]> {
     const includeDrafts = filters.includeDrafts ?? false;
     const { rows } = await this.db.query<Ticket>(SQL_FIND_ALL_TICKETS, [
       includeDrafts,
@@ -138,7 +142,7 @@ export class TicketsService {
       filters.projectId ?? null,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.TICKETS, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, null, {
       scope: 'list',
       resultCount: rows.length,
       projectId: filters.projectId ?? null,
@@ -167,9 +171,8 @@ export class TicketsService {
       [userId, TicketStatusName.DRAFT, projectId ?? null],
     );
 
-    await this.auditRead(AUDIT_TABLE.TICKETS, null, {
+    await this.auditRead(userId, AUDIT_TABLE.TICKETS, null, {
       scope: 'portal_list',
-      userId,
       projectId: projectId ?? null,
       resultCount: rows.length,
     });
@@ -177,10 +180,10 @@ export class TicketsService {
     return rows;
   }
 
-  async findById(id: string): Promise<Ticket> {
+  async findById(actorUserId: string, id: string): Promise<Ticket> {
     const ticket = await this.findTicketRowById(id);
 
-    await this.auditRead(AUDIT_TABLE.TICKETS, id, { scope: 'detail' });
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, id, { scope: 'detail' });
 
     return ticket;
   }
@@ -197,9 +200,8 @@ export class TicketsService {
       throw new TicketNoEncontradoException();
     }
 
-    await this.auditRead(AUDIT_TABLE.TICKETS, id, {
+    await this.auditRead(userId, AUDIT_TABLE.TICKETS, id, {
       scope: 'portal_detail',
-      userId,
     });
 
     return ticket;
@@ -217,10 +219,10 @@ export class TicketsService {
       throw new ProyectoNoEncontradoException();
     }
 
-    return this.create({ ...dto, userId });
+    return this.create(userId, dto);
   }
 
-  async create(dto: CreateTicketDto): Promise<Ticket> {
+  async create(actorUserId: string, dto: CreateTicketDto): Promise<Ticket> {
     await this.projectsService.findProjectRowById(dto.projectId);
     await this.ensurePriorityExists(dto.priorityId);
 
@@ -236,7 +238,7 @@ export class TicketsService {
 
     const { rows } = await this.db.query<{ id: string }>(SQL_INSERT_TICKET, [
       dto.projectId,
-      dto.userId,
+      actorUserId,
       dto.title,
       dto.description ?? null,
       createdStatus.id,
@@ -251,13 +253,13 @@ export class TicketsService {
     await this.db.query(SQL_INSERT_TICKET_STATUS_HISTORY, [
       ticketId,
       createdStatus.id,
-      dto.userId,
+      actorUserId,
     ]);
 
     const ticket = await this.findTicketRowById(ticketId);
 
     await this.auditService.log({
-      userId: dto.userId,
+      userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE.TICKETS,
       recordId: ticketId,
@@ -267,7 +269,11 @@ export class TicketsService {
     return ticket;
   }
 
-  async update(id: string, dto: UpdateTicketDto): Promise<Ticket> {
+  async update(
+    actorUserId: string,
+    id: string,
+    dto: UpdateTicketDto,
+  ): Promise<Ticket> {
     const previous = await this.findTicketRowById(id);
 
     if (dto.priorityId) {
@@ -304,7 +310,7 @@ export class TicketsService {
     const updated = await this.findTicketRowById(id);
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE.TICKETS,
       recordId: id,
@@ -315,7 +321,11 @@ export class TicketsService {
     return updated;
   }
 
-  async changeStatus(id: string, dto: ChangeTicketStatusDto): Promise<Ticket> {
+  async changeStatus(
+    actorUserId: string,
+    id: string,
+    dto: ChangeTicketStatusDto,
+  ): Promise<Ticket> {
     const previous = await this.findTicketRowById(id);
     await this.ensureStatusExists(dto.statusId);
 
@@ -335,13 +345,13 @@ export class TicketsService {
     await this.db.query(SQL_INSERT_TICKET_STATUS_HISTORY, [
       id,
       dto.statusId,
-      dto.userId,
+      actorUserId,
     ]);
 
     const updated = await this.findTicketRowById(id);
 
     await this.auditService.log({
-      userId: dto.userId,
+      userId: actorUserId,
       action: AuditAction.STATUS_CHANGE,
       tableName: AUDIT_TABLE.TICKETS,
       recordId: id,
@@ -395,7 +405,10 @@ export class TicketsService {
     return updated;
   }
 
-  async getStatusHistory(ticketId: string): Promise<TicketStatusHistoryEntry[]> {
+  async getStatusHistory(
+    actorUserId: string,
+    ticketId: string,
+  ): Promise<TicketStatusHistoryEntry[]> {
     await this.findTicketRowById(ticketId);
 
     const { rows } = await this.db.query<TicketStatusHistoryEntry>(
@@ -403,7 +416,7 @@ export class TicketsService {
       [ticketId],
     );
 
-    await this.auditRead(AUDIT_TABLE.TICKET_STATUS_HISTORY, ticketId, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_STATUS_HISTORY, ticketId, {
       scope: 'list_by_ticket',
       resultCount: rows.length,
     });
@@ -411,14 +424,17 @@ export class TicketsService {
     return rows;
   }
 
-  async getComments(ticketId: string): Promise<TicketComment[]> {
+  async getComments(
+    actorUserId: string,
+    ticketId: string,
+  ): Promise<TicketComment[]> {
     await this.findTicketRowById(ticketId);
 
     const { rows } = await this.db.query<TicketComment>(SQL_FIND_TICKET_COMMENTS, [
       ticketId,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
       scope: 'list_by_ticket',
       resultCount: rows.length,
     });
@@ -441,32 +457,36 @@ export class TicketsService {
       throw new TicketNoEncontradoException();
     }
 
-    const { rows } = await this.db.query<TicketComment>(SQL_FIND_TICKET_COMMENTS, [
-      ticketId,
-    ]);
+    const { rows } = await this.db.query<TicketComment>(
+      SQL_FIND_TICKET_COMMENTS_PUBLIC,
+      [ticketId],
+    );
 
-    await this.auditRead(AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
+    await this.auditRead(userId, AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
       scope: 'portal_list_by_ticket',
-      userId,
       resultCount: rows.length,
     });
 
     return rows;
   }
 
-  async addComment(dto: CreateTicketCommentDto): Promise<TicketComment> {
+  async addComment(
+    actorUserId: string,
+    dto: CreateTicketCommentDto,
+  ): Promise<TicketComment> {
     await this.findTicketRowById(dto.ticketId);
 
     const { rows } = await this.db.query<TicketComment>(SQL_INSERT_TICKET_COMMENT, [
       dto.ticketId,
-      dto.userId,
+      actorUserId,
       dto.comment,
+      dto.isInternal ?? false,
     ]);
 
     const comment = rows[0];
 
     await this.auditService.log({
-      userId: dto.userId,
+      userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE.TICKET_COMMENTS,
       recordId: comment.id,
@@ -493,19 +513,22 @@ export class TicketsService {
       throw new TicketNoEncontradoException();
     }
 
-    return this.addComment({
+    return this.addComment(userId, {
       ticketId: dto.ticketId,
-      userId,
       comment: dto.comment,
+      isInternal: false,
     });
   }
 
-  async getTicketAssets(ticketId: string): Promise<Asset[]> {
+  async getTicketAssets(
+    actorUserId: string,
+    ticketId: string,
+  ): Promise<Asset[]> {
     await this.findTicketRowById(ticketId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [ticketId]);
 
-    await this.auditRead(AUDIT_TABLE.TICKET_ASSETS, ticketId, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_ASSETS, ticketId, {
       scope: 'list_by_ticket',
       resultCount: rows.length,
     });
@@ -513,7 +536,11 @@ export class TicketsService {
     return rows;
   }
 
-  async linkAsset(ticketId: string, assetId: string): Promise<void> {
+  async linkAsset(
+    actorUserId: string,
+    ticketId: string,
+    assetId: string,
+  ): Promise<void> {
     await this.findTicketRowById(ticketId);
     await this.assetsService.findById(assetId);
 
@@ -529,7 +556,7 @@ export class TicketsService {
     await this.db.query(SQL_INSERT_TICKET_ASSET, [ticketId, assetId]);
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.TICKET_ASSETS,
       recordId: ticketId,
@@ -537,7 +564,11 @@ export class TicketsService {
     });
   }
 
-  async unlinkAsset(ticketId: string, assetId: string): Promise<void> {
+  async unlinkAsset(
+    actorUserId: string,
+    ticketId: string,
+    assetId: string,
+  ): Promise<void> {
     const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [ticketId, assetId]);
 
     if (!result.rowCount) {
@@ -545,7 +576,7 @@ export class TicketsService {
     }
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UNLINK,
       tableName: AUDIT_TABLE.TICKET_ASSETS,
       recordId: ticketId,
@@ -554,9 +585,9 @@ export class TicketsService {
   }
 
   async uploadAssetToTicket(
+    actorUserId: string,
     ticketId: string,
     file: Express.Multer.File,
-    uploadedById?: string | null,
   ): Promise<Asset> {
     await this.findTicketRowById(ticketId);
 
@@ -566,13 +597,13 @@ export class TicketsService {
       mimeType: file.mimetype,
       ownerType: 'tickets',
       ownerId: ticketId,
-      uploadedById,
+      uploadedById: actorUserId,
     });
 
     await this.db.query(SQL_INSERT_TICKET_ASSET, [ticketId, asset.id]);
 
     await this.auditService.log({
-      userId: uploadedById ?? null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.TICKET_ASSETS,
       recordId: ticketId,
@@ -587,22 +618,31 @@ export class TicketsService {
     return asset;
   }
 
-  async getCommentAssets(ticketCommentId: string): Promise<Asset[]> {
+  async getCommentAssets(
+    actorUserId: string,
+    ticketCommentId: string,
+  ): Promise<Asset[]> {
     await this.findCommentRowById(ticketCommentId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_COMMENT_ASSETS, [
       ticketCommentId,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.TICKET_COMMENT_ASSETS, ticketCommentId, {
-      scope: 'list_by_comment',
-      resultCount: rows.length,
-    });
+    await this.auditRead(
+      actorUserId,
+      AUDIT_TABLE.TICKET_COMMENT_ASSETS,
+      ticketCommentId,
+      {
+        scope: 'list_by_comment',
+        resultCount: rows.length,
+      },
+    );
 
     return rows;
   }
 
   async linkAssetToComment(
+    actorUserId: string,
     ticketCommentId: string,
     assetId: string,
   ): Promise<void> {
@@ -621,7 +661,7 @@ export class TicketsService {
     await this.db.query(SQL_INSERT_COMMENT_ASSET, [ticketCommentId, assetId]);
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.TICKET_COMMENT_ASSETS,
       recordId: ticketCommentId,
@@ -630,6 +670,7 @@ export class TicketsService {
   }
 
   async unlinkAssetFromComment(
+    actorUserId: string,
     ticketCommentId: string,
     assetId: string,
   ): Promise<void> {
@@ -643,7 +684,7 @@ export class TicketsService {
     }
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UNLINK,
       tableName: AUDIT_TABLE.TICKET_COMMENT_ASSETS,
       recordId: ticketCommentId,
@@ -652,9 +693,9 @@ export class TicketsService {
   }
 
   async uploadAssetToComment(
+    actorUserId: string,
     ticketCommentId: string,
     file: Express.Multer.File,
-    uploadedById?: string | null,
   ): Promise<Asset> {
     await this.findCommentRowById(ticketCommentId);
 
@@ -664,13 +705,13 @@ export class TicketsService {
       mimeType: file.mimetype,
       ownerType: 'tickets',
       ownerId: ticketCommentId,
-      uploadedById,
+      uploadedById: actorUserId,
     });
 
     await this.db.query(SQL_INSERT_COMMENT_ASSET, [ticketCommentId, asset.id]);
 
     await this.auditService.log({
-      userId: uploadedById ?? null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.TICKET_COMMENT_ASSETS,
       recordId: ticketCommentId,
@@ -796,12 +837,13 @@ export class TicketsService {
   }
 
   private async auditRead(
+    actorUserId: string,
     tableName: string,
     recordId: string | null,
     metadata: Record<string, unknown>,
   ): Promise<void> {
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.READ,
       tableName,
       recordId,

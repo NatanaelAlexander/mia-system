@@ -75,12 +75,12 @@ export class CompaniesService {
     private readonly portalAccess: PortalAccessService,
   ) {}
 
-  async findAll(): Promise<Company[]> {
+  async findAll(actorUserId: string): Promise<Company[]> {
     const { rows } = await this.db.query<Company>(SQL_FIND_ALL_ACTIVE_COMPANIES, [
       CompanyStatus.ACTIVE,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.COMPANIES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.COMPANIES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
@@ -88,12 +88,12 @@ export class CompaniesService {
     return rows;
   }
 
-  async findById(id: string): Promise<CompanyDetail> {
+  async findById(actorUserId: string, id: string): Promise<CompanyDetail> {
     const company = await this.findActiveCompanyById(id);
     const representativeLinks = await this.fetchCompanyRepresentatives(id);
     const detail = { ...company, representativeLinks };
 
-    await this.auditRead(AUDIT_TABLE.COMPANIES, id, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.COMPANIES, id, {
       scope: 'detail',
       representativeCount: representativeLinks.length,
     });
@@ -101,7 +101,7 @@ export class CompaniesService {
     return detail;
   }
 
-  async create(dto: CreateCompanyDto): Promise<Company> {
+  async create(actorUserId: string, dto: CreateCompanyDto): Promise<Company> {
     const taxId = this.normalizeTaxId(dto.taxId);
     await this.ensureTaxIdAvailable(taxId);
 
@@ -117,7 +117,7 @@ export class CompaniesService {
     const company = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE.COMPANIES,
       recordId: company.id,
@@ -127,7 +127,11 @@ export class CompaniesService {
     return company;
   }
 
-  async update(id: string, dto: UpdateCompanyDto): Promise<Company> {
+  async update(
+    actorUserId: string,
+    id: string,
+    dto: UpdateCompanyDto,
+  ): Promise<Company> {
     const previous = await this.findActiveCompanyById(id);
 
     if (dto.taxId) {
@@ -158,7 +162,7 @@ export class CompaniesService {
     const updated = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE.COMPANIES,
       recordId: id,
@@ -169,7 +173,7 @@ export class CompaniesService {
     return updated;
   }
 
-  async deactivate(id: string): Promise<Company> {
+  async deactivate(actorUserId: string, id: string): Promise<Company> {
     const previous = await this.findActiveCompanyById(id);
 
     const { rows } = await this.db.query<Company>(SQL_DEACTIVATE_COMPANY, [
@@ -185,7 +189,7 @@ export class CompaniesService {
     const deactivated = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.SOFT_DELETE,
       tableName: AUDIT_TABLE.COMPANIES,
       recordId: id,
@@ -202,9 +206,8 @@ export class CompaniesService {
       [userId, CompanyStatus.ACTIVE],
     );
 
-    await this.auditRead(AUDIT_TABLE.COMPANIES, null, {
+    await this.auditRead(userId, AUDIT_TABLE.COMPANIES, null, {
       scope: 'portal_list',
-      userId,
       resultCount: rows.length,
     });
 
@@ -221,21 +224,22 @@ export class CompaniesService {
     const representativeLinks = await this.fetchCompanyRepresentatives(id);
     const detail = { ...company, representativeLinks };
 
-    await this.auditRead(AUDIT_TABLE.COMPANIES, id, {
+    await this.auditRead(userId, AUDIT_TABLE.COMPANIES, id, {
       scope: 'portal_detail',
-      userId,
       representativeCount: representativeLinks.length,
     });
 
     return detail;
   }
 
-  async findAllLegalRepresentatives(): Promise<LegalRepresentative[]> {
+  async findAllLegalRepresentatives(
+    actorUserId: string,
+  ): Promise<LegalRepresentative[]> {
     const { rows } = await this.db.query<LegalRepresentative>(
       SQL_FIND_ALL_LEGAL_REPRESENTATIVES,
     );
 
-    await this.auditRead(AUDIT_TABLE.LEGAL_REPRESENTATIVES, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.LEGAL_REPRESENTATIVES, null, {
       scope: 'list',
       resultCount: rows.length,
     });
@@ -243,10 +247,13 @@ export class CompaniesService {
     return rows;
   }
 
-  async findLegalRepresentativeById(id: string): Promise<LegalRepresentative> {
+  async findLegalRepresentativeById(
+    actorUserId: string,
+    id: string,
+  ): Promise<LegalRepresentative> {
     const representative = await this.findLegalRepresentativeRowById(id);
 
-    await this.auditRead(AUDIT_TABLE.LEGAL_REPRESENTATIVES, id, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.LEGAL_REPRESENTATIVES, id, {
       scope: 'detail',
     });
 
@@ -254,6 +261,7 @@ export class CompaniesService {
   }
 
   async createLegalRepresentative(
+    actorUserId: string,
     dto: CreateLegalRepresentativeDto,
   ): Promise<LegalRepresentative> {
     const { rows } = await this.db.query<LegalRepresentative>(
@@ -271,7 +279,7 @@ export class CompaniesService {
     const representative = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE.LEGAL_REPRESENTATIVES,
       recordId: representative.id,
@@ -282,6 +290,7 @@ export class CompaniesService {
   }
 
   async updateLegalRepresentative(
+    actorUserId: string,
     id: string,
     dto: UpdateLegalRepresentativeDto,
   ): Promise<LegalRepresentative> {
@@ -309,7 +318,7 @@ export class CompaniesService {
     const updated = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE.LEGAL_REPRESENTATIVES,
       recordId: id,
@@ -321,12 +330,13 @@ export class CompaniesService {
   }
 
   async getCompanyRepresentatives(
+    actorUserId: string,
     companyId: string,
   ): Promise<CompanyRepresentative[]> {
     await this.findActiveCompanyById(companyId);
     const representatives = await this.fetchCompanyRepresentatives(companyId);
 
-    await this.auditRead(AUDIT_TABLE.COMPANY_REPRESENTATIVES, companyId, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.COMPANY_REPRESENTATIVES, companyId, {
       scope: 'list_by_company',
       resultCount: representatives.length,
     });
@@ -335,6 +345,7 @@ export class CompaniesService {
   }
 
   async linkRepresentativeToCompany(
+    actorUserId: string,
     companyId: string,
     dto: LinkRepresentativeDto,
   ): Promise<CompanyRepresentative> {
@@ -362,7 +373,7 @@ export class CompaniesService {
     const link = { ...rows[0], legalRepresentative };
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.COMPANY_REPRESENTATIVES,
       recordId: companyId,
@@ -377,6 +388,7 @@ export class CompaniesService {
   }
 
   async unlinkRepresentativeFromCompany(
+    actorUserId: string,
     companyId: string,
     legalRepresentativeId: string,
   ): Promise<void> {
@@ -395,7 +407,7 @@ export class CompaniesService {
     }
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UNLINK,
       tableName: AUDIT_TABLE.COMPANY_REPRESENTATIVES,
       recordId: companyId,
@@ -528,12 +540,13 @@ export class CompaniesService {
   }
 
   private async auditRead(
+    actorUserId: string,
     tableName: string,
     recordId: string | null,
     metadata: Record<string, unknown>,
   ): Promise<void> {
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.READ,
       tableName,
       recordId,

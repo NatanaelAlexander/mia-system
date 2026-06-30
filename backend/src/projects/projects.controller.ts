@@ -52,24 +52,30 @@ export class InternalProjectsController {
   @Get()
   @ApiOperation({ summary: 'Listar proyectos activos' })
   @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
-  findAll() {
-    return this.projectsService.findAllActive();
+  findAll(@CurrentUser('sub') actorUserId: string) {
+    return this.projectsService.findAllActive(actorUserId);
   }
 
   @Get('detalle')
   @ApiOperation({ summary: 'Obtener proyecto por ID' })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: ProjectResponseDto })
-  findOne(@Body() dto: FindByIdDto) {
-    return this.projectsService.findById(dto.id);
+  findOne(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.projectsService.findById(actorUserId, dto.id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear proyecto' })
   @ApiBody({ type: CreateProjectDto })
   @ApiCreatedResponse({ type: ProjectResponseDto })
-  create(@Body() dto: CreateProjectDto) {
-    return this.projectsService.create(dto);
+  create(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: CreateProjectDto,
+  ) {
+    return this.projectsService.create(actorUserId, dto);
   }
 
   @Patch(':id')
@@ -78,42 +84,55 @@ export class InternalProjectsController {
   @ApiBody({ type: UpdateProjectDto })
   @ApiOkResponse({ type: ProjectResponseDto })
   update(
+    @CurrentUser('sub') actorUserId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProjectDto,
   ) {
-    return this.projectsService.update(id, dto);
+    return this.projectsService.update(actorUserId, id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Desactivar proyecto' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: ProjectResponseDto })
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.projectsService.deactivate(id);
+  deactivate(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.projectsService.deactivate(actorUserId, id);
   }
 
   @Get('archivos')
   @ApiOperation({ summary: 'Listar archivos del proyecto' })
   @ApiBody({ type: GetProjectAssetsDto })
   @ApiOkResponse({ type: AssetResponseDto, isArray: true })
-  getAssets(@Body() dto: GetProjectAssetsDto) {
-    return this.projectsService.getProjectAssets(dto.projectId);
+  getAssets(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetProjectAssetsDto,
+  ) {
+    return this.projectsService.getProjectAssets(actorUserId, dto.projectId);
   }
 
   @Post('vincular-archivo')
   @ApiOperation({ summary: 'Vincular un asset existente al proyecto' })
   @ApiBody({ type: LinkProjectAssetDto })
   @ApiOkResponse({ description: 'Vinculado' })
-  linkAsset(@Body() dto: LinkProjectAssetDto) {
-    return this.projectsService.linkAsset(dto.projectId, dto.assetId);
+  linkAsset(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: LinkProjectAssetDto,
+  ) {
+    return this.projectsService.linkAsset(actorUserId, dto.projectId, dto.assetId);
   }
 
   @Post('desvincular-archivo')
   @ApiOperation({ summary: 'Desvincular asset del proyecto (no borra el archivo)' })
   @ApiBody({ type: UnlinkProjectAssetDto })
   @ApiOkResponse({ description: 'Desvinculado' })
-  unlinkAsset(@Body() dto: UnlinkProjectAssetDto) {
-    return this.projectsService.unlinkAsset(dto.projectId, dto.assetId);
+  unlinkAsset(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: UnlinkProjectAssetDto,
+  ) {
+    return this.projectsService.unlinkAsset(actorUserId, dto.projectId, dto.assetId);
   }
 
   @Post('subir-archivo')
@@ -140,10 +159,11 @@ export class InternalProjectsController {
     }),
   )
   uploadAsset(
+    @CurrentUser('sub') actorUserId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadProjectAssetDto,
   ) {
-    return this.projectsService.uploadAssetToProject(dto.projectId, file);
+    return this.projectsService.uploadAssetToProject(actorUserId, dto.projectId, file);
   }
 }
 

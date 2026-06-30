@@ -32,6 +32,7 @@ export interface TicketComment {
   ticketId: string;
   userId: string;
   comment: string;
+  isInternal: boolean;
   createdAt: Date;
 }
 

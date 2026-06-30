@@ -10,6 +10,7 @@ const MIGRATIONS = [
   'assets',
   'projects',
   'tickets',
+  'ticket_comments_internal',
   'audit_logs',
 ] as const;
 

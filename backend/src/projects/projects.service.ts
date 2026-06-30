@@ -44,12 +44,12 @@ export class ProjectsService {
     private readonly assetsService: AssetsService,
   ) {}
 
-  async findAllActive(): Promise<Project[]> {
+  async findAllActive(actorUserId: string): Promise<Project[]> {
     const { rows } = await this.db.query<Project>(SQL_FIND_ALL_ACTIVE_PROJECTS, [
       ProjectStatus.ACTIVE,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.PROJECTS, null, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'list',
       resultCount: rows.length,
     });
@@ -73,9 +73,8 @@ export class ProjectsService {
       [userId, ProjectStatus.ACTIVE, companyId ?? null],
     );
 
-    await this.auditRead(AUDIT_TABLE.PROJECTS, null, {
+    await this.auditRead(userId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'portal_list',
-      userId,
       companyId: companyId ?? null,
       resultCount: rows.length,
     });
@@ -91,24 +90,23 @@ export class ProjectsService {
 
     const project = await this.findProjectRowById(id);
 
-    await this.auditRead(AUDIT_TABLE.PROJECTS, id, {
+    await this.auditRead(userId, AUDIT_TABLE.PROJECTS, id, {
       scope: 'portal_detail',
-      userId,
     });
 
     return project;
   }
 
-  async findById(id: string): Promise<Project> {
+  async findById(actorUserId: string, id: string): Promise<Project> {
     const project = await this.findProjectRowById(id);
 
-    await this.auditRead(AUDIT_TABLE.PROJECTS, id, { scope: 'detail' });
+    await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, id, { scope: 'detail' });
 
     return project;
   }
 
-  async create(dto: CreateProjectDto): Promise<Project> {
-    await this.companiesService.findById(dto.companyId);
+  async create(actorUserId: string, dto: CreateProjectDto): Promise<Project> {
+    await this.companiesService.findById(actorUserId, dto.companyId);
 
     const { rows } = await this.db.query<Project>(SQL_INSERT_PROJECT, [
       dto.companyId,
@@ -120,7 +118,7 @@ export class ProjectsService {
     const project = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE.PROJECTS,
       recordId: project.id,
@@ -130,7 +128,11 @@ export class ProjectsService {
     return project;
   }
 
-  async update(id: string, dto: UpdateProjectDto): Promise<Project> {
+  async update(
+    actorUserId: string,
+    id: string,
+    dto: UpdateProjectDto,
+  ): Promise<Project> {
     const previous = await this.findProjectRowById(id);
 
     const { sets, values } = this.buildProjectUpdate(dto);
@@ -155,7 +157,7 @@ export class ProjectsService {
     const updated = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE.PROJECTS,
       recordId: id,
@@ -166,7 +168,7 @@ export class ProjectsService {
     return updated;
   }
 
-  async deactivate(id: string): Promise<Project> {
+  async deactivate(actorUserId: string, id: string): Promise<Project> {
     const previous = await this.findProjectRowById(id);
 
     const { rows } = await this.db.query<Project>(SQL_DEACTIVATE_PROJECT, [
@@ -181,7 +183,7 @@ export class ProjectsService {
     const deactivated = rows[0];
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.SOFT_DELETE,
       tableName: AUDIT_TABLE.PROJECTS,
       recordId: id,
@@ -192,14 +194,17 @@ export class ProjectsService {
     return deactivated;
   }
 
-  async getProjectAssets(projectId: string): Promise<Asset[]> {
+  async getProjectAssets(
+    actorUserId: string,
+    projectId: string,
+  ): Promise<Asset[]> {
     await this.findProjectRowById(projectId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_PROJECT_ASSETS, [
       projectId,
     ]);
 
-    await this.auditRead(AUDIT_TABLE.PROJECTS_ASSETS, projectId, {
+    await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS_ASSETS, projectId, {
       scope: 'list_by_project',
       resultCount: rows.length,
     });
@@ -207,7 +212,11 @@ export class ProjectsService {
     return rows;
   }
 
-  async linkAsset(projectId: string, assetId: string): Promise<void> {
+  async linkAsset(
+    actorUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<void> {
     await this.findProjectRowById(projectId);
     await this.assetsService.findById(assetId);
 
@@ -223,7 +232,7 @@ export class ProjectsService {
     await this.db.query(SQL_INSERT_PROJECT_ASSET, [projectId, assetId]);
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.PROJECTS_ASSETS,
       recordId: projectId,
@@ -231,7 +240,11 @@ export class ProjectsService {
     });
   }
 
-  async unlinkAsset(projectId: string, assetId: string): Promise<void> {
+  async unlinkAsset(
+    actorUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<void> {
     const result = await this.db.query(SQL_DELETE_PROJECT_ASSET, [
       projectId,
       assetId,
@@ -242,7 +255,7 @@ export class ProjectsService {
     }
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.UNLINK,
       tableName: AUDIT_TABLE.PROJECTS_ASSETS,
       recordId: projectId,
@@ -251,9 +264,9 @@ export class ProjectsService {
   }
 
   async uploadAssetToProject(
+    actorUserId: string,
     projectId: string,
     file: Express.Multer.File,
-    uploadedById?: string | null,
   ): Promise<Asset> {
     await this.findProjectRowById(projectId);
 
@@ -263,13 +276,13 @@ export class ProjectsService {
       mimeType: file.mimetype,
       ownerType: 'projects',
       ownerId: projectId,
-      uploadedById,
+      uploadedById: actorUserId,
     });
 
     await this.db.query(SQL_INSERT_PROJECT_ASSET, [projectId, asset.id]);
 
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.ASSIGN,
       tableName: AUDIT_TABLE.PROJECTS_ASSETS,
       recordId: projectId,
@@ -295,12 +308,13 @@ export class ProjectsService {
   }
 
   private async auditRead(
+    actorUserId: string,
     tableName: string,
     recordId: string | null,
     metadata: Record<string, unknown>,
   ): Promise<void> {
     await this.auditService.log({
-      userId: null,
+      userId: actorUserId,
       action: AuditAction.READ,
       tableName,
       recordId,

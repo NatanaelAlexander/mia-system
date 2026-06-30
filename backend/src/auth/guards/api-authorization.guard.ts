@@ -27,6 +27,7 @@ import { hasPermissions } from '../permissions/has-permissions';
 import { PermissionsService } from '../permissions/permissions.service';
 import { RoutePermissionResolver } from '../permissions/route-permission.resolver';
 import { AuthenticatedRequest } from '../types/authenticated-request';
+import { parseBearerToken } from '../jwt-token.util';
 
 /**
  * Guard global (estilo middleware de edificio-alcazar):
@@ -142,16 +143,7 @@ export class ApiAuthorizationGuard implements CanActivate {
   }
 
   private async authenticate(request: AuthenticatedRequest): Promise<void> {
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new TokenAccesoInvalidoException();
-    }
-
-    const token = authHeader.slice('Bearer '.length).trim();
-    if (!token) {
-      throw new TokenAccesoInvalidoException();
-    }
+    const token = parseBearerToken(request.headers.authorization);
 
     try {
       request.user = await this.authService.verifyAccessToken(token);

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { loadAuthConfig } from './auth.config';
+import { JWT_ALGORITHM } from './jwt-token.util';
 import { AuthController } from './auth.controller';
 import { AuthAdminController } from './auth-admin.controller';
 import { AuthAdminService } from './auth-admin.service';
@@ -16,7 +17,8 @@ import { PermissionsService } from './permissions/permissions.service';
   imports: [
     JwtModule.register({
       global: true,
-      secret: loadAuthConfig().accessSecret || 'dev-only-change-me',
+      secret: loadAuthConfig().accessSecret || undefined,
+      signOptions: { algorithm: JWT_ALGORITHM },
     }),
   ],
   controllers: [AuthController, AuthAdminController],

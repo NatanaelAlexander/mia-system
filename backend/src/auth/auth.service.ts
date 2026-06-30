@@ -14,6 +14,14 @@ import {
   RefreshTokenInvalidoException,
   TokenAccesoInvalidoException,
 } from './exceptions/auth.exceptions';
+import {
+  accessTokenSignOptions,
+  accessTokenVerifyOptions,
+  assertAccessTokenPayload,
+  assertRefreshTokenPayload,
+  refreshTokenSignOptions,
+  refreshTokenVerifyOptions,
+} from './jwt-token.util';
 import { PermissionsService } from './permissions/permissions.service';
 import {
   SQL_FIND_USER_BY_EMAIL_AND_PASSWORD,
@@ -47,14 +55,12 @@ export class AuthService implements OnModuleInit {
     this.ensureConfigured();
 
     try {
-      const payload = await this.jwtService.verifyAsync<JwtAccessPayload>(
+      const payload = await this.jwtService.verifyAsync(
         token,
-        { secret: this.config.accessSecret },
+        accessTokenVerifyOptions(this.config.accessSecret),
       );
 
-      if (payload.type !== 'access') {
-        throw new TokenAccesoInvalidoException();
-      }
+      assertAccessTokenPayload(payload);
 
       return payload;
     } catch (error) {
@@ -98,15 +104,16 @@ export class AuthService implements OnModuleInit {
 
     let payload: JwtRefreshPayload;
     try {
-      payload = await this.jwtService.verifyAsync<JwtRefreshPayload>(
+      const verified = await this.jwtService.verifyAsync(
         refreshToken,
-        { secret: this.config.refreshSecret },
+        refreshTokenVerifyOptions(this.config.refreshSecret),
       );
-    } catch {
-      throw new RefreshTokenInvalidoException();
-    }
-
-    if (payload.type !== 'refresh') {
+      assertRefreshTokenPayload(verified);
+      payload = verified;
+    } catch (error) {
+      if (error instanceof RefreshTokenInvalidoException) {
+        throw error;
+      }
       throw new RefreshTokenInvalidoException();
     }
 
@@ -187,15 +194,15 @@ export class AuthService implements OnModuleInit {
       this.config,
     );
 
-    const accessSignOptions: JwtSignOptions = {
-      secret: this.config.accessSecret,
-      expiresIn: accessExpiresIn as JwtSignOptions['expiresIn'],
-    };
+    const accessSignOptions = accessTokenSignOptions(
+      this.config.accessSecret,
+      accessExpiresIn as JwtSignOptions['expiresIn'],
+    );
 
-    const refreshSignOptions: JwtSignOptions = {
-      secret: this.config.refreshSecret,
-      expiresIn: this.config.refreshExpiresIn as JwtSignOptions['expiresIn'],
-    };
+    const refreshSignOptions = refreshTokenSignOptions(
+      this.config.refreshSecret,
+      this.config.refreshExpiresIn as JwtSignOptions['expiresIn'],
+    );
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(accessPayload, accessSignOptions),

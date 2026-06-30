@@ -47,8 +47,8 @@ export class InternalCompaniesController {
   @Get()
   @ApiOperation({ summary: 'Listar empresas activas' })
   @ApiOkResponse({ type: CompanyResponseDto, isArray: true })
-  findAll() {
-    return this.companiesService.findAll();
+  findAll(@CurrentUser('sub') actorUserId: string) {
+    return this.companiesService.findAll(actorUserId);
   }
 
   @Get('detalle')
@@ -58,16 +58,22 @@ export class InternalCompaniesController {
   })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: CompanyResponseDto })
-  findOne(@Body() dto: FindByIdDto) {
-    return this.companiesService.findById(dto.id);
+  findOne(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.companiesService.findById(actorUserId, dto.id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear empresa' })
   @ApiBody({ type: CreateCompanyDto })
   @ApiCreatedResponse({ type: CompanyResponseDto })
-  create(@Body() dto: CreateCompanyDto) {
-    return this.companiesService.create(dto);
+  create(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: CreateCompanyDto,
+  ) {
+    return this.companiesService.create(actorUserId, dto);
   }
 
   @Patch(':id')
@@ -76,18 +82,22 @@ export class InternalCompaniesController {
   @ApiBody({ type: UpdateCompanyDto })
   @ApiOkResponse({ type: CompanyResponseDto })
   update(
+    @CurrentUser('sub') actorUserId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCompanyDto,
   ) {
-    return this.companiesService.update(id, dto);
+    return this.companiesService.update(actorUserId, id, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Desactivar empresa (soft delete)' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: CompanyResponseDto })
-  deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.companiesService.deactivate(id);
+  deactivate(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.companiesService.deactivate(actorUserId, id);
   }
 
   @Get('representantes')
@@ -97,8 +107,14 @@ export class InternalCompaniesController {
   })
   @ApiBody({ type: GetCompanyRepresentativesDto })
   @ApiOkResponse({ type: CompanyRepresentativeResponseDto, isArray: true })
-  getRepresentatives(@Body() dto: GetCompanyRepresentativesDto) {
-    return this.companiesService.getCompanyRepresentatives(dto.companyId);
+  getRepresentatives(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetCompanyRepresentativesDto,
+  ) {
+    return this.companiesService.getCompanyRepresentatives(
+      actorUserId,
+      dto.companyId,
+    );
   }
 
   @Post(':id/representatives')
@@ -107,10 +123,15 @@ export class InternalCompaniesController {
   @ApiBody({ type: LinkRepresentativeDto })
   @ApiCreatedResponse({ type: CompanyRepresentativeResponseDto })
   linkRepresentative(
+    @CurrentUser('sub') actorUserId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: LinkRepresentativeDto,
   ) {
-    return this.companiesService.linkRepresentativeToCompany(id, dto);
+    return this.companiesService.linkRepresentativeToCompany(
+      actorUserId,
+      id,
+      dto,
+    );
   }
 
   @Delete(':id/representatives/:legalRepresentativeId')
@@ -119,10 +140,12 @@ export class InternalCompaniesController {
   @ApiParam({ name: 'legalRepresentativeId', format: 'uuid' })
   @ApiOkResponse({ description: 'Sin contenido' })
   unlinkRepresentative(
+    @CurrentUser('sub') actorUserId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Param('legalRepresentativeId', ParseUUIDPipe) legalRepresentativeId: string,
   ) {
     return this.companiesService.unlinkRepresentativeFromCompany(
+      actorUserId,
       id,
       legalRepresentativeId,
     );
@@ -140,8 +163,8 @@ export class InternalLegalRepresentativesController {
   @Get()
   @ApiOperation({ summary: 'Listar representantes legales' })
   @ApiOkResponse({ type: LegalRepresentativeResponseDto, isArray: true })
-  findAll() {
-    return this.companiesService.findAllLegalRepresentatives();
+  findAll(@CurrentUser('sub') actorUserId: string) {
+    return this.companiesService.findAllLegalRepresentatives(actorUserId);
   }
 
   @Get('detalle')
@@ -151,16 +174,22 @@ export class InternalLegalRepresentativesController {
   })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: LegalRepresentativeResponseDto })
-  findOne(@Body() dto: FindByIdDto) {
-    return this.companiesService.findLegalRepresentativeById(dto.id);
+  findOne(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.companiesService.findLegalRepresentativeById(actorUserId, dto.id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear representante legal' })
   @ApiBody({ type: CreateLegalRepresentativeDto })
   @ApiCreatedResponse({ type: LegalRepresentativeResponseDto })
-  create(@Body() dto: CreateLegalRepresentativeDto) {
-    return this.companiesService.createLegalRepresentative(dto);
+  create(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: CreateLegalRepresentativeDto,
+  ) {
+    return this.companiesService.createLegalRepresentative(actorUserId, dto);
   }
 
   @Patch(':id')
@@ -169,10 +198,11 @@ export class InternalLegalRepresentativesController {
   @ApiBody({ type: UpdateLegalRepresentativeDto })
   @ApiOkResponse({ type: LegalRepresentativeResponseDto })
   update(
+    @CurrentUser('sub') actorUserId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateLegalRepresentativeDto,
   ) {
-    return this.companiesService.updateLegalRepresentative(id, dto);
+    return this.companiesService.updateLegalRepresentative(actorUserId, id, dto);
   }
 }
 
