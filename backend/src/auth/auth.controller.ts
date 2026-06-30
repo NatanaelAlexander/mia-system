@@ -9,7 +9,7 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { ErrorResponseDto } from '../common/exceptions/app.exception';
 import { AuthenticatedOnly } from './decorators/authorize.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
