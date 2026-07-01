@@ -56,6 +56,19 @@ async function request(path: string, options: RequestInit, authenticated: boolea
   });
 }
 
+async function parseResponseBody<T>(response: Response): Promise<T> {
+  if (response.status === 204 || response.status === 205) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -78,11 +91,7 @@ export async function apiFetch<T>(
     );
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return parseResponseBody<T>(response);
 }
 
 export async function apiUpload<T>(
@@ -121,11 +130,7 @@ export async function apiUpload<T>(
     );
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return parseResponseBody<T>(response);
 }
 
 /** Lecturas con filtros/id en body (el navegador no permite GET con body). */
