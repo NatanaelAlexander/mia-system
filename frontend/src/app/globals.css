@@ -210,9 +210,17 @@
   }
 
   [data-sonner-toast] {
+    position: relative;
     box-shadow:
       0 10px 30px -12px rgb(0 0 0 / 0.55),
       0 0 0 1px color-mix(in oklch, var(--primary-foreground), transparent 88%);
+  }
+
+  [data-sonner-toaster][dir="ltr"] button[data-close-button] {
+    --toast-close-button-start: auto;
+    --toast-close-button-end: 0.5rem;
+    --toast-close-button-transform: none;
+    top: 0.5rem;
   }
 
   [data-sonner-toast][data-type="error"] {

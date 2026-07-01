@@ -8,17 +8,18 @@ export function Toaster({ ...props }: ToasterProps) {
       theme="dark"
       position="top-right"
       closeButton
+      closeButtonPosition="right"
       className="toaster group"
       toastOptions={{
         classNames: {
           toast:
-            "group toast !bg-primary !text-primary-foreground !border-primary/30 !shadow-lg !rounded-lg !font-sans",
+            "group toast relative !bg-primary !text-primary-foreground !border-primary/30 !shadow-lg !rounded-lg !font-sans !pr-10",
           title: "!text-primary-foreground !font-medium",
           description: "!text-primary-foreground/80",
           content: "!text-primary-foreground",
           icon: "!text-primary-foreground",
           closeButton:
-            "!bg-primary-foreground/10 !text-primary-foreground !border-primary-foreground/20 hover:!bg-primary-foreground/20",
+            "!absolute !right-2 !top-2 !left-auto !translate-x-0 !translate-y-0 !size-6 !rounded-md !bg-primary-foreground/10 !text-primary-foreground !border-primary-foreground/20 hover:!bg-primary-foreground/20",
           actionButton:
             "!bg-primary-foreground !text-primary !font-medium",
           cancelButton:
