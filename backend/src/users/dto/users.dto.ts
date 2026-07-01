@@ -137,6 +137,12 @@ export class LinkUserCompanyRequestDto extends LinkUserCompanyDto {
 }
 
 export class UpdateProfileDto {
+  @ApiPropertyOptional({ example: 'nuevo@mia.local' })
+  @IsOptional()
+  @IsEmail({}, { message: 'El correo no es válido' })
+  @MaxLength(255)
+  email?: string;
+
   @ApiPropertyOptional({ example: 'María' })
   @IsOptional()
   @IsString()

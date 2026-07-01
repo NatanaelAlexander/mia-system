@@ -17,3 +17,12 @@ export async function logoutRequest(refreshToken: string): Promise<{ ok: true }>
     body: JSON.stringify({ refreshToken }),
   });
 }
+
+export async function refreshRequest(
+  refreshToken: string,
+): Promise<AuthTokensResponse> {
+  return apiFetch<AuthTokensResponse>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}

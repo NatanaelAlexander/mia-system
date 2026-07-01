@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { logoutRequest } from "@/lib/api/auth";
+import { logoutRequest, refreshRequest } from "@/lib/api/auth";
 import {
   clearSession,
   getRefreshToken,
@@ -16,6 +16,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (tokens: AuthTokensResponse) => void;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -59,8 +60,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  const refreshSession = React.useCallback(async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      const tokens = await refreshRequest(refreshToken);
+      const session = persistAuthTokens(tokens);
+      setClaims(session.claims);
+    } catch {
+      clearSession();
+      setClaims(null);
+      router.replace("/login");
+    }
+  }, [router]);
+
   return (
-    <AuthContext.Provider value={{ claims, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ claims, isLoading, login, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
