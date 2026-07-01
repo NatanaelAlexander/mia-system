@@ -18,6 +18,7 @@ import {
   SQL_FIND_COMPANIES_FILTERED,
   SQL_FIND_COMPANIES_FOR_PORTAL_USER,
   SQL_FIND_COMPANY_BY_ID_ACTIVE,
+  SQL_FIND_COMPANY_BY_ID,
   SQL_INSERT_COMPANY,
   COMPANY_COLUMNS,
 } from './queries/companies.queries';
@@ -99,7 +100,7 @@ export class CompaniesService {
   }
 
   async findById(actorUserId: string, id: string): Promise<CompanyDetail> {
-    const company = await this.findActiveCompanyById(id);
+    const company = await this.findCompanyById(id);
     const representativeLinks = await this.fetchCompanyRepresentatives(id);
     const detail = { ...company, representativeLinks };
 
@@ -142,7 +143,7 @@ export class CompaniesService {
     id: string,
     dto: UpdateCompanyDto,
   ): Promise<Company> {
-    const previous = await this.findActiveCompanyById(id);
+    const previous = await this.findCompanyById(id);
 
     if (dto.taxId) {
       try {
@@ -164,12 +165,11 @@ export class CompaniesService {
     }
 
     const idParam = values.length + 1;
-    const statusParam = values.length + 2;
-    values.push(id, CompanyStatus.ACTIVE);
+    values.push(id);
 
     const { rows } = await this.db.query<Company>(
       `UPDATE companies SET ${sets.join(', ')}, updated_at = NOW()
-       WHERE id = $${idParam} AND status = $${statusParam}
+       WHERE id = $${idParam}
        RETURNING ${COMPANY_COLUMNS}`,
       values,
     );
@@ -436,6 +436,16 @@ export class CompaniesService {
         position: existingLink?.position ?? null,
       },
     });
+  }
+
+  private async findCompanyById(id: string): Promise<Company> {
+    const { rows } = await this.db.query<Company>(SQL_FIND_COMPANY_BY_ID, [id]);
+
+    if (!rows[0]) {
+      throw new EmpresaNoEncontradaException();
+    }
+
+    return rows[0];
   }
 
   private async findActiveCompanyById(id: string): Promise<Company> {

@@ -44,6 +44,12 @@ export const SQL_FIND_COMPANY_BY_ID_ACTIVE = `
   WHERE id = $1 AND status = $2
 `;
 
+export const SQL_FIND_COMPANY_BY_ID = `
+  SELECT ${COMPANY_COLUMNS}
+  FROM companies
+  WHERE id = $1
+`;
+
 export const SQL_EXISTS_COMPANY_BY_TAX_ID = `
   SELECT 1
   FROM companies

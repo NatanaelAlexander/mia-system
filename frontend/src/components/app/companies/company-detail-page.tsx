@@ -213,7 +213,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
 
         <div className="flex items-center gap-2">
           <Badge variant="secondary">{company.status}</Badge>
-          {canDeactivate ? (
+          {canDeactivate && company.status === "active" ? (
             <Button
               type="button"
               variant="outline"
