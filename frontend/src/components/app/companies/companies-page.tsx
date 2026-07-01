@@ -220,6 +220,12 @@ export function CompaniesPage() {
                   {item}
                 </Badge>
               ))}
+              {canCreate ? (
+                <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus />
+                  Nueva empresa
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -230,12 +236,6 @@ export function CompaniesPage() {
                 <RefreshCcw />
                 Actualizar
               </Button>
-              {canCreate ? (
-                <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-                  <Plus />
-                  Nueva empresa
-                </Button>
-              ) : null}
             </div>
           </div>
         </CardHeader>

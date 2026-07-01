@@ -44,3 +44,31 @@ export function formatCompanyStatus(status: string) {
 
   return status;
 }
+
+export function formatProjectType(type: string) {
+  if (type === "internal") {
+    return "Interno";
+  }
+
+  if (type === "external") {
+    return "Externo";
+  }
+
+  return type;
+}
+
+export function formatProjectStatus(status: string) {
+  if (status === "active") {
+    return "Activo";
+  }
+
+  if (status === "inactive") {
+    return "Inactivo";
+  }
+
+  if (status === "completed") {
+    return "Completado";
+  }
+
+  return status;
+}
