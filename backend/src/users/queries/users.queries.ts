@@ -10,8 +10,20 @@ export const USER_COLUMNS = `
   updated_at AS "updatedAt"
 `;
 
+export const USER_COLUMNS_ALIASED = `
+  u.id,
+  u.email,
+  u.first_name AS "firstName",
+  u.last_name AS "lastName",
+  u.phone_number AS "phoneNumber",
+  u.is_active AS "isActive",
+  u.permissions_version AS "permissionsVersion",
+  u.created_at AS "createdAt",
+  u.updated_at AS "updatedAt"
+`;
+
 export const SQL_FIND_ALL_USERS = `
-  SELECT DISTINCT ${USER_COLUMNS}
+  SELECT DISTINCT ${USER_COLUMNS_ALIASED}
   FROM users u
   LEFT JOIN users_roles ur ON ur.user_id = u.id
   LEFT JOIN roles r ON r.id = ur.role_id

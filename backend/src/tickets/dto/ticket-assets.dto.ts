@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class GetTicketCommentsDto {
   @ApiProperty({ format: 'uuid' })
@@ -69,10 +69,26 @@ export class UploadTicketAssetDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID('4', { message: 'El ID del ticket no es válido' })
   ticketId: string;
+
+  @ApiPropertyOptional({
+    description: 'Nombre visible opcional. Sin valor usa el nombre original del archivo.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  displayName?: string;
 }
 
 export class UploadCommentAssetDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID('4', { message: 'El ID del comentario no es válido' })
   ticketCommentId: string;
+
+  @ApiPropertyOptional({
+    description: 'Nombre visible opcional. Sin valor usa el nombre original del archivo.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  displayName?: string;
 }

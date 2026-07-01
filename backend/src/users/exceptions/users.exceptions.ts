@@ -25,6 +25,12 @@ export class CargoNoEncontradoException extends AppException {
   }
 }
 
+export class CargoNombreDuplicadoException extends AppException {
+  constructor() {
+    super('Ya existe un cargo con ese nombre', HttpStatus.CONFLICT);
+  }
+}
+
 export class VinculoUsuarioEmpresaNoEncontradoException extends AppException {
   constructor() {
     super('El usuario no está vinculado a esa empresa', HttpStatus.NOT_FOUND);
@@ -48,6 +54,15 @@ export class SoloPuedesModificarTuPerfilException extends AppException {
     super(
       'Solo puedes modificar los datos de tu propio usuario',
       HttpStatus.FORBIDDEN,
+    );
+  }
+}
+
+export class SoloClientesPuedenVincularseEmpresaException extends AppException {
+  constructor() {
+    super(
+      'Solo los usuarios con rol cliente pueden vincularse a una empresa',
+      HttpStatus.BAD_REQUEST,
     );
   }
 }

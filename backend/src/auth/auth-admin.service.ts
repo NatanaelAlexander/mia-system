@@ -6,8 +6,15 @@ import {
   SQL_COUNT_ROLES,
   SQL_COUNT_USERS_WITHOUT_PERMISSIONS,
   SQL_COUNT_USERS_WITHOUT_ROLES,
+  SQL_LIST_PERMISSIONS,
   SQL_SUPER_ADMIN_ROLE_PERMISSION_COUNT,
 } from './queries/auth-admin.queries';
+
+export interface PermissionRecord {
+  id: string;
+  name: string;
+  module: string;
+}
 
 export interface AuthorizationHealthReport {
   roles: number;
@@ -71,6 +78,11 @@ export class AuthAdminService {
       healthy: warnings.length === 0,
       warnings,
     };
+  }
+
+  async listPermissions(): Promise<PermissionRecord[]> {
+    const { rows } = await this.db.query<PermissionRecord>(SQL_LIST_PERMISSIONS);
+    return rows;
   }
 
   private async scalar(sql: string): Promise<number> {

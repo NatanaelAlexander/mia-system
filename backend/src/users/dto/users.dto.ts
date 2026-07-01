@@ -137,6 +137,12 @@ export class LinkUserCompanyRequestDto extends LinkUserCompanyDto {
 }
 
 export class UpdateProfileDto {
+  @ApiPropertyOptional({ example: 'nuevo@mia.local' })
+  @IsOptional()
+  @IsEmail({}, { message: 'El correo no es válido' })
+  @MaxLength(255)
+  email?: string;
+
   @ApiPropertyOptional({ example: 'María' })
   @IsOptional()
   @IsString()
@@ -195,4 +201,20 @@ export class FilterUsersDto {
   @IsOptional()
   @IsUUID('4')
   companyId?: string;
+}
+
+export class CreateJobTitleDto {
+  @ApiProperty({ example: 'Programador backend' })
+  @IsString({ message: 'El nombre del cargo debe ser texto' })
+  @MinLength(1, { message: 'El nombre del cargo es obligatorio' })
+  @MaxLength(100, { message: 'El nombre no puede superar 100 caracteres' })
+  name: string;
+}
+
+export class UpdateJobTitleDto {
+  @ApiProperty({ example: 'Programador frontend' })
+  @IsString({ message: 'El nombre del cargo debe ser texto' })
+  @MinLength(1, { message: 'El nombre del cargo es obligatorio' })
+  @MaxLength(100, { message: 'El nombre no puede superar 100 caracteres' })
+  name: string;
 }

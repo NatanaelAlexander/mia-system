@@ -43,7 +43,7 @@ docker compose exec api pnpm run migrate
 | 1 | `permissions.sql` | Permisos `module:action` |
 | 2 | `roles.sql` | Roles y `roles_permissions` (lógica edificio-alcazar) |
 | 3 | `tickets.sql` | Estados, prioridades, categorías, pagos |
-| 4 | `users.sql` | Usuarios dev admin y cliente |
+| 4 | `users.sql` | Usuarios dev super_admin, admin y cliente |
 | 5 | `companies.sql` | Empresa demo + vínculo cliente |
 
 ```bash
@@ -55,6 +55,7 @@ docker compose exec api pnpm run migrate:data
 
 | Email | Password | Rol | Notas |
 |-------|----------|-----|-------|
+| `superadmin@mia.local` | `superadmin` | `super_admin` | Interno, permisos amplios |
 | `admin@mia.local` | `admin` | `admin` | Interno |
 | `cliente@mia.local` | `cliente` | `cliente` | Externo, empresa demo |
 

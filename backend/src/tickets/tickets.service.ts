@@ -72,6 +72,8 @@ import {
   TicketStatusHistoryEntry,
   TicketStatusName,
 } from './types/ticket.types';
+import { JwtAccessPayload } from '../auth/types/auth.types';
+import { TicketsRealtimeService } from './realtime/tickets-realtime.service';
 
 const AUDIT_TABLE = {
   TICKETS: 'tickets',
@@ -93,7 +95,36 @@ export class TicketsService {
     private readonly portalAccess: PortalAccessService,
     private readonly projectsService: ProjectsService,
     private readonly assetsService: AssetsService,
+    private readonly realtimeService: TicketsRealtimeService,
   ) {}
+
+  async assertRealtimeTicketAccess(
+    user: JwtAccessPayload,
+    ticketId: string,
+  ): Promise<{ isInternalViewer: boolean }> {
+    const isInternalViewer = user.surfaces.includes('internal');
+
+    if (isInternalViewer) {
+      await this.findTicketRowById(ticketId);
+      return { isInternalViewer: true };
+    }
+
+    if (user.surfaces.includes('portal')) {
+      const hasAccess = await this.portalAccess.userHasTicket(user.sub, ticketId);
+      if (!hasAccess) {
+        throw new TicketNoEncontradoException();
+      }
+
+      const ticket = await this.findTicketRowById(ticketId);
+      if (ticket.statusName === TicketStatusName.DRAFT) {
+        throw new TicketNoEncontradoException();
+      }
+
+      return { isInternalViewer: false };
+    }
+
+    throw new TicketNoEncontradoException();
+  }
 
   async findAllStatuses(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_STATUSES);
@@ -365,6 +396,15 @@ export class TicketsService {
       },
     });
 
+    this.realtimeService.emitTicketStatusChanged({
+      ticket: updated,
+      previous: {
+        statusId: previous.statusId,
+        statusName: previous.statusName,
+      },
+      changedByUserId: actorUserId,
+    });
+
     return updated;
   }
 
@@ -400,6 +440,15 @@ export class TicketsService {
       recordId: id,
       oldValues: this.asJson(previous),
       newValues: this.asJson(updated),
+    });
+
+    this.realtimeService.emitTicketStatusChanged({
+      ticket: updated,
+      previous: {
+        statusId: previous.statusId,
+        statusName: previous.statusName,
+      },
+      changedByUserId: userId,
     });
 
     return updated;
@@ -476,14 +525,12 @@ export class TicketsService {
   ): Promise<TicketComment> {
     await this.findTicketRowById(dto.ticketId);
 
-    const { rows } = await this.db.query<TicketComment>(SQL_INSERT_TICKET_COMMENT, [
-      dto.ticketId,
-      actorUserId,
-      dto.comment,
-      dto.isInternal ?? false,
-    ]);
+    const { rows: inserted } = await this.db.query<{ id: string }>(
+      SQL_INSERT_TICKET_COMMENT,
+      [dto.ticketId, actorUserId, dto.comment, dto.isInternal ?? false],
+    );
 
-    const comment = rows[0];
+    const comment = await this.findCommentRowById(inserted[0].id);
 
     await this.auditService.log({
       userId: actorUserId,
@@ -492,6 +539,8 @@ export class TicketsService {
       recordId: comment.id,
       newValues: this.asJson(comment),
     });
+
+    this.realtimeService.emitCommentCreated(comment);
 
     return comment;
   }
@@ -534,6 +583,47 @@ export class TicketsService {
     });
 
     return rows;
+  }
+
+  async getTicketAssetsForPortal(
+    userId: string,
+    ticketId: string,
+  ): Promise<Asset[]> {
+    await this.assertPortalTicketAccess(userId, ticketId);
+
+    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [ticketId]);
+
+    await this.auditRead(userId, AUDIT_TABLE.TICKET_ASSETS, ticketId, {
+      scope: 'portal_list_by_ticket',
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
+  async uploadAssetToTicketForPortal(
+    userId: string,
+    ticketId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
+    await this.assertPortalTicketAccess(userId, ticketId);
+    return this.uploadAssetToTicket(userId, ticketId, file, displayName);
+  }
+
+  private async assertPortalTicketAccess(
+    userId: string,
+    ticketId: string,
+  ): Promise<void> {
+    const hasAccess = await this.portalAccess.userHasTicket(userId, ticketId);
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    const ticket = await this.findTicketRowById(ticketId);
+    if (ticket.statusName === TicketStatusName.DRAFT) {
+      throw new TicketNoEncontradoException();
+    }
   }
 
   async linkAsset(
@@ -588,6 +678,7 @@ export class TicketsService {
     actorUserId: string,
     ticketId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
     await this.findTicketRowById(ticketId);
 
@@ -598,6 +689,7 @@ export class TicketsService {
       ownerType: 'tickets',
       ownerId: ticketId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_TICKET_ASSET, [ticketId, asset.id]);
@@ -696,8 +788,9 @@ export class TicketsService {
     actorUserId: string,
     ticketCommentId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
-    await this.findCommentRowById(ticketCommentId);
+    const comment = await this.findCommentRowById(ticketCommentId);
 
     const asset = await this.assetsService.uploadFile({
       buffer: file.buffer,
@@ -706,6 +799,7 @@ export class TicketsService {
       ownerType: 'tickets',
       ownerId: ticketCommentId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_COMMENT_ASSET, [ticketCommentId, asset.id]);
@@ -723,7 +817,98 @@ export class TicketsService {
       },
     });
 
+    const assetPayload = {
+      id: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      fileSize: asset.fileSize,
+      createdAt: asset.createdAt,
+    };
+
+    this.realtimeService.emitCommentAssetAdded({
+      ticketId: comment.ticketId,
+      commentId: ticketCommentId,
+      isInternal: comment.isInternal,
+      asset: assetPayload,
+    });
+
+    const { rows: commentAssets } = await this.db.query<Asset>(
+      SQL_FIND_COMMENT_ASSETS,
+      [ticketCommentId],
+    );
+
+    this.realtimeService.emitCommentAssetsUpdated({
+      ticketId: comment.ticketId,
+      commentId: ticketCommentId,
+      isInternal: comment.isInternal,
+      assets: commentAssets.map((item) => ({
+        id: item.id,
+        fileName: item.fileName,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        createdAt: item.createdAt,
+      })),
+    });
+
     return asset;
+  }
+
+  async getCommentAssetsForPortal(
+    userId: string,
+    ticketCommentId: string,
+  ): Promise<Asset[]> {
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertPortalCommentAccess(userId, comment);
+
+    const { rows } = await this.db.query<Asset>(SQL_FIND_COMMENT_ASSETS, [
+      ticketCommentId,
+    ]);
+
+    await this.auditRead(
+      userId,
+      AUDIT_TABLE.TICKET_COMMENT_ASSETS,
+      ticketCommentId,
+      {
+        scope: 'portal_list_by_comment',
+        resultCount: rows.length,
+      },
+    );
+
+    return rows;
+  }
+
+  async uploadAssetToCommentForPortal(
+    userId: string,
+    ticketCommentId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertPortalCommentAccess(userId, comment);
+
+    return this.uploadAssetToComment(userId, ticketCommentId, file, displayName);
+  }
+
+  private async assertPortalCommentAccess(
+    userId: string,
+    comment: TicketComment,
+  ): Promise<void> {
+    if (comment.isInternal) {
+      throw new ComentarioTicketNoEncontradoException();
+    }
+
+    const hasAccess = await this.portalAccess.userHasTicket(
+      userId,
+      comment.ticketId,
+    );
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    const ticket = await this.findTicketRowById(comment.ticketId);
+    if (ticket.statusName === TicketStatusName.DRAFT) {
+      throw new TicketNoEncontradoException();
+    }
   }
 
   private async findTicketRowById(id: string): Promise<Ticket> {

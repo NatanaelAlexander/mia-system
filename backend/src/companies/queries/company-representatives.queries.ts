@@ -33,6 +33,13 @@ export const SQL_INSERT_COMPANY_REPRESENTATIVE = `
   RETURNING company_id AS "companyId", legal_representative_id AS "legalRepresentativeId", position
 `;
 
+export const SQL_UPDATE_COMPANY_REPRESENTATIVE = `
+  UPDATE company_representatives
+  SET position = $3
+  WHERE company_id = $1 AND legal_representative_id = $2
+  RETURNING company_id AS "companyId", legal_representative_id AS "legalRepresentativeId", position
+`;
+
 export const SQL_DELETE_COMPANY_REPRESENTATIVE = `
   DELETE FROM company_representatives
   WHERE company_id = $1 AND legal_representative_id = $2

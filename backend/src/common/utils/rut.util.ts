@@ -1,17 +1,24 @@
 /** Validación y formato de RUT chileno (misma lógica que edificio-alcazar). */
 
+/** Formato canónico de almacenamiento y API: `12.345.678-5` */
+export const CANONICAL_RUT_PATTERN = /^\d{1,2}(?:\.\d{3}){2}-[\dkK]$/;
+
+export function cleanRut(rut: string): string {
+  return rut.replace(/[.-]/g, '').toUpperCase();
+}
+
 export function validateRut(rut: string): boolean {
   if (!rut || typeof rut !== 'string') {
     return false;
   }
 
-  const cleanRut = rut.replace(/[.-]/g, '').toUpperCase();
-  if (cleanRut.length < 2) {
+  const clean = cleanRut(rut);
+  if (clean.length < 2) {
     return false;
   }
 
-  const body = cleanRut.slice(0, -1);
-  const dv = cleanRut.slice(-1);
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
 
   if (!/^\d+$/.test(body)) {
     return false;
@@ -40,14 +47,27 @@ export function validateRut(rut: string): boolean {
 }
 
 export function formatRut(rut: string): string {
-  const cleanRut = rut.replace(/[.-]/g, '').toUpperCase();
-  if (cleanRut.length < 2) {
+  const clean = cleanRut(rut);
+  if (clean.length < 2) {
     return rut;
   }
 
-  const body = cleanRut.slice(0, -1);
-  const dv = cleanRut.slice(-1);
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
   const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
   return `${formattedBody}-${dv}`;
+}
+
+export function isCanonicalRutFormat(rut: string): boolean {
+  return CANONICAL_RUT_PATTERN.test(rut) && rut === formatRut(rut);
+}
+
+/** Valida el RUT y devuelve el formato canónico para guardar o responder. */
+export function normalizeRutForStorage(rut: string): string {
+  if (!validateRut(rut)) {
+    throw new Error('INVALID_RUT');
+  }
+
+  return formatRut(rut);
 }

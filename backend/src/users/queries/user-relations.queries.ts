@@ -43,6 +43,39 @@ export const SQL_FIND_ALL_JOB_TITLES = `
   ORDER BY name ASC
 `;
 
+export const SQL_INSERT_JOB_TITLE = `
+  INSERT INTO job_titles (name)
+  VALUES ($1)
+  RETURNING id, name
+`;
+
+export const SQL_UPDATE_JOB_TITLE = `
+  UPDATE job_titles
+  SET name = $2
+  WHERE id = $1
+  RETURNING id, name
+`;
+
+export const SQL_DELETE_JOB_TITLE = `
+  DELETE FROM job_titles
+  WHERE id = $1
+  RETURNING id, name
+`;
+
+export const SQL_EXISTS_JOB_TITLE_BY_NAME = `
+  SELECT 1
+  FROM job_titles
+  WHERE LOWER(name) = LOWER($1)
+    AND ($2::uuid IS NULL OR id <> $2)
+  LIMIT 1
+`;
+
+export const SQL_COUNT_USERS_BY_JOB_TITLE = `
+  SELECT COUNT(*)::int AS count
+  FROM users_job_titles
+  WHERE job_title_id = $1
+`;
+
 export const SQL_FIND_JOB_TITLE_BY_ID = `
   SELECT id, name
   FROM job_titles

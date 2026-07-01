@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,6 +26,7 @@ import { memoryStorage } from 'multer';
 import {
   AuthorizeResource,
   AuthorizeSurface,
+  AuthorizeAction,
 } from '../auth/decorators/authorize.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
@@ -67,6 +70,18 @@ export class InternalAssetsController {
     return this.assetsService.getDownloadUrl(dto.id);
   }
 
+  @Post('descarga')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'URL firmada temporal para descargar (body)',
+    description: 'Equivalente a GET /descarga para clientes web.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: AssetDownloadUrlResponseDto })
+  getDownloadUrlByBody(@Body() dto: FindByIdDto) {
+    return this.assetsService.getDownloadUrl(dto.id);
+  }
+
   @Post('subir')
   @ApiOperation({
     summary: 'Subir archivo a R2 (sin vincular a proyecto)',
@@ -97,6 +112,7 @@ export class InternalAssetsController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar archivo (R2 + BD)' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ description: 'Eliminado' })
