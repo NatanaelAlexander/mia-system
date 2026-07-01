@@ -72,6 +72,8 @@ import {
   TicketStatusHistoryEntry,
   TicketStatusName,
 } from './types/ticket.types';
+import { JwtAccessPayload } from '../auth/types/auth.types';
+import { TicketsRealtimeService } from './realtime/tickets-realtime.service';
 
 const AUDIT_TABLE = {
   TICKETS: 'tickets',
@@ -93,7 +95,36 @@ export class TicketsService {
     private readonly portalAccess: PortalAccessService,
     private readonly projectsService: ProjectsService,
     private readonly assetsService: AssetsService,
+    private readonly realtimeService: TicketsRealtimeService,
   ) {}
+
+  async assertRealtimeTicketAccess(
+    user: JwtAccessPayload,
+    ticketId: string,
+  ): Promise<{ isInternalViewer: boolean }> {
+    const isInternalViewer = user.surfaces.includes('internal');
+
+    if (isInternalViewer) {
+      await this.findTicketRowById(ticketId);
+      return { isInternalViewer: true };
+    }
+
+    if (user.surfaces.includes('portal')) {
+      const hasAccess = await this.portalAccess.userHasTicket(user.sub, ticketId);
+      if (!hasAccess) {
+        throw new TicketNoEncontradoException();
+      }
+
+      const ticket = await this.findTicketRowById(ticketId);
+      if (ticket.statusName === TicketStatusName.DRAFT) {
+        throw new TicketNoEncontradoException();
+      }
+
+      return { isInternalViewer: false };
+    }
+
+    throw new TicketNoEncontradoException();
+  }
 
   async findAllStatuses(actorUserId: string): Promise<CatalogItem[]> {
     const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_STATUSES);
@@ -365,6 +396,15 @@ export class TicketsService {
       },
     });
 
+    this.realtimeService.emitTicketStatusChanged({
+      ticket: updated,
+      previous: {
+        statusId: previous.statusId,
+        statusName: previous.statusName,
+      },
+      changedByUserId: actorUserId,
+    });
+
     return updated;
   }
 
@@ -400,6 +440,15 @@ export class TicketsService {
       recordId: id,
       oldValues: this.asJson(previous),
       newValues: this.asJson(updated),
+    });
+
+    this.realtimeService.emitTicketStatusChanged({
+      ticket: updated,
+      previous: {
+        statusId: previous.statusId,
+        statusName: previous.statusName,
+      },
+      changedByUserId: userId,
     });
 
     return updated;
@@ -492,6 +541,8 @@ export class TicketsService {
       recordId: comment.id,
       newValues: this.asJson(comment),
     });
+
+    this.realtimeService.emitCommentCreated(comment);
 
     return comment;
   }
