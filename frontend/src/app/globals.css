@@ -192,4 +192,34 @@
     letter-spacing: var(--tracking-normal);
     font-family: var(--font-sans);
   }
+
+  [data-sonner-toaster] {
+    --normal-bg: var(--primary);
+    --normal-text: var(--primary-foreground);
+    --normal-border: color-mix(in oklch, var(--primary), black 22%);
+    --success-bg: var(--primary);
+    --success-text: var(--primary-foreground);
+    --success-border: color-mix(in oklch, var(--primary), black 22%);
+    --error-bg: var(--primary);
+    --error-text: var(--primary-foreground);
+    --error-border: color-mix(in oklch, var(--primary), black 22%);
+    --info-bg: var(--primary);
+    --info-text: var(--primary-foreground);
+    --warning-bg: var(--primary);
+    --warning-text: var(--primary-foreground);
+  }
+
+  [data-sonner-toast] {
+    box-shadow:
+      0 10px 30px -12px rgb(0 0 0 / 0.55),
+      0 0 0 1px color-mix(in oklch, var(--primary-foreground), transparent 88%);
+  }
+
+  [data-sonner-toast][data-type="error"] {
+    border-left: 3px solid var(--destructive);
+  }
+
+  [data-sonner-toast][data-type="warning"] {
+    border-left: 3px solid oklch(0.8721 0.0864 68.5474);
+  }
 }
