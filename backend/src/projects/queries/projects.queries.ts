@@ -16,19 +16,45 @@ export const SQL_FIND_ALL_ACTIVE_PROJECTS = `
 `;
 
 export const SQL_FIND_PROJECTS_FILTERED = `
-  SELECT ${PROJECT_COLUMNS}
-  FROM projects
-  WHERE ($1::text IS NULL OR status = $1)
-  ORDER BY name ASC
+  SELECT
+    p.id,
+    p.company_id AS "companyId",
+    p.name,
+    p.type,
+    p.status,
+    p.created_at AS "createdAt",
+    p.updated_at AS "updatedAt"
+  FROM projects p
+  INNER JOIN companies c ON c.id = p.company_id
+  WHERE ($1::text IS NULL OR p.status = $1)
+    AND (
+      $2::text IS NULL
+      OR c.name ILIKE '%' || $2 || '%'
+      OR regexp_replace(c.tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($2, '[.\\-]', '', 'g') || '%'
+    )
+  ORDER BY p.name ASC
 `;
 
 export const SQL_FIND_PROJECTS_FOR_PORTAL_USER = `
-  SELECT ${PROJECT_COLUMNS}
+  SELECT
+    p.id,
+    p.company_id AS "companyId",
+    p.name,
+    p.type,
+    p.status,
+    p.created_at AS "createdAt",
+    p.updated_at AS "updatedAt"
   FROM projects p
   INNER JOIN users_companies uc ON uc.company_id = p.company_id
+  INNER JOIN companies c ON c.id = p.company_id
   WHERE uc.user_id = $1
     AND p.status = $2
     AND ($3::uuid IS NULL OR p.company_id = $3)
+    AND (
+      $4::text IS NULL
+      OR c.name ILIKE '%' || $4 || '%'
+      OR regexp_replace(c.tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($4, '[.\\-]', '', 'g') || '%'
+    )
   ORDER BY p.name ASC
 `;
 

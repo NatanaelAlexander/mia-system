@@ -239,7 +239,19 @@ export class PortalProjectsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: PortalFilterProjectsDto = {},
   ) {
-    return this.projectsService.findAllForPortal(userId, dto.companyId);
+    return this.projectsService.findAllForPortal(userId, dto);
+  }
+
+  @Post('listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar proyectos del cliente (body)' })
+  @ApiBody({ type: PortalFilterProjectsDto, required: false })
+  @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
+  listWithFilters(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalFilterProjectsDto = {},
+  ) {
+    return this.projectsService.findAllForPortal(userId, dto);
   }
 
   @Get('detalle')

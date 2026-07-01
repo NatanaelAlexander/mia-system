@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, RefreshCcw } from "lucide-react";
+import { Plus, RefreshCcw, Search } from "lucide-react";
 import { listCompanies } from "@/components/app/api/companies";
 import {
   listProjects,
@@ -33,6 +33,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -72,15 +73,26 @@ export function ProjectsPage() {
   });
   const [createOpen, setCreateOpen] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
+  const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
   const [companyNames, setCompanyNames] = React.useState<Record<string, string>>(
     {},
   );
 
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
   const apiFilters = React.useMemo(
     () => ({
-      status: statusFilter === "all" ? undefined : statusFilter,
+      status: isInternal && statusFilter !== "all" ? statusFilter : undefined,
+      companySearch: debouncedSearch || undefined,
     }),
-    [statusFilter],
+    [debouncedSearch, isInternal, statusFilter],
   );
 
   const reload = React.useCallback(async () => {
@@ -93,7 +105,7 @@ export function ProjectsPage() {
 
     try {
       const [projects, companies] = await Promise.all([
-        listProjects(surface, isInternal ? apiFilters : {}),
+        listProjects(surface, apiFilters),
         listCompanies(surface, isInternal ? {} : {}),
       ]);
 
@@ -225,31 +237,55 @@ export function ProjectsPage() {
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
-          {isInternal ? (
-            <div className="max-w-xs space-y-2">
-              <Label htmlFor="project-status-filter">Estado</Label>
-              <Select
-                items={statusFilterItems}
-                value={statusFilter}
-                onValueChange={(value) =>
-                  setStatusFilter(
-                    typeof value === "string" ? (value as StatusFilter) : "active",
-                  )
-                }
-              >
-                <SelectTrigger id="project-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusFilterItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div
+            className={
+              isInternal
+                ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end"
+                : "max-w-xl space-y-2"
+            }
+          >
+            <div className="space-y-2">
+              <Label htmlFor="project-company-search" className="text-base font-medium">
+                Buscar por empresa
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="project-company-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Nombre o RUT de la empresa"
+                  className="pl-8"
+                />
+              </div>
             </div>
-          ) : null}
+
+            {isInternal ? (
+              <div className="space-y-2">
+                <Label htmlFor="project-status-filter">Estado</Label>
+                <Select
+                  items={statusFilterItems}
+                  value={statusFilter}
+                  onValueChange={(value) =>
+                    setStatusFilter(
+                      typeof value === "string" ? (value as StatusFilter) : "active",
+                    )
+                  }
+                >
+                  <SelectTrigger id="project-status-filter" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusFilterItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </div>
 
           {state.status === "loading" || isAuthLoading ? (
             <ListSkeleton columns={columns.length} />
@@ -259,9 +295,11 @@ export function ProjectsPage() {
             <EmptyState
               title="No hay proyectos"
               description={
-                canCreate
-                  ? "Crea el primer proyecto para empezar a trabajar con tickets y archivos."
-                  : "Los proyectos aparecerán aquí cuando existan o estén vinculados a tu empresa."
+                search || (isInternal && statusFilter !== "active")
+                  ? "No se encontraron proyectos con los filtros seleccionados."
+                  : canCreate
+                    ? "Crea el primer proyecto para empezar a trabajar con tickets y archivos."
+                    : "Los proyectos aparecerán aquí cuando existan o estén vinculados a tu empresa."
               }
             />
           ) : (

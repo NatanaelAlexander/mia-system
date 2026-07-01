@@ -65,11 +65,13 @@ export class ProjectsService {
   ): Promise<Project[]> {
     const { rows } = await this.db.query<Project>(SQL_FIND_PROJECTS_FILTERED, [
       filters.status ?? null,
+      filters.companySearch?.trim() || null,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'list_filtered',
       status: filters.status ?? null,
+      companySearch: filters.companySearch?.trim() || null,
       resultCount: rows.length,
     });
 
@@ -78,8 +80,11 @@ export class ProjectsService {
 
   async findAllForPortal(
     userId: string,
-    companyId?: string,
+    filters: { companyId?: string; companySearch?: string } = {},
   ): Promise<Project[]> {
+    const companyId = filters.companyId;
+    const companySearch = filters.companySearch?.trim() || null;
+
     if (companyId) {
       const hasAccess = await this.portalAccess.userHasCompany(userId, companyId);
       if (!hasAccess) {
@@ -89,12 +94,13 @@ export class ProjectsService {
 
     const { rows } = await this.db.query<Project>(
       SQL_FIND_PROJECTS_FOR_PORTAL_USER,
-      [userId, ProjectStatus.ACTIVE, companyId ?? null],
+      [userId, ProjectStatus.ACTIVE, companyId ?? null, companySearch],
     );
 
     await this.auditRead(userId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'portal_list',
       companyId: companyId ?? null,
+      companySearch,
       resultCount: rows.length,
     });
 

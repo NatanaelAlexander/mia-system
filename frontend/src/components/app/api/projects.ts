@@ -29,6 +29,7 @@ export interface UpdateProjectPayload {
 
 export interface ListProjectsFilters {
   status?: ProjectStatus;
+  companySearch?: string;
 }
 
 export function listProjects(
@@ -38,12 +39,19 @@ export function listProjects(
   if (surface === "internal") {
     return apiFetchDetalle<ProjectListItem[]>(
       "/internal/projects/listar",
-      { status: filters.status },
+      {
+        status: filters.status,
+        companySearch: filters.companySearch,
+      },
       true,
     );
   }
 
-  return apiFetch<ProjectListItem[]>(`/${surface}/projects`, {}, true);
+  return apiFetchDetalle<ProjectListItem[]>(
+    "/portal/projects/listar",
+    { companySearch: filters.companySearch },
+    true,
+  );
 }
 
 export function createProject(payload: CreateProjectPayload) {
