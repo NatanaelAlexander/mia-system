@@ -21,6 +21,7 @@ import { ticketInternalRoom, ticketPublicRoom } from './realtime/ticket-rooms.ut
 import { TicketsRealtimeService } from './realtime/tickets-realtime.service';
 import { TicketsRealtimeEvent } from './realtime/tickets-realtime.types';
 import type {
+  CommentAssetsUploadingMessage,
   CommentTypingMessage,
   TicketJoinPayload,
   TicketLeavePayload,
@@ -135,6 +136,42 @@ export class TicketsGateway
     this.untrackJoinedTicket(client, ticketId);
 
     await this.broadcastPresence(ticketId);
+    return { ok: true };
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('comment.assets_uploading')
+  async handleAssetsUploading(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: CommentAssetsUploadingMessage,
+  ): Promise<{ ok: true }> {
+    const ticketId = payload?.ticketId;
+    if (!ticketId || !payload.commentId) {
+      throw new WsException('ticketId y commentId son requeridos');
+    }
+
+    try {
+      await this.ticketsService.assertRealtimeTicketAccess(
+        client.data.user,
+        ticketId,
+      );
+    } catch (error) {
+      if (error instanceof TicketNoEncontradoException) {
+        throw new WsException('Ticket no encontrado o sin acceso');
+      }
+      throw error;
+    }
+
+    const room = payload.isInternal
+      ? ticketInternalRoom(ticketId)
+      : ticketPublicRoom(ticketId);
+
+    client.to(room).emit(TicketsRealtimeEvent.COMMENT_ASSETS_UPLOADING, {
+      ticketId,
+      commentId: payload.commentId,
+      isInternal: Boolean(payload.isInternal),
+      count: payload.count ?? 0,
+    });
     return { ok: true };
   }
 

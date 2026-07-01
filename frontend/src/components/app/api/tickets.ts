@@ -38,6 +38,7 @@ export interface TicketComment {
   createdAt: string;
   authorFirstName: string;
   authorLastName: string;
+  authorJobTitles: string[];
 }
 
 export interface ListTicketsFilters {

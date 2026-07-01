@@ -29,6 +29,7 @@ export interface UpdateProjectPayload {
 
 export interface ListProjectsFilters {
   status?: ProjectStatus;
+  companyId?: string;
   companySearch?: string;
 }
 
@@ -41,6 +42,7 @@ export function listProjects(
       "/internal/projects/listar",
       {
         status: filters.status,
+        companyId: filters.companyId,
         companySearch: filters.companySearch,
       },
       true,
@@ -49,7 +51,10 @@ export function listProjects(
 
   return apiFetchDetalle<ProjectListItem[]>(
     "/portal/projects/listar",
-    { companySearch: filters.companySearch },
+    {
+      companyId: filters.companyId,
+      companySearch: filters.companySearch,
+    },
     true,
   );
 }

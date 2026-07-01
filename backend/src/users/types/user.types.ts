@@ -33,6 +33,10 @@ export interface JobTitleOption {
   name: string;
 }
 
+export interface JobTitleListItem extends JobTitleOption {
+  userCount: number;
+}
+
 export interface FilterUsersInput {
   isActive?: boolean;
   roleName?: string;

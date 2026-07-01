@@ -11,8 +11,10 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getAssetDownloadUrl } from "@/components/app/api/assets";
-import type { AssetListItem } from "@/components/app/api/assets";
+import {
+  getAssetDownloadUrl,
+  type AssetListItem,
+} from "@/components/app/api/assets";
 import { listCompanies } from "@/components/app/api/companies";
 import { getProjectDetail } from "@/components/app/api/projects";
 import {
@@ -57,24 +59,116 @@ import {
   type TicketChatComment,
 } from "./ticket-chat-message";
 
-interface CommentWithAssets extends TicketChatComment {}
+type CommentWithAssets = TicketChatComment;
 
 interface TicketDetailPageProps {
   projectId: string;
   ticketId: string;
 }
 
+function normalizeAsset(asset: AssetListItem): AssetListItem {
+  return {
+    ...asset,
+    createdAt:
+      typeof asset.createdAt === "string"
+        ? asset.createdAt
+        : new Date(asset.createdAt).toISOString(),
+  };
+}
+
 function mergeComments(
   current: CommentWithAssets[],
   incoming: TicketComment,
+  assets?: AssetListItem[],
+  pendingAssets: AssetListItem[] = [],
+  assetSyncStatus?: CommentWithAssets["assetSyncStatus"],
 ): CommentWithAssets[] {
-  if (current.some((item) => item.id === incoming.id)) {
+  const existingIndex = current.findIndex((item) => item.id === incoming.id);
+
+  if (existingIndex >= 0) {
+    const existing = current[existingIndex];
+    const nextAssets =
+      assets !== undefined
+        ? assets
+        : pendingAssets.length > 0
+          ? pendingAssets
+          : existing.assets;
+
+    const next = [...current];
+    next[existingIndex] = {
+      ...existing,
+      ...incoming,
+      assets: nextAssets,
+      assetSyncStatus: assetSyncStatus ?? existing.assetSyncStatus,
+    };
+    return next;
+  }
+
+  const initialAssets = assets ?? pendingAssets;
+
+  return [...current, { ...incoming, assets: initialAssets, assetSyncStatus }].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+function replaceCommentAssets(
+  current: CommentWithAssets[],
+  commentId: string,
+  assets: AssetListItem[],
+): CommentWithAssets[] {
+  const existingIndex = current.findIndex((item) => item.id === commentId);
+  if (existingIndex < 0) {
     return current;
   }
 
-  return [...current, { ...incoming, assets: [] }].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  const next = [...current];
+  next[existingIndex] = {
+    ...next[existingIndex],
+    assets: assets.map(normalizeAsset),
+  };
+  return next;
+}
+
+function appendCommentAsset(
+  current: CommentWithAssets[],
+  commentId: string,
+  asset: AssetListItem,
+): CommentWithAssets[] {
+  const existingIndex = current.findIndex((item) => item.id === commentId);
+  if (existingIndex < 0) {
+    return current;
+  }
+
+  const normalized = normalizeAsset(asset);
+  const existing = current[existingIndex];
+  if (existing.assets.some((item) => item.id === normalized.id)) {
+    return current;
+  }
+
+  const next = [...current];
+  next[existingIndex] = {
+    ...existing,
+    assets: [...existing.assets, normalized],
+  };
+  return next;
+}
+
+function setCommentAssetSyncStatus(
+  current: CommentWithAssets[],
+  commentId: string,
+  assetSyncStatus?: CommentWithAssets["assetSyncStatus"],
+): CommentWithAssets[] {
+  const existingIndex = current.findIndex((item) => item.id === commentId);
+  if (existingIndex < 0) {
+    return current;
+  }
+
+  const next = [...current];
+  next[existingIndex] = {
+    ...next[existingIndex],
+    assetSyncStatus,
+  };
+  return next;
 }
 
 function TicketMetaField({ label, value }: { label: string; value: string }) {
@@ -119,6 +213,104 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     PendingAttachment[]
   >([]);
   const [typingUsers, setTypingUsers] = React.useState<string[]>([]);
+
+  const commentsRef = React.useRef(comments);
+  const pendingCommentAssetsRef = React.useRef(
+    new Map<string, AssetListItem[]>(),
+  );
+  const pendingCommentAssetStatusesRef = React.useRef(new Set<string>());
+  const assetSyncTimersRef = React.useRef(new Map<string, number[]>());
+
+  React.useEffect(() => {
+    commentsRef.current = comments;
+  }, [comments]);
+
+  React.useEffect(
+    () => () => {
+      assetSyncTimersRef.current.forEach((timers) => {
+        timers.forEach((timerId) => window.clearTimeout(timerId));
+      });
+      assetSyncTimersRef.current.clear();
+    },
+    [],
+  );
+
+  const consumePendingAssets = React.useCallback((commentId: string) => {
+    const pending = pendingCommentAssetsRef.current.get(commentId) ?? [];
+    pendingCommentAssetsRef.current.delete(commentId);
+    return pending;
+  }, []);
+
+  const consumePendingAssetStatus = React.useCallback((commentId: string) => {
+    const hasStatus = pendingCommentAssetStatusesRef.current.has(commentId);
+    pendingCommentAssetStatusesRef.current.delete(commentId);
+    return hasStatus;
+  }, []);
+
+  const stashPendingAssetStatus = React.useCallback((commentId: string) => {
+    pendingCommentAssetStatusesRef.current.add(commentId);
+  }, []);
+
+  const stashPendingAssets = React.useCallback(
+    (commentId: string, assets: AssetListItem[]) => {
+      if (assets.length === 0) {
+        return;
+      }
+
+      const map = pendingCommentAssetsRef.current;
+      const current = map.get(commentId) ?? [];
+      const merged = [...current];
+
+      for (const asset of assets.map(normalizeAsset)) {
+        if (!merged.some((item) => item.id === asset.id)) {
+          merged.push(asset);
+        }
+      }
+
+      map.set(commentId, merged);
+    },
+    [],
+  );
+
+  const applyCommentAssets = React.useCallback(
+    async (commentId: string) => {
+      try {
+        const assets = await listTicketCommentAssets(surface, commentId);
+        setComments((current) => replaceCommentAssets(current, commentId, assets));
+      } catch {
+        // Ignorar fallos puntuales de sincronización.
+      }
+    },
+    [surface],
+  );
+
+  const scheduleCommentAssetSync = React.useCallback(
+    (commentId: string) => {
+      const existing = assetSyncTimersRef.current.get(commentId) ?? [];
+      existing.forEach((timerId) => window.clearTimeout(timerId));
+
+      const delays = [400, 1000, 2500, 5000];
+      const timers = delays.map((delay, index) =>
+        window.setTimeout(() => {
+          void applyCommentAssets(commentId);
+          if (index === delays.length - 1) {
+            setComments((current) =>
+              setCommentAssetSyncStatus(current, commentId),
+            );
+          }
+        }, delay),
+      );
+
+      assetSyncTimersRef.current.set(commentId, timers);
+    },
+    [applyCommentAssets],
+  );
+
+  const refreshAllCommentAssets = React.useCallback(async () => {
+    await Promise.all(
+      commentsRef.current.map((comment) => applyCommentAssets(comment.id)),
+    );
+  }, [applyCommentAssets]);
 
   const openAttachmentPicker = React.useCallback((file?: File | null) => {
     setAttachmentInitialFile(file ?? null);
@@ -211,30 +403,163 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     } finally {
       setIsLoading(false);
     }
-  }, [claims, isInternal, projectId, surface, ticketId]);
+  }, [claims, projectId, surface, ticketId]);
 
   React.useEffect(() => {
-    if (!isAuthLoading) {
-      void loadThread();
+    if (isAuthLoading) {
+      return;
     }
+
+    const timerId = window.setTimeout(() => {
+      void loadThread();
+    }, 0);
+
+    return () => window.clearTimeout(timerId);
   }, [isAuthLoading, loadThread]);
 
   React.useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [comments.length]);
 
-  const handleRealtimeComment = React.useCallback((comment: TicketComment) => {
-    if (comment.isInternal && !isInternal) {
-      return;
-    }
+  const handleRealtimeComment = React.useCallback(
+    (comment: TicketComment) => {
+      if (comment.isInternal && !isInternal) {
+        return;
+      }
 
-    setComments((current) => mergeComments(current, comment));
-  }, [isInternal]);
+      const pendingAssets = consumePendingAssets(comment.id);
+      const hasPendingAssetStatus = consumePendingAssetStatus(comment.id);
+      const shouldShowReceiving =
+        comment.userId !== claims?.sub &&
+        pendingAssets.length === 0 &&
+        hasPendingAssetStatus;
 
-  const { isConnected, emitTyping } = useTicketRealtime({
+      setComments((current) =>
+        mergeComments(
+          current,
+          comment,
+          undefined,
+          pendingAssets,
+          shouldShowReceiving ? "receiving" : undefined,
+        ),
+      );
+
+      if (shouldShowReceiving) {
+        scheduleCommentAssetSync(comment.id);
+      }
+    },
+    [
+      claims?.sub,
+      consumePendingAssets,
+      consumePendingAssetStatus,
+      isInternal,
+      scheduleCommentAssetSync,
+    ],
+  );
+
+  const handleRealtimeCommentAssetsUploading = React.useCallback(
+    (payload: {
+      ticketId: string;
+      commentId: string;
+      isInternal: boolean;
+      count: number;
+    }) => {
+      if (payload.isInternal && !isInternal) {
+        return;
+      }
+
+      setComments((current) => {
+        if (!current.some((item) => item.id === payload.commentId)) {
+          stashPendingAssetStatus(payload.commentId);
+          return current;
+        }
+
+        return setCommentAssetSyncStatus(
+          current,
+          payload.commentId,
+          "receiving",
+        );
+      });
+
+      scheduleCommentAssetSync(payload.commentId);
+    },
+    [isInternal, scheduleCommentAssetSync, stashPendingAssetStatus],
+  );
+
+  const handleRealtimeCommentAsset = React.useCallback(
+    (payload: {
+      ticketId: string;
+      commentId: string;
+      isInternal: boolean;
+      asset: AssetListItem;
+    }) => {
+      if (payload.isInternal && !isInternal) {
+        return;
+      }
+
+      const asset = normalizeAsset(payload.asset);
+
+      setComments((current) => {
+        if (!current.some((item) => item.id === payload.commentId)) {
+          stashPendingAssets(payload.commentId, [asset]);
+          return current;
+        }
+
+        const next = appendCommentAsset(current, payload.commentId, asset);
+        const comment = next.find((item) => item.id === payload.commentId);
+
+        if (comment?.userId === claims?.sub) {
+          return next;
+        }
+
+        return setCommentAssetSyncStatus(next, payload.commentId);
+      });
+    },
+    [claims?.sub, isInternal, stashPendingAssets],
+  );
+
+  const handleRealtimeCommentAssetsUpdated = React.useCallback(
+    (payload: {
+      ticketId: string;
+      commentId: string;
+      isInternal: boolean;
+      assets: AssetListItem[];
+    }) => {
+      if (payload.isInternal && !isInternal) {
+        return;
+      }
+
+      const assets = payload.assets.map(normalizeAsset);
+
+      setComments((current) => {
+        if (!current.some((item) => item.id === payload.commentId)) {
+          stashPendingAssets(payload.commentId, assets);
+          return current;
+        }
+
+        const next = replaceCommentAssets(current, payload.commentId, assets);
+        const comment = next.find((item) => item.id === payload.commentId);
+
+        if (comment?.userId === claims?.sub || assets.length === 0) {
+          return next;
+        }
+
+        return setCommentAssetSyncStatus(next, payload.commentId);
+      });
+    },
+    [claims?.sub, isInternal, stashPendingAssets],
+  );
+
+  const { isConnected, emitTyping, emitAssetsUploading } = useTicketRealtime({
     ticketId,
     enabled: Boolean(claims && ticket),
     onCommentCreated: handleRealtimeComment,
+    onCommentAssetsUploading: handleRealtimeCommentAssetsUploading,
+    onCommentAssetAdded: handleRealtimeCommentAsset,
+    onCommentAssetsUpdated: handleRealtimeCommentAssetsUpdated,
+    onReconnect: () => {
+      void refreshAllCommentAssets();
+    },
     onTyping: (payload) => {
       if (payload.userId === claims?.sub) {
         return;
@@ -300,12 +625,27 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     setIsSending(true);
     emitTyping(false, isInternalComment);
 
+    let createdCommentId: string | null = null;
+
     try {
+      const commentIsInternal = canPostInternal ? isInternalComment : false;
       const created = await addTicketComment(surface, {
         ticketId,
         comment: trimmed || "(archivo adjunto)",
-        isInternal: canPostInternal ? isInternalComment : false,
+        isInternal: commentIsInternal,
       });
+      createdCommentId = created.id;
+
+      if (pendingAttachments.length > 0) {
+        setComments((current) =>
+          mergeComments(current, created, [], [], "uploading"),
+        );
+        emitAssetsUploading(
+          created.id,
+          pendingAttachments.length,
+          commentIsInternal,
+        );
+      }
 
       const uploadedAssets: AssetListItem[] = [];
       for (const attachment of pendingAttachments) {
@@ -319,7 +659,10 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
       }
 
       setComments((current) =>
-        mergeComments(current, { ...created, assets: uploadedAssets }),
+        setCommentAssetSyncStatus(
+          mergeComments(current, created, uploadedAssets),
+          created.id,
+        ),
       );
       setMessage("");
       setPendingAttachments([]);
@@ -331,6 +674,11 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
           : "No se pudo enviar el mensaje.";
       toast.error(errorText);
     } finally {
+      if (createdCommentId) {
+        setComments((current) =>
+          setCommentAssetSyncStatus(current, createdCommentId),
+        );
+      }
       setIsSending(false);
     }
   };

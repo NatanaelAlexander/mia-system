@@ -36,6 +36,7 @@ export interface TicketComment {
   createdAt: Date;
   authorFirstName: string;
   authorLastName: string;
+  authorJobTitles: string[];
 }
 
 export interface TicketStatusHistoryEntry {

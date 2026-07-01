@@ -24,19 +24,24 @@ import {
   AuthorizeAction,
 } from '../auth/decorators/authorize.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
+import { Permission } from '../auth/permissions/permission.constants';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import {
   AdminChangePasswordDto,
   AssignUserRolesDto,
   ChangePasswordDto,
   CreateUserDto,
+  CreateJobTitleDto,
   FilterUsersDto,
   LinkUserCompanyDto,
   LinkUserCompanyRequestDto,
   UpdateProfileDto,
   UpdateUserDto,
+  UpdateJobTitleDto,
 } from './dto/users.dto';
 import {
+  JobTitleListItemResponseDto,
   JobTitleOptionResponseDto,
   RoleOptionResponseDto,
   UserDetailResponseDto,
@@ -110,6 +115,63 @@ export class InternalUsersController {
   @ApiOkResponse({ type: JobTitleOptionResponseDto, isArray: true })
   findAllJobTitles() {
     return this.usersService.findAllJobTitles();
+  }
+
+  @Post('catalogos/cargos/listar')
+  @RequirePermissions(Permission.JobTitlesRead)
+  @ApiOperation({
+    summary: 'Listar cargos con uso (administración)',
+    description: 'Equivalente a GET /catalogos/cargos/admin para clientes web.',
+  })
+  @ApiOkResponse({ type: JobTitleListItemResponseDto, isArray: true })
+  listJobTitlesAdmin() {
+    return this.usersService.findAllJobTitlesWithUsage();
+  }
+
+  @Get('catalogos/cargos/admin')
+  @RequirePermissions(Permission.JobTitlesRead)
+  @ApiOperation({ summary: 'Listar cargos con uso (administración)' })
+  @ApiOkResponse({ type: JobTitleListItemResponseDto, isArray: true })
+  findAllJobTitlesAdmin() {
+    return this.usersService.findAllJobTitlesWithUsage();
+  }
+
+  @Post('catalogos/cargos')
+  @RequirePermissions(Permission.JobTitlesCreate)
+  @ApiOperation({ summary: 'Crear cargo laboral' })
+  @ApiBody({ type: CreateJobTitleDto })
+  @ApiCreatedResponse({ type: JobTitleOptionResponseDto })
+  createJobTitle(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: CreateJobTitleDto,
+  ) {
+    return this.usersService.createJobTitle(dto, actorUserId);
+  }
+
+  @Patch('catalogos/cargos/:id')
+  @RequirePermissions(Permission.JobTitlesUpdate)
+  @ApiOperation({ summary: 'Actualizar cargo laboral' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiBody({ type: UpdateJobTitleDto })
+  @ApiOkResponse({ type: JobTitleOptionResponseDto })
+  updateJobTitle(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateJobTitleDto,
+  ) {
+    return this.usersService.updateJobTitle(id, dto, actorUserId);
+  }
+
+  @Delete('catalogos/cargos/:id')
+  @RequirePermissions(Permission.JobTitlesDelete)
+  @ApiOperation({ summary: 'Eliminar cargo laboral' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: JobTitleOptionResponseDto })
+  deleteJobTitle(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.deleteJobTitle(id, actorUserId);
   }
 
   @Post()

@@ -82,6 +82,13 @@ export class TicketCommentResponseDto {
   @ApiProperty()
   authorLastName: string;
 
+  @ApiProperty({
+    example: ['Programador backend'],
+    isArray: true,
+    description: 'Cargos internos del autor del comentario',
+  })
+  authorJobTitles: string[];
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }

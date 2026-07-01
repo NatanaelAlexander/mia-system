@@ -27,10 +27,11 @@ export const SQL_FIND_PROJECTS_FILTERED = `
   FROM projects p
   INNER JOIN companies c ON c.id = p.company_id
   WHERE ($1::text IS NULL OR p.status = $1)
+    AND ($2::uuid IS NULL OR p.company_id = $2)
     AND (
-      $2::text IS NULL
-      OR c.name ILIKE '%' || $2 || '%'
-      OR regexp_replace(c.tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($2, '[.\\-]', '', 'g') || '%'
+      $3::text IS NULL
+      OR c.name ILIKE '%' || $3 || '%'
+      OR regexp_replace(c.tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($3, '[.\\-]', '', 'g') || '%'
     )
   ORDER BY p.name ASC
 `;

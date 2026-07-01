@@ -25,6 +25,12 @@ export class CargoNoEncontradoException extends AppException {
   }
 }
 
+export class CargoNombreDuplicadoException extends AppException {
+  constructor() {
+    super('Ya existe un cargo con ese nombre', HttpStatus.CONFLICT);
+  }
+}
+
 export class VinculoUsuarioEmpresaNoEncontradoException extends AppException {
   constructor() {
     super('El usuario no está vinculado a esa empresa', HttpStatus.NOT_FOUND);

@@ -18,6 +18,7 @@ import {
   isInternalUser,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
+import { projectsModule } from "@/components/app/projects/projects-module";
 import { ErrorState } from "@/components/app/shared/list-states";
 import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,6 +43,7 @@ import {
 } from "./company-form";
 import { CompanyRepresentativesSection } from "./company-representatives-section";
 import { CompanyUsersSection } from "./company-users-section";
+import { CompanyProjectsSection } from "./company-projects-section";
 
 interface CompanyDetailPageProps {
   companyId: string;
@@ -66,6 +68,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     isInternalUser(claims) && hasPermission(claims, "companies:update");
   const canDeactivate =
     isInternalUser(claims) && hasPermission(claims, "companies:delete");
+  const canViewProjects = canAccessModule(claims, projectsModule);
 
   const [company, setCompany] = React.useState<CompanyDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -255,6 +258,10 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
           />
           <CompanyUsersSection companyId={company.id} canManage={canEdit} />
         </>
+      ) : null}
+
+      {canViewProjects ? (
+        <CompanyProjectsSection companyId={company.id} surface={surface} />
       ) : null}
 
       <ConfirmDialog

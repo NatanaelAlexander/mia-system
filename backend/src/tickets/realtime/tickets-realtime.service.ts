@@ -3,6 +3,8 @@ import { Server } from 'socket.io';
 import { Ticket, TicketComment } from '../types/ticket.types';
 import { ticketInternalRoom, ticketPublicRoom } from './ticket-rooms.util';
 import {
+  CommentAssetAddedPayload,
+  CommentAssetsUpdatedPayload,
   CommentCreatedPayload,
   TicketStatusChangedPayload,
   TicketsRealtimeEvent,
@@ -24,6 +26,22 @@ export class TicketsRealtimeService {
       : ticketPublicRoom(comment.ticketId);
 
     this.emitToRoom(room, TicketsRealtimeEvent.COMMENT_CREATED, payload);
+  }
+
+  emitCommentAssetAdded(payload: CommentAssetAddedPayload): void {
+    const room = payload.isInternal
+      ? ticketInternalRoom(payload.ticketId)
+      : ticketPublicRoom(payload.ticketId);
+
+    this.emitToRoom(room, TicketsRealtimeEvent.COMMENT_ASSET_ADDED, payload);
+  }
+
+  emitCommentAssetsUpdated(payload: CommentAssetsUpdatedPayload): void {
+    const room = payload.isInternal
+      ? ticketInternalRoom(payload.ticketId)
+      : ticketPublicRoom(payload.ticketId);
+
+    this.emitToRoom(room, TicketsRealtimeEvent.COMMENT_ASSETS_UPDATED, payload);
   }
 
   emitTicketStatusChanged(payload: TicketStatusChangedPayload): void {

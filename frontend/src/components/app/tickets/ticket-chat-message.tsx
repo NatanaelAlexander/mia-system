@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Loader2 } from "lucide-react";
 import type { AssetListItem } from "@/components/app/api/assets";
 import type { TicketComment } from "@/components/app/api/tickets";
 import { formatChatTime, formatFileSize } from "@/components/app/shared/format";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 export interface TicketChatComment extends TicketComment {
   assets: AssetListItem[];
+  assetSyncStatus?: "uploading" | "receiving";
 }
 
 interface TicketChatMessageProps {
@@ -34,6 +35,50 @@ function getInitials(label: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+function AuthorNameWithCargos({
+  label,
+  jobTitles,
+  alignEnd = false,
+}: {
+  label: string;
+  jobTitles: string[];
+  alignEnd?: boolean;
+}) {
+  const hasCargos = jobTitles.length > 0;
+
+  if (!hasCargos) {
+    return <span className="text-sm font-bold text-primary">{label}</span>;
+  }
+
+  return (
+    <span className="group/author relative inline-flex">
+      <span className="text-sm font-bold text-primary transition-opacity group-hover/author:opacity-90">
+        {label}
+      </span>
+      <span
+        role="tooltip"
+        className={cn(
+          "pointer-events-none absolute bottom-[calc(100%+6px)] z-50",
+          "flex max-w-[15rem] flex-wrap gap-1 rounded-lg p-1",
+          "border border-primary/15 bg-popover/90 shadow-md backdrop-blur-md",
+          "opacity-0 translate-y-0.5 transition-all duration-150",
+          "group-hover/author:opacity-100 group-hover/author:translate-y-0",
+          alignEnd ? "right-0" : "left-0",
+        )}
+      >
+        {jobTitles.map((title) => (
+          <span
+            key={title}
+            className="inline-flex rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary"
+          >
+            {title}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 export function TicketChatMessage({
   comment,
   isOwn,
@@ -42,6 +87,13 @@ export function TicketChatMessage({
   onDownload,
 }: TicketChatMessageProps) {
   const initials = getInitials(authorLabel === "Tú" ? "TU" : authorLabel);
+  const jobTitles = comment.authorJobTitles ?? [];
+  const assetStatusLabel =
+    comment.assetSyncStatus === "uploading"
+      ? "Subiendo adjuntos..."
+      : comment.assetSyncStatus === "receiving"
+        ? "Recibiendo adjuntos..."
+        : null;
 
   return (
     <div
@@ -70,7 +122,11 @@ export function TicketChatMessage({
             isOwn ? "justify-end" : "justify-start",
           )}
         >
-          <span className="text-sm font-bold text-primary">{authorLabel}</span>
+          <AuthorNameWithCargos
+            label={authorLabel}
+            jobTitles={jobTitles}
+            alignEnd={isOwn}
+          />
           <span className="text-xs text-muted-foreground">
             {formatChatTime(comment.createdAt)}
           </span>
@@ -142,6 +198,20 @@ export function TicketChatMessage({
                   ) : null}
                 </div>
               ))}
+            </div>
+          ) : null}
+
+          {assetStatusLabel ? (
+            <div
+              className={cn(
+                "mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs",
+                isOwn
+                  ? "bg-primary-foreground/10 text-primary-foreground/80"
+                  : "bg-background/70 text-muted-foreground",
+              )}
+            >
+              <Loader2 className="size-3 animate-spin" />
+              {assetStatusLabel}
             </div>
           ) : null}
         </div>

@@ -790,7 +790,7 @@ export class TicketsService {
     file: Express.Multer.File,
     displayName?: string,
   ): Promise<Asset> {
-    await this.findCommentRowById(ticketCommentId);
+    const comment = await this.findCommentRowById(ticketCommentId);
 
     const asset = await this.assetsService.uploadFile({
       buffer: file.buffer,
@@ -815,6 +815,39 @@ export class TicketsService {
         fileName: asset.fileName,
         source: 'upload',
       },
+    });
+
+    const assetPayload = {
+      id: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      fileSize: asset.fileSize,
+      createdAt: asset.createdAt,
+    };
+
+    this.realtimeService.emitCommentAssetAdded({
+      ticketId: comment.ticketId,
+      commentId: ticketCommentId,
+      isInternal: comment.isInternal,
+      asset: assetPayload,
+    });
+
+    const { rows: commentAssets } = await this.db.query<Asset>(
+      SQL_FIND_COMMENT_ASSETS,
+      [ticketCommentId],
+    );
+
+    this.realtimeService.emitCommentAssetsUpdated({
+      ticketId: comment.ticketId,
+      commentId: ticketCommentId,
+      isInternal: comment.isInternal,
+      assets: commentAssets.map((item) => ({
+        id: item.id,
+        fileName: item.fileName,
+        mimeType: item.mimeType,
+        fileSize: item.fileSize,
+        createdAt: item.createdAt,
+      })),
     });
 
     return asset;

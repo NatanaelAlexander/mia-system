@@ -65,12 +65,14 @@ export class ProjectsService {
   ): Promise<Project[]> {
     const { rows } = await this.db.query<Project>(SQL_FIND_PROJECTS_FILTERED, [
       filters.status ?? null,
+      filters.companyId ?? null,
       filters.companySearch?.trim() || null,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'list_filtered',
       status: filters.status ?? null,
+      companyId: filters.companyId ?? null,
       companySearch: filters.companySearch?.trim() || null,
       resultCount: rows.length,
     });

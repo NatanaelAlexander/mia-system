@@ -6,5 +6,8 @@ INSERT INTO job_titles (name) VALUES
   ('Frontend Developer'),
   ('QA Engineer'),
   ('DevOps Engineer'),
-  ('UI Designer')
+  ('UI Designer'),
+  ('Programador backend'),
+  ('Programador frontend'),
+  ('Diseñador UI')
 ON CONFLICT (name) DO NOTHING;

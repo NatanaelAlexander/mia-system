@@ -1,4 +1,5 @@
 import type React from "react";
+import { jobTitlesModule } from "@/components/app/admin/job-titles-module";
 import { permissionsModule } from "@/components/app/admin/permissions-module";
 import { rolesModule } from "@/components/app/admin/roles-module";
 import { systemModule } from "@/components/app/admin/system-module";
@@ -30,6 +31,7 @@ export const companiesSectionHrefs = [
 export const appStandaloneNav = [usersModule] satisfies NavModule[];
 
 export const administrationNav = [
+  jobTitlesModule,
   rolesModule,
   permissionsModule,
   systemModule,
