@@ -69,3 +69,8 @@ export class JobTitleOptionResponseDto {
   @ApiProperty({ example: 'Backend Dev' })
   name: string;
 }
+
+export class JobTitleListItemResponseDto extends JobTitleOptionResponseDto {
+  @ApiProperty({ example: 3, description: 'Usuarios con este cargo asignado' })
+  userCount: number;
+}

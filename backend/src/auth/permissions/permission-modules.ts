@@ -8,5 +8,6 @@ export type PermissionModule =
   | 'assets'
   | 'tickets'
   | 'ticket_comments'
+  | 'job_titles'
   | 'audit_logs'
   | 'system';

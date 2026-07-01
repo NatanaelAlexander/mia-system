@@ -11,9 +11,9 @@ import { UsersService } from './users.service';
 @Module({
   imports: [AuthModule, AuditModule],
   controllers: [
-    InternalUsersController,
     InternalUserProfileController,
     PortalUserProfileController,
+    InternalUsersController,
   ],
   providers: [UsersService],
   exports: [UsersService],

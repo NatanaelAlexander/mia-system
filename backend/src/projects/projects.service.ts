@@ -21,12 +21,14 @@ import {
   PROJECT_COLUMNS,
   SQL_DEACTIVATE_PROJECT,
   SQL_FIND_ALL_ACTIVE_PROJECTS,
+  SQL_FIND_PROJECTS_FILTERED,
   SQL_FIND_PROJECTS_FOR_PORTAL_USER,
   SQL_FIND_PROJECT_BY_ID,
   SQL_INSERT_PROJECT,
 } from './queries/projects.queries';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { FilterProjectsDto } from './dto/filter-projects.dto';
 import { Project, ProjectStatus } from './types/project.types';
 
 const AUDIT_TABLE = {
@@ -57,10 +59,34 @@ export class ProjectsService {
     return rows;
   }
 
+  async findAllFiltered(
+    actorUserId: string,
+    filters: FilterProjectsDto = {},
+  ): Promise<Project[]> {
+    const { rows } = await this.db.query<Project>(SQL_FIND_PROJECTS_FILTERED, [
+      filters.status ?? null,
+      filters.companyId ?? null,
+      filters.companySearch?.trim() || null,
+    ]);
+
+    await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
+      scope: 'list_filtered',
+      status: filters.status ?? null,
+      companyId: filters.companyId ?? null,
+      companySearch: filters.companySearch?.trim() || null,
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
   async findAllForPortal(
     userId: string,
-    companyId?: string,
+    filters: { companyId?: string; companySearch?: string } = {},
   ): Promise<Project[]> {
+    const companyId = filters.companyId;
+    const companySearch = filters.companySearch?.trim() || null;
+
     if (companyId) {
       const hasAccess = await this.portalAccess.userHasCompany(userId, companyId);
       if (!hasAccess) {
@@ -70,12 +96,13 @@ export class ProjectsService {
 
     const { rows } = await this.db.query<Project>(
       SQL_FIND_PROJECTS_FOR_PORTAL_USER,
-      [userId, ProjectStatus.ACTIVE, companyId ?? null],
+      [userId, ProjectStatus.ACTIVE, companyId ?? null, companySearch],
     );
 
     await this.auditRead(userId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'portal_list',
       companyId: companyId ?? null,
+      companySearch,
       resultCount: rows.length,
     });
 
@@ -267,6 +294,7 @@ export class ProjectsService {
     actorUserId: string,
     projectId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
     await this.findProjectRowById(projectId);
 
@@ -277,6 +305,7 @@ export class ProjectsService {
       ownerType: 'projects',
       ownerId: projectId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_PROJECT_ASSET, [projectId, asset.id]);

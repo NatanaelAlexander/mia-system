@@ -10,17 +10,21 @@ import {
   AssignUserRolesDto,
   ChangePasswordDto,
   CreateUserDto,
+  CreateJobTitleDto,
   FilterUsersDto,
   LinkUserCompanyDto,
   UpdateProfileDto,
   UpdateUserDto,
+  UpdateJobTitleDto,
 } from './dto/users.dto';
 import {
   CargoNoEncontradoException,
+  CargoNombreDuplicadoException,
   ContrasenaActualIncorrectaException,
   EmailUsuarioDuplicadoException,
   NoPuedesDesactivarTuCuentaException,
   RolNoEncontradoException,
+  SoloClientesPuedenVincularseEmpresaException,
   SoloPuedesModificarTuPerfilException,
   UsuarioNoEncontradoException,
   VinculoUsuarioEmpresaNoEncontradoException,
@@ -33,11 +37,16 @@ import {
   SQL_EXISTS_USER_COMPANY,
   SQL_FIND_ALL_JOB_TITLES,
   SQL_FIND_ALL_ROLES,
+  SQL_INSERT_JOB_TITLE,
+  SQL_UPDATE_JOB_TITLE,
+  SQL_DELETE_JOB_TITLE,
+  SQL_EXISTS_JOB_TITLE_BY_NAME,
   SQL_FIND_JOB_TITLE_BY_ID,
   SQL_FIND_ROLE_BY_ID,
   SQL_FIND_USER_COMPANIES,
   SQL_FIND_USER_JOB_TITLES,
   SQL_FIND_USER_ROLE_IDS,
+  SQL_FIND_USER_ROLE_NAMES,
   SQL_INSERT_USER_COMPANY,
   SQL_INSERT_USER_JOB_TITLE,
   SQL_INSERT_USER_ROLE,
@@ -53,6 +62,7 @@ import {
   USER_COLUMNS,
 } from './queries/users.queries';
 import {
+  JobTitleListItem,
   JobTitleOption,
   RoleOption,
   User,
@@ -69,7 +79,11 @@ const AUDIT_TABLE = {
   USERS_ROLES: 'users_roles',
   USERS_COMPANIES: 'users_companies',
   USERS_JOB_TITLES: 'users_job_titles',
+  JOB_TITLES: 'job_titles',
 } as const;
+
+const PORTAL_CLIENT_ROLE = 'cliente';
+const INTERNAL_ROLES = new Set(['admin', 'super_admin']);
 
 @Injectable()
 export class UsersService {
@@ -230,6 +244,7 @@ export class UsersService {
     audit = true,
   ): Promise<UserDetail> {
     await this.findUserById(userId);
+    await this.ensurePortalClientUser(userId);
     await this.ensureActiveCompany(dto.companyId);
 
     await this.db.query(SQL_INSERT_USER_COMPANY, [userId, dto.companyId]);
@@ -346,6 +361,92 @@ export class UsersService {
   async findAllJobTitles(): Promise<JobTitleOption[]> {
     const { rows } = await this.db.query<JobTitleOption>(SQL_FIND_ALL_JOB_TITLES);
     return rows;
+  }
+
+  async findAllJobTitlesWithUsage(): Promise<JobTitleListItem[]> {
+    const { rows } = await this.db.query<JobTitleListItem>(`
+      SELECT jt.id, jt.name, COUNT(ujt.user_id)::int AS "userCount"
+      FROM job_titles jt
+      LEFT JOIN users_job_titles ujt ON ujt.job_title_id = jt.id
+      GROUP BY jt.id, jt.name
+      ORDER BY jt.name ASC
+    `);
+
+    return rows;
+  }
+
+  async createJobTitle(
+    dto: CreateJobTitleDto,
+    actorUserId: string | null,
+  ): Promise<JobTitleOption> {
+    const name = dto.name.trim();
+    await this.ensureJobTitleNameAvailable(name);
+
+    const { rows } = await this.db.query<JobTitleOption>(SQL_INSERT_JOB_TITLE, [
+      name,
+    ]);
+
+    const jobTitle = rows[0];
+
+    await this.auditService.log({
+      userId: actorUserId,
+      action: AuditAction.CREATE,
+      tableName: AUDIT_TABLE.JOB_TITLES,
+      recordId: jobTitle.id,
+      newValues: this.asJson(jobTitle),
+    });
+
+    return jobTitle;
+  }
+
+  async updateJobTitle(
+    id: string,
+    dto: UpdateJobTitleDto,
+    actorUserId: string | null,
+  ): Promise<JobTitleOption> {
+    const previous = await this.findJobTitleById(id);
+    const name = dto.name.trim();
+    await this.ensureJobTitleNameAvailable(name, id);
+
+    const { rows } = await this.db.query<JobTitleOption>(SQL_UPDATE_JOB_TITLE, [
+      id,
+      name,
+    ]);
+
+    if (!rows[0]) {
+      throw new CargoNoEncontradoException();
+    }
+
+    await this.auditService.log({
+      userId: actorUserId,
+      action: AuditAction.UPDATE,
+      tableName: AUDIT_TABLE.JOB_TITLES,
+      recordId: id,
+      oldValues: this.asJson(previous),
+      newValues: this.asJson(rows[0]),
+    });
+
+    return rows[0];
+  }
+
+  async deleteJobTitle(id: string, actorUserId: string | null): Promise<JobTitleOption> {
+    const previous = await this.findJobTitleById(id);
+
+    const { rows } = await this.db.query<JobTitleOption>(SQL_DELETE_JOB_TITLE, [id]);
+
+    if (!rows[0]) {
+      throw new CargoNoEncontradoException();
+    }
+
+    await this.auditService.log({
+      userId: actorUserId,
+      action: AuditAction.SOFT_DELETE,
+      tableName: AUDIT_TABLE.JOB_TITLES,
+      recordId: id,
+      oldValues: this.asJson(previous),
+    });
+
+    return rows[0];
   }
 
   private async replaceRoles(
@@ -475,12 +576,53 @@ export class UsersService {
     }
   }
 
+  private async findJobTitleById(id: string): Promise<JobTitleOption> {
+    const { rows } = await this.db.query<JobTitleOption>(SQL_FIND_JOB_TITLE_BY_ID, [
+      id,
+    ]);
+
+    if (!rows[0]) {
+      throw new CargoNoEncontradoException();
+    }
+
+    return rows[0];
+  }
+
+  private async ensureJobTitleNameAvailable(
+    name: string,
+    excludeId?: string,
+  ): Promise<void> {
+    const { rowCount } = await this.db.query(SQL_EXISTS_JOB_TITLE_BY_NAME, [
+      name,
+      excludeId ?? null,
+    ]);
+
+    if (rowCount) {
+      throw new CargoNombreDuplicadoException();
+    }
+  }
+
   private async ensureActiveCompany(companyId: string): Promise<void> {
     const { rowCount } = await this.db.query(SQL_EXISTS_COMPANY_ACTIVE, [
       companyId,
     ]);
     if (!rowCount) {
       throw new EmpresaNoEncontradaException();
+    }
+  }
+
+  private async ensurePortalClientUser(userId: string): Promise<void> {
+    const { rows } = await this.db.query<{ name: string }>(
+      SQL_FIND_USER_ROLE_NAMES,
+      [userId],
+    );
+    const roles = rows.map((row) => row.name);
+    const isPortalClient =
+      roles.includes(PORTAL_CLIENT_ROLE) &&
+      !roles.some((role) => INTERNAL_ROLES.has(role));
+
+    if (!isPortalClient) {
+      throw new SoloClientesPuedenVincularseEmpresaException();
     }
   }
 

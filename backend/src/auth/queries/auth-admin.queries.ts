@@ -42,3 +42,9 @@ export const SQL_SUPER_ADMIN_ROLE_PERMISSION_COUNT = `
   INNER JOIN permissions p ON p.id = rp.permission_id
   WHERE r.name = 'super_admin'
 `;
+
+export const SQL_LIST_PERMISSIONS = `
+  SELECT id, name, module
+  FROM permissions
+  ORDER BY module ASC, name ASC
+`;

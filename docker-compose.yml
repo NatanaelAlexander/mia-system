@@ -28,6 +28,18 @@ services:
       retries: 12
       start_period: 10s
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
   api:
     build: ./backend
     init: true
@@ -56,8 +68,12 @@ services:
       JWT_ACCESS_EXPIRES_IN_PORTAL: ${JWT_ACCESS_EXPIRES_IN_PORTAL:-12h}
       JWT_ACCESS_EXPIRES_IN_INTERNAL: ${JWT_ACCESS_EXPIRES_IN_INTERNAL:-1d}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
     depends_on:
       bd_main:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -93,6 +109,7 @@ services:
       WATCHPACK_POLLING: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
     depends_on:
       api:
         condition: service_healthy

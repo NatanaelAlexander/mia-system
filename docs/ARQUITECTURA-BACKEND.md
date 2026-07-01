@@ -135,6 +135,17 @@ Los GET de listado sin filtros (`GET /internal/companies`) no llevan body.
 
 `PATCH`, `DELETE` y `POST` con recurso puntual pueden seguir usando `:id` en la URL.
 
+### Clientes web (navegador)
+
+Los navegadores **no permiten GET con body**. Para el frontend se expone el mismo contrato vía **POST** con `@AuthorizeAction('read')` (permiso de lectura, no de creación):
+
+| Lectura (Postman / curl) | Equivalente web |
+|--------------------------|-----------------|
+| `GET …/detalle` + body `{ "id" }` | `POST …/detalle` + body `{ "id" }` |
+| `GET …/users` + body filtros | `POST …/users/listar` + body filtros |
+
+El GET original se mantiene para herramientas que sí envían body en GET.
+
 ---
 
 ## Swagger
@@ -250,7 +261,9 @@ backend/src/
 | Método | Ruta | Permiso / auth | Body |
 |--------|------|----------------|------|
 | GET | `/api/internal/users` | `users:read` | filtros opcionales |
+| POST | `/api/internal/users/listar` | `users:read` | filtros opcionales (web) |
 | GET | `/api/internal/users/detalle` | `users:read` | `{ "id" }` |
+| POST | `/api/internal/users/detalle` | `users:read` | `{ "id" }` (web) |
 | GET | `/api/internal/users/catalogos/roles` | `users:read` | — |
 | GET | `/api/internal/users/catalogos/cargos` | `users:read` | — |
 | POST | `/api/internal/users` | `users:create` | `CreateUserDto` |
@@ -278,6 +291,7 @@ Desactivar usuario = `is_active = false` (nunca DELETE físico). Roles al cambia
 |--------|------|------|
 | GET | `/api/internal/companies` | — |
 | GET | `/api/internal/companies/detalle` | `{ "id": "uuid" }` |
+| POST | `/api/internal/companies/detalle` | `{ "id": "uuid" }` (web, `companies:read`) |
 | POST | `/api/internal/companies` | `CreateCompanyDto` |
 | PATCH | `/api/internal/companies/:id` | `UpdateCompanyDto` |
 | DELETE | `/api/internal/companies/:id` | — (soft: inactive) |
@@ -427,6 +441,7 @@ Todas las rutas portal validan acceso vía JWT (`@CurrentUser('sub')`) y `users_
 |--------|------|------|------|
 | GET | `/api/portal/companies` | Bearer | — |
 | GET | `/api/portal/companies/detalle` | Bearer | `{ "id" }` |
+| POST | `/api/portal/companies/detalle` | Bearer | `{ "id" }` (web) |
 | GET | `/api/portal/projects` | Bearer | `{ "companyId"? }` |
 | GET | `/api/portal/projects/detalle` | Bearer | `{ "id" }` |
 | GET | `/api/portal/tickets` | Bearer | `{ "projectId"? }` |

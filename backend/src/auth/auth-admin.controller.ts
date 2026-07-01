@@ -12,13 +12,20 @@ import { AuthAdminService } from './auth-admin.service';
 
 @ApiBearerAuth('access-token')
 @AuthorizeSurface('internal')
-@RequirePermissions(Permission.SystemManage)
 @ApiTags('Auth — Admin')
 @Controller('internal/admin/authorization')
 export class AuthAdminController {
   constructor(private readonly authAdminService: AuthAdminService) {}
 
+  @Get('permissions')
+  @RequirePermissions(Permission.PermissionsRead)
+  @ApiOperation({ summary: 'Listar permisos del sistema' })
+  listPermissions() {
+    return this.authAdminService.listPermissions();
+  }
+
   @Get('verify')
+  @RequirePermissions(Permission.SystemManage)
   @ApiOperation({
     summary: 'Verificar salud de roles y permisos',
     description:

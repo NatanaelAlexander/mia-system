@@ -7,6 +7,8 @@ const DATA_MIGRATIONS = [
   'permissions',
   'roles',
   'job_titles',
+  'job_titles_permissions',
+  'job_titles_spanish_labels',
   'tickets',
   'users',
   'companies',

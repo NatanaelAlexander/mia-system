@@ -17,6 +17,18 @@ export const SQL_FIND_ALL_ACTIVE_COMPANIES = `
   ORDER BY name ASC
 `;
 
+export const SQL_FIND_COMPANIES_FILTERED = `
+  SELECT ${COMPANY_COLUMNS}
+  FROM companies
+  WHERE ($1::text IS NULL OR status = $1)
+    AND (
+      $2::text IS NULL
+      OR name ILIKE '%' || $2 || '%'
+      OR regexp_replace(tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($2, '[.\\-]', '', 'g') || '%'
+    )
+  ORDER BY name ASC
+`;
+
 export const SQL_FIND_COMPANIES_FOR_PORTAL_USER = `
   SELECT ${COMPANY_COLUMNS}
   FROM companies c
@@ -30,6 +42,12 @@ export const SQL_FIND_COMPANY_BY_ID_ACTIVE = `
   SELECT ${COMPANY_COLUMNS}
   FROM companies
   WHERE id = $1 AND status = $2
+`;
+
+export const SQL_FIND_COMPANY_BY_ID = `
+  SELECT ${COMPANY_COLUMNS}
+  FROM companies
+  WHERE id = $1
 `;
 
 export const SQL_EXISTS_COMPANY_BY_TAX_ID = `

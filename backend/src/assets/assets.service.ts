@@ -27,6 +27,7 @@ export interface UploadAssetFileInput {
   ownerType: string;
   ownerId: string;
   uploadedById?: string | null;
+  displayFileName?: string;
 }
 
 @Injectable()
@@ -87,7 +88,7 @@ export class AssetsService {
     });
 
     const { rows } = await this.db.query<Asset>(SQL_INSERT_ASSET, [
-      input.originalName,
+      input.displayFileName?.trim() || input.originalName,
       uploaded.key,
       uploaded.mimeType,
       uploaded.fileSize,

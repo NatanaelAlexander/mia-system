@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class GetProjectAssetsDto {
   @ApiProperty({ format: 'uuid', description: 'ID del proyecto' })
@@ -31,4 +31,14 @@ export class UploadProjectAssetDto {
   @ApiProperty({ format: 'uuid', description: 'Proyecto al que se vincula el archivo' })
   @IsUUID('4', { message: 'El ID del proyecto no es válido' })
   projectId: string;
+
+  @ApiPropertyOptional({
+    example: 'Contrato firmado 2025.pdf',
+    description:
+      'Nombre visible del archivo. Si no se envía, se usa el nombre original del archivo subido.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  displayName?: string;
 }
