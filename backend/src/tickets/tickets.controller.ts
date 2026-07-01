@@ -136,6 +136,18 @@ export class InternalTicketsController {
     return this.ticketsService.findById(actorUserId, dto.id);
   }
 
+  @Post('detalle')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Obtener ticket por ID (body)' })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: TicketResponseDto })
+  findOneByBody(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.ticketsService.findById(actorUserId, dto.id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear ticket' })
   @ApiBody({ type: CreateTicketDto })
@@ -209,6 +221,18 @@ export class InternalTicketsController {
     return this.ticketsService.getComments(actorUserId, dto.ticketId);
   }
 
+  @Post('comentarios/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar comentarios del ticket (body)' })
+  @ApiBody({ type: GetTicketCommentsDto })
+  @ApiOkResponse({ type: TicketCommentResponseDto, isArray: true })
+  listComments(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetTicketCommentsDto,
+  ) {
+    return this.ticketsService.getComments(actorUserId, dto.ticketId);
+  }
+
   @Post('comentarios')
   @ApiOperation({ summary: 'Agregar comentario al ticket' })
   @ApiBody({ type: CreateTicketCommentDto })
@@ -225,6 +249,18 @@ export class InternalTicketsController {
   @ApiBody({ type: GetTicketAssetsDto })
   @ApiOkResponse({ type: AssetResponseDto, isArray: true })
   getAssets(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetTicketAssetsDto,
+  ) {
+    return this.ticketsService.getTicketAssets(actorUserId, dto.ticketId);
+  }
+
+  @Post('archivos/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar archivos del ticket (body)' })
+  @ApiBody({ type: GetTicketAssetsDto })
+  @ApiOkResponse({ type: AssetResponseDto, isArray: true })
+  listAssets(
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: GetTicketAssetsDto,
   ) {
@@ -278,7 +314,12 @@ export class InternalTicketsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadTicketAssetDto,
   ) {
-    return this.ticketsService.uploadAssetToTicket(actorUserId, dto.ticketId, file);
+    return this.ticketsService.uploadAssetToTicket(
+      actorUserId,
+      dto.ticketId,
+      file,
+      dto.displayName,
+    );
   }
 
   @Get('comentarios/archivos')
@@ -286,6 +327,18 @@ export class InternalTicketsController {
   @ApiBody({ type: GetCommentAssetsDto })
   @ApiOkResponse({ type: AssetResponseDto, isArray: true })
   getCommentAssets(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetCommentAssetsDto,
+  ) {
+    return this.ticketsService.getCommentAssets(actorUserId, dto.ticketCommentId);
+  }
+
+  @Post('comentarios/archivos/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar archivos de un comentario (body)' })
+  @ApiBody({ type: GetCommentAssetsDto })
+  @ApiOkResponse({ type: AssetResponseDto, isArray: true })
+  listCommentAssets(
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: GetCommentAssetsDto,
   ) {
@@ -351,6 +404,7 @@ export class InternalTicketsController {
       actorUserId,
       dto.ticketCommentId,
       file,
+      dto.displayName,
     );
   }
 }
@@ -362,6 +416,20 @@ export class InternalTicketsController {
 @Controller('portal/tickets')
 export class PortalTicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
+
+  @Get('catalogos/prioridades')
+  @ApiOperation({ summary: 'Listar prioridades de ticket (portal)' })
+  @ApiOkResponse({ type: CatalogItemResponseDto, isArray: true })
+  findAllPriorities(@CurrentUser('sub') userId: string) {
+    return this.ticketsService.findAllPriorities(userId);
+  }
+
+  @Get('catalogos/categorias')
+  @ApiOperation({ summary: 'Listar categorías de ticket (portal)' })
+  @ApiOkResponse({ type: CatalogItemResponseDto, isArray: true })
+  findAllCategories(@CurrentUser('sub') userId: string) {
+    return this.ticketsService.findAllCategories(userId);
+  }
 
   @Get()
   @ApiOperation({
@@ -400,6 +468,18 @@ export class PortalTicketsController {
     return this.ticketsService.findByIdForPortal(userId, dto.id);
   }
 
+  @Post('detalle')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Obtener ticket por ID (body, portal)' })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: TicketResponseDto })
+  findOneByBody(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.ticketsService.findByIdForPortal(userId, dto.id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear ticket desde portal' })
   @ApiBody({ type: PortalCreateTicketDto })
@@ -425,6 +505,18 @@ export class PortalTicketsController {
     return this.ticketsService.getCommentsForPortal(userId, dto.ticketId);
   }
 
+  @Post('comentarios/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar comentarios públicos del ticket (body)' })
+  @ApiBody({ type: GetTicketCommentsDto })
+  @ApiOkResponse({ type: TicketCommentResponseDto, isArray: true })
+  listComments(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: GetTicketCommentsDto,
+  ) {
+    return this.ticketsService.getCommentsForPortal(userId, dto.ticketId);
+  }
+
   @Post('comentarios')
   @ApiOperation({ summary: 'Agregar comentario público (portal)' })
   @ApiBody({ type: PortalCreateTicketCommentDto })
@@ -434,5 +526,95 @@ export class PortalTicketsController {
     @Body() dto: PortalCreateTicketCommentDto,
   ) {
     return this.ticketsService.addCommentForPortal(userId, dto);
+  }
+
+  @Post('archivos/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar archivos del ticket (portal)' })
+  @ApiBody({ type: GetTicketAssetsDto })
+  @ApiOkResponse({ type: AssetResponseDto, isArray: true })
+  listTicketAssets(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: GetTicketAssetsDto,
+  ) {
+    return this.ticketsService.getTicketAssetsForPortal(userId, dto.ticketId);
+  }
+
+  @Post('subir-archivo')
+  @ApiOperation({ summary: 'Subir archivo al ticket (portal)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'ticketId'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        ticketId: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  @ApiCreatedResponse({ type: AssetResponseDto })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  uploadTicketAsset(
+    @CurrentUser('sub') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UploadTicketAssetDto,
+  ) {
+    return this.ticketsService.uploadAssetToTicketForPortal(
+      userId,
+      dto.ticketId,
+      file,
+      dto.displayName,
+    );
+  }
+
+  @Post('comentarios/archivos/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar archivos de un comentario (portal)' })
+  @ApiBody({ type: GetCommentAssetsDto })
+  @ApiOkResponse({ type: AssetResponseDto, isArray: true })
+  listCommentAssets(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: GetCommentAssetsDto,
+  ) {
+    return this.ticketsService.getCommentAssetsForPortal(userId, dto.ticketCommentId);
+  }
+
+  @Post('comentarios/subir-archivo')
+  @ApiOperation({ summary: 'Subir archivo a comentario (portal)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file', 'ticketCommentId'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        ticketCommentId: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  @ApiCreatedResponse({ type: AssetResponseDto })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  uploadCommentAsset(
+    @CurrentUser('sub') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UploadCommentAssetDto,
+  ) {
+    return this.ticketsService.uploadAssetToCommentForPortal(
+      userId,
+      dto.ticketCommentId,
+      file,
+      dto.displayName,
+    );
   }
 }

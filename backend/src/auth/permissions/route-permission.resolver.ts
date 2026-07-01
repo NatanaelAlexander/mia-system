@@ -73,8 +73,25 @@ const PATH_RULES: PathRule[] = [
   },
   {
     test: (path, method) =>
-      (path.includes('archivos') || path.includes('descarga')) && method === 'GET',
+      (path.includes('archivos') || path.includes('descarga')) &&
+      (method === 'GET' || method === 'POST'),
     permission: 'assets:read',
+  },
+  {
+    test: (path, method, surface) =>
+      path.includes('comentarios') &&
+      path.includes('listar') &&
+      method === 'POST' &&
+      surface === 'internal',
+    permission: 'ticket_comments:read_internal',
+  },
+  {
+    test: (path, method, surface) =>
+      path.includes('comentarios') &&
+      path.includes('listar') &&
+      method === 'POST' &&
+      surface === 'portal',
+    permission: 'ticket_comments:read',
   },
   {
     test: (path, method, surface) =>
@@ -88,7 +105,12 @@ const PATH_RULES: PathRule[] = [
   },
   {
     test: (path, method) =>
-      path.includes('comentarios') && method === 'POST',
+      path.includes('comentarios') &&
+      method === 'POST' &&
+      !path.includes('listar') &&
+      !path.includes('subir-archivo') &&
+      !path.includes('vincular-archivo') &&
+      !path.includes('desvincular-archivo'),
     permission: 'ticket_comments:create',
   },
   {

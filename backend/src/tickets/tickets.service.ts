@@ -587,6 +587,47 @@ export class TicketsService {
     return rows;
   }
 
+  async getTicketAssetsForPortal(
+    userId: string,
+    ticketId: string,
+  ): Promise<Asset[]> {
+    await this.assertPortalTicketAccess(userId, ticketId);
+
+    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [ticketId]);
+
+    await this.auditRead(userId, AUDIT_TABLE.TICKET_ASSETS, ticketId, {
+      scope: 'portal_list_by_ticket',
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
+  async uploadAssetToTicketForPortal(
+    userId: string,
+    ticketId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
+    await this.assertPortalTicketAccess(userId, ticketId);
+    return this.uploadAssetToTicket(userId, ticketId, file, displayName);
+  }
+
+  private async assertPortalTicketAccess(
+    userId: string,
+    ticketId: string,
+  ): Promise<void> {
+    const hasAccess = await this.portalAccess.userHasTicket(userId, ticketId);
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    const ticket = await this.findTicketRowById(ticketId);
+    if (ticket.statusName === TicketStatusName.DRAFT) {
+      throw new TicketNoEncontradoException();
+    }
+  }
+
   async linkAsset(
     actorUserId: string,
     ticketId: string,
@@ -639,6 +680,7 @@ export class TicketsService {
     actorUserId: string,
     ticketId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
     await this.findTicketRowById(ticketId);
 
@@ -649,6 +691,7 @@ export class TicketsService {
       ownerType: 'tickets',
       ownerId: ticketId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_TICKET_ASSET, [ticketId, asset.id]);
@@ -747,6 +790,7 @@ export class TicketsService {
     actorUserId: string,
     ticketCommentId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
     await this.findCommentRowById(ticketCommentId);
 
@@ -757,6 +801,7 @@ export class TicketsService {
       ownerType: 'tickets',
       ownerId: ticketCommentId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_COMMENT_ASSET, [ticketCommentId, asset.id]);
@@ -775,6 +820,64 @@ export class TicketsService {
     });
 
     return asset;
+  }
+
+  async getCommentAssetsForPortal(
+    userId: string,
+    ticketCommentId: string,
+  ): Promise<Asset[]> {
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertPortalCommentAccess(userId, comment);
+
+    const { rows } = await this.db.query<Asset>(SQL_FIND_COMMENT_ASSETS, [
+      ticketCommentId,
+    ]);
+
+    await this.auditRead(
+      userId,
+      AUDIT_TABLE.TICKET_COMMENT_ASSETS,
+      ticketCommentId,
+      {
+        scope: 'portal_list_by_comment',
+        resultCount: rows.length,
+      },
+    );
+
+    return rows;
+  }
+
+  async uploadAssetToCommentForPortal(
+    userId: string,
+    ticketCommentId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertPortalCommentAccess(userId, comment);
+
+    return this.uploadAssetToComment(userId, ticketCommentId, file, displayName);
+  }
+
+  private async assertPortalCommentAccess(
+    userId: string,
+    comment: TicketComment,
+  ): Promise<void> {
+    if (comment.isInternal) {
+      throw new ComentarioTicketNoEncontradoException();
+    }
+
+    const hasAccess = await this.portalAccess.userHasTicket(
+      userId,
+      comment.ticketId,
+    );
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    const ticket = await this.findTicketRowById(comment.ticketId);
+    if (ticket.statusName === TicketStatusName.DRAFT) {
+      throw new TicketNoEncontradoException();
+    }
   }
 
   private async findTicketRowById(id: string): Promise<Ticket> {

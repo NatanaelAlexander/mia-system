@@ -1,12 +1,12 @@
 import { ProjectAssetsPage } from "@/components/app/projects/project-assets-page";
 
-interface ProjectAssetsRoutePageProps {
+interface ProjectAssetsRouteProps {
   params: Promise<{ projectId: string }>;
 }
 
 export default async function ProjectAssetsRoutePage({
   params,
-}: ProjectAssetsRoutePageProps) {
+}: ProjectAssetsRouteProps) {
   const { projectId } = await params;
   return <ProjectAssetsPage projectId={projectId} />;
 }

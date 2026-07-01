@@ -1,12 +1,12 @@
 import { ProjectHubPage } from "@/components/app/projects/project-hub-page";
 
-interface ProjectHubRoutePageProps {
+interface ProjectDetailRouteProps {
   params: Promise<{ projectId: string }>;
 }
 
-export default async function ProjectHubRoutePage({
+export default async function ProjectDetailRoutePage({
   params,
-}: ProjectHubRoutePageProps) {
+}: ProjectDetailRouteProps) {
   const { projectId } = await params;
   return <ProjectHubPage projectId={projectId} />;
 }

@@ -1,12 +1,12 @@
 import { ProjectTicketsPage } from "@/components/app/projects/project-tickets-page";
 
-interface ProjectTicketsRoutePageProps {
+interface ProjectTicketsRouteProps {
   params: Promise<{ projectId: string }>;
 }
 
 export default async function ProjectTicketsRoutePage({
   params,
-}: ProjectTicketsRoutePageProps) {
+}: ProjectTicketsRouteProps) {
   const { projectId } = await params;
   return <ProjectTicketsPage projectId={projectId} />;
 }
