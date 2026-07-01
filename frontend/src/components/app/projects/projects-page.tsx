@@ -149,7 +149,22 @@ export function ProjectsPage() {
       base.push({
         key: "company",
         label: "Empresa",
-        render: (item) => companyNames[item.companyId] ?? "—",
+        render: (item) => {
+          const companyName = companyNames[item.companyId];
+
+          if (!companyName) {
+            return "—";
+          }
+
+          return (
+            <Link
+              href={`/app/companies/${item.companyId}`}
+              className="font-medium text-primary hover:underline"
+            >
+              {companyName}
+            </Link>
+          );
+        },
       });
     }
 
