@@ -13,6 +13,32 @@ export function pickFirstFile(files: FileList | null): File | null {
   return files[0] ?? null;
 }
 
+export function collectFiles(
+  files: FileList | null,
+  options?: { onRejected?: (file: File) => void },
+): File[] {
+  if (!files?.length) {
+    return [];
+  }
+
+  const accepted: File[] = [];
+
+  for (const file of Array.from(files)) {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      options?.onRejected?.(file);
+      continue;
+    }
+
+    accepted.push(file);
+  }
+
+  return accepted;
+}
+
+export function filesToPendingAttachments(files: File[]): PendingAttachment[] {
+  return files.map((file) => ({ file }));
+}
+
 export function resolveAttachmentDisplayName(
   customName: string,
   file: File,

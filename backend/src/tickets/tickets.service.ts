@@ -525,14 +525,12 @@ export class TicketsService {
   ): Promise<TicketComment> {
     await this.findTicketRowById(dto.ticketId);
 
-    const { rows } = await this.db.query<TicketComment>(SQL_INSERT_TICKET_COMMENT, [
-      dto.ticketId,
-      actorUserId,
-      dto.comment,
-      dto.isInternal ?? false,
-    ]);
+    const { rows: inserted } = await this.db.query<{ id: string }>(
+      SQL_INSERT_TICKET_COMMENT,
+      [dto.ticketId, actorUserId, dto.comment, dto.isInternal ?? false],
+    );
 
-    const comment = rows[0];
+    const comment = await this.findCommentRowById(inserted[0].id);
 
     await this.auditService.log({
       userId: actorUserId,

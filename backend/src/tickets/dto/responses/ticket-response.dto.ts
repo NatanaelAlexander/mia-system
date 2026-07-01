@@ -76,6 +76,12 @@ export class TicketCommentResponseDto {
   })
   isInternal: boolean;
 
+  @ApiProperty()
+  authorFirstName: string;
+
+  @ApiProperty()
+  authorLastName: string;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }

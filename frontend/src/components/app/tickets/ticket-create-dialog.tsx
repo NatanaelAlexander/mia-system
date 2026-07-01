@@ -13,8 +13,9 @@ import {
 } from "@/components/app/api/tickets";
 import { AttachmentPickDialog } from "@/components/app/shared/attachment-pick-dialog";
 import {
+  collectFiles,
+  filesToPendingAttachments,
   getAttachmentLabel,
-  pickFirstFile,
   type PendingAttachment,
 } from "@/components/app/shared/attachment-utils";
 import { formatFileSize } from "@/components/app/shared/format";
@@ -71,6 +72,37 @@ export function TicketCreateDialog({
   const [paymentStatuses, setPaymentStatuses] = React.useState<
     Awaited<ReturnType<typeof listTicketPaymentStatuses>>
   >([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const openAttachmentPicker = React.useCallback((file?: File | null) => {
+    setAttachmentInitialFile(file ?? null);
+    setAttachmentPickOpen(true);
+  }, []);
+
+  const rejectOversized = React.useCallback((file: File) => {
+    toast.error(`"${file.name}" supera el límite de 50 MB.`);
+  }, []);
+
+  const addFiles = React.useCallback(
+    (files: FileList | null) => {
+      const collected = collectFiles(files, { onRejected: rejectOversized });
+      if (collected.length === 0) {
+        return;
+      }
+
+      if (collected.length === 1) {
+        openAttachmentPicker(collected[0]);
+        return;
+      }
+
+      setPendingAttachments((current) => [
+        ...current,
+        ...filesToPendingAttachments(collected),
+      ]);
+      toast.success(`${collected.length} archivos agregados`);
+    },
+    [openAttachmentPicker, rejectOversized],
+  );
 
   React.useEffect(() => {
     if (!open) {
@@ -120,11 +152,6 @@ export function TicketCreateDialog({
     };
   }, [open, surface]);
 
-  const openAttachmentPicker = (file?: File | null) => {
-    setAttachmentInitialFile(file ?? null);
-    setAttachmentPickOpen(true);
-  };
-
   const handleDialogDragOver = (event: React.DragEvent) => {
     if (!canUpload || attachmentPickOpen) {
       return;
@@ -151,10 +178,7 @@ export function TicketCreateDialog({
 
     event.preventDefault();
     setIsDragging(false);
-    const file = pickFirstFile(event.dataTransfer.files);
-    if (file) {
-      openAttachmentPicker(file);
-    }
+    addFiles(event.dataTransfer.files);
   };
 
   const handleSubmit = async (values: CreateTicketFormValues) => {
@@ -224,7 +248,7 @@ export function TicketCreateDialog({
             {isDragging ? (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-primary/5">
                 <div className="rounded-lg border border-primary/40 bg-background px-4 py-3 text-sm font-medium text-primary">
-                  Suelta el archivo para adjuntarlo al ticket
+                  Suelta los archivos para adjuntarlos al ticket
                 </div>
               </div>
             ) : null}
@@ -256,20 +280,31 @@ export function TicketCreateDialog({
 
               {canUpload ? (
                 <div className="space-y-2 border-t border-border/70 pt-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    disabled={isSubmitting}
+                    onChange={(event) => {
+                      addFiles(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
                   <Label>Archivos adjuntos (opcional)</Label>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={isSubmitting}
-                    onClick={() => openAttachmentPicker()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip />
-                    Adjuntar archivo
+                    Adjuntar archivos
                   </Button>
                   <p className="text-xs text-muted-foreground">
-                    Arrastra archivos sobre este cuadro o usa el botón. Máximo 50
-                    MB por archivo.
+                    Arrastra varios archivos sobre este cuadro o usa el botón.
+                    Máximo 50 MB por archivo.
                   </p>
 
                   {pendingAttachments.length > 0 ? (

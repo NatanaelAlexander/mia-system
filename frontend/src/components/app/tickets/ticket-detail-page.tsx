@@ -25,14 +25,14 @@ import {
   type TicketComment,
   type TicketDetail,
 } from "@/components/app/api/tickets";
-import { listUsers } from "@/components/app/api/users";
 import { AttachmentPickDialog } from "@/components/app/shared/attachment-pick-dialog";
 import {
+  collectFiles,
+  filesToPendingAttachments,
   getAttachmentLabel,
-  pickFirstFile,
   type PendingAttachment,
 } from "@/components/app/shared/attachment-utils";
-import { formatDate, formatFileSize } from "@/components/app/shared/format";
+import { formatFileSize } from "@/components/app/shared/format";
 import { ErrorState } from "@/components/app/shared/list-states";
 import {
   hasPermission,
@@ -48,16 +48,16 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { ProjectContextHeader } from "../projects/project-context-header";
+import {
+  TicketChatMessage,
+  TicketChatTypingIndicator,
+  type TicketChatComment,
+} from "./ticket-chat-message";
 
-interface CommentWithAssets extends TicketComment {
-  assets: AssetListItem[];
-}
+interface CommentWithAssets extends TicketChatComment {}
 
 interface TicketDetailPageProps {
   projectId: string;
@@ -77,6 +77,17 @@ function mergeComments(
   );
 }
 
+function TicketMetaField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-base font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
 export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps) {
   const router = useRouter();
   const { claims, isLoading: isAuthLoading } = useAuth();
@@ -88,6 +99,7 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
   const canPostInternal = isInternal && hasPermission(claims, "ticket_comments:create");
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSending, setIsSending] = React.useState(false);
@@ -101,7 +113,6 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
   const [companyName, setCompanyName] = React.useState("");
   const [comments, setComments] = React.useState<CommentWithAssets[]>([]);
   const [ticketAssets, setTicketAssets] = React.useState<AssetListItem[]>([]);
-  const [userNames, setUserNames] = React.useState<Record<string, string>>({});
   const [message, setMessage] = React.useState("");
   const [isInternalComment, setIsInternalComment] = React.useState(false);
   const [pendingAttachments, setPendingAttachments] = React.useState<
@@ -109,10 +120,35 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
   >([]);
   const [typingUsers, setTypingUsers] = React.useState<string[]>([]);
 
-  const openAttachmentPicker = (file?: File | null) => {
+  const openAttachmentPicker = React.useCallback((file?: File | null) => {
     setAttachmentInitialFile(file ?? null);
     setAttachmentPickOpen(true);
-  };
+  }, []);
+
+  const rejectOversized = React.useCallback((file: File) => {
+    toast.error(`"${file.name}" supera el límite de 50 MB.`);
+  }, []);
+
+  const addFiles = React.useCallback(
+    (files: FileList | null) => {
+      const collected = collectFiles(files, { onRejected: rejectOversized });
+      if (collected.length === 0) {
+        return;
+      }
+
+      if (collected.length === 1) {
+        openAttachmentPicker(collected[0]);
+        return;
+      }
+
+      setPendingAttachments((current) => [
+        ...current,
+        ...filesToPendingAttachments(collected),
+      ]);
+      toast.success(`${collected.length} archivos agregados`);
+    },
+    [openAttachmentPicker, rejectOversized],
+  );
 
   const loadThread = React.useCallback(async () => {
     if (!claims) {
@@ -123,14 +159,13 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     setErrorMessage(null);
 
     try {
-      const [project, companies, ticketData, commentData, assetsData, users] =
+      const [project, companies, ticketData, commentData, assetsData] =
         await Promise.all([
         getProjectDetail(surface, projectId),
         listCompanies(surface, {}),
         getTicketDetail(surface, ticketId),
         listTicketComments(surface, ticketId),
         listTicketAssets(surface, ticketId).catch(() => [] as AssetListItem[]),
-        isInternal ? listUsers({}) : Promise.resolve([]),
       ]);
 
       if (ticketData.projectId !== projectId) {
@@ -163,14 +198,6 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
           ...comment,
           assets: assetsMap[comment.id] ?? [],
         })),
-      );
-      setUserNames(
-        Object.fromEntries(
-          users.map((user) => [
-            user.id,
-            `${user.firstName} ${user.lastName}`.trim() || user.email,
-          ]),
-        ),
       );
     } catch (error) {
       const message =
@@ -224,12 +251,15 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     },
   });
 
-  const resolveAuthorName = (userId: string) => {
-    if (userId === claims?.sub) {
+  const resolveAuthorName = (comment: TicketComment) => {
+    if (comment.userId === claims?.sub) {
       return "Tú";
     }
 
-    return userNames[userId] ?? "Usuario";
+    const fullName =
+      `${comment.authorFirstName ?? ""} ${comment.authorLastName ?? ""}`.trim();
+
+    return fullName || "Usuario";
   };
 
   const handleDownload = async (asset: AssetListItem) => {
@@ -326,21 +356,22 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
 
       <Card>
         <CardHeader className="border-b">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <CardTitle>{ticket?.title ?? "Cargando ticket..."}</CardTitle>
-              <CardDescription>
-                {ticket
-                  ? `${ticket.statusName} · ${ticket.priorityName}${
-                      ticket.categoryName ? ` · ${ticket.categoryName}` : ""
-                    }`
-                  : "Detalle del ticket"}
-              </CardDescription>
-              {ticket?.description ? (
-                <p className="text-sm text-muted-foreground">{ticket.description}</p>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            {ticket ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <TicketMetaField label="Estado" value={ticket.statusName} />
+                <TicketMetaField label="Prioridad" value={ticket.priorityName} />
+                {ticket.categoryName ? (
+                  <TicketMetaField label="Categoría" value={ticket.categoryName} />
+                ) : null}
+                {ticket.paymentStatusName ? (
+                  <TicketMetaField label="Pago" value={ticket.paymentStatusName} />
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Cargando detalle del ticket...</p>
+            )}
+            <div className="flex shrink-0 items-center gap-2">
               <Badge variant={isConnected ? "secondary" : "outline"}>
                 {isConnected ? "En vivo" : "Sin conexión"}
               </Badge>
@@ -356,6 +387,16 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
               </Button>
             </div>
           </div>
+          {ticket?.description ? (
+            <div className="mt-4 space-y-1 border-t border-border/60 pt-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Descripción
+              </p>
+              <p className="text-sm leading-relaxed text-foreground">
+                {ticket.description}
+              </p>
+            </div>
+          ) : null}
         </CardHeader>
 
         <CardContent className="space-y-4 pt-6">
@@ -390,80 +431,37 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
             </div>
           ) : null}
 
-          <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-border/70 p-4">
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando conversación...</p>
-            ) : comments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no hay mensajes. Escribe el primero o adjunta archivos.
-              </p>
-            ) : (
-              comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className={cn(
-                    "rounded-lg border px-3 py-2",
-                    comment.isInternal
-                      ? "border-amber-500/30 bg-amber-500/5"
-                      : "border-border/70 bg-muted/20",
-                  )}
-                >
-                  <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      {resolveAuthorName(comment.userId)}
-                    </span>
-                    <span>{formatDate(comment.createdAt)}</span>
-                    {comment.isInternal ? (
-                      <Badge variant="outline" className="text-[10px]">
-                        Interno
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm">{comment.comment}</p>
-                  {comment.assets.length > 0 ? (
-                    <div className="mt-2 space-y-1">
-                      {comment.assets.map((asset) => (
-                        <div
-                          key={asset.id}
-                          className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">{asset.fileName}</p>
-                            <p className="text-muted-foreground">
-                              {formatFileSize(asset.fileSize)}
-                            </p>
-                          </div>
-                          {canDownload ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon-sm"
-                              onClick={() => void handleDownload(asset)}
-                            >
-                              <Download />
-                            </Button>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-            <div ref={threadEndRef} />
-          </div>
-
-          {typingUsers.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {typingUsers.join(", ")} está escribiendo...
-            </p>
-          ) : null}
+          <div className="flex max-h-[32rem] min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando conversación...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground">
+                  Aún no hay mensajes. Escribe el primero o adjunta archivos.
+                </p>
+              ) : (
+                comments.map((comment) => (
+                  <TicketChatMessage
+                    key={comment.id}
+                    comment={comment}
+                    isOwn={comment.userId === claims?.sub}
+                    authorLabel={resolveAuthorName(comment)}
+                    canDownload={canDownload}
+                    onDownload={(asset) => void handleDownload(asset)}
+                  />
+                ))
+              )}
+              {typingUsers.length > 0 ? (
+                <TicketChatTypingIndicator names={typingUsers} />
+              ) : null}
+              <div ref={threadEndRef} />
+            </div>
 
           {canComment ? (
             <div
               className={cn(
-                "relative space-y-3 rounded-xl border border-border/70 p-4 transition-colors",
-                isComposerDragging && "border-primary ring-2 ring-primary/20",
+                "relative border-t border-border/70 bg-card/60 p-3 transition-colors",
+                isComposerDragging && "ring-2 ring-inset ring-primary/20",
               )}
               onDragOver={(event) => {
                 if (!canUpload || attachmentPickOpen) {
@@ -486,38 +484,19 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
                 }
                 event.preventDefault();
                 setIsComposerDragging(false);
-                const file = pickFirstFile(event.dataTransfer.files);
-                if (file) {
-                  openAttachmentPicker(file);
-                }
+                addFiles(event.dataTransfer.files);
               }}
             >
               {isComposerDragging ? (
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-primary/5">
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary/5">
                   <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
-                    Suelta el archivo para adjuntarlo al mensaje
+                    Suelta los archivos para adjuntarlos al mensaje
                   </div>
                 </div>
               ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="ticket-message">Mensaje</Label>
-                <textarea
-                  id="ticket-message"
-                  rows={3}
-                  value={message}
-                  disabled={isSending}
-                  onChange={(event) => {
-                    setMessage(event.target.value);
-                    emitTyping(event.target.value.trim().length > 0, isInternalComment);
-                  }}
-                  placeholder="Escribe una respuesta..."
-                  className="flex min-h-[80px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
-                />
-              </div>
-
               {canPostInternal ? (
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
                     checked={isInternalComment}
@@ -529,11 +508,11 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
               ) : null}
 
               {pendingAttachments.length > 0 ? (
-                <div className="space-y-2">
+                <div className="mb-2 space-y-1.5">
                   {pendingAttachments.map((attachment, index) => (
                     <div
                       key={`${getAttachmentLabel(attachment)}-${index}`}
-                      className="flex items-center justify-between gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1.5 text-sm"
                     >
                       <div className="min-w-0">
                         <p className="truncate font-medium">
@@ -560,22 +539,56 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-end gap-2">
                 {canUpload ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isSending}
-                    onClick={() => openAttachmentPicker()}
-                  >
-                    <Paperclip />
-                    Adjuntar
-                  </Button>
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      disabled={isSending}
+                      onChange={(event) => {
+                        addFiles(event.target.files);
+                        event.target.value = "";
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-muted-foreground"
+                      disabled={isSending}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip />
+                    </Button>
+                  </>
                 ) : null}
+
+                <textarea
+                  id="ticket-message"
+                  rows={1}
+                  value={message}
+                  disabled={isSending}
+                  onChange={(event) => {
+                    setMessage(event.target.value);
+                    emitTyping(event.target.value.trim().length > 0, isInternalComment);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  placeholder="Escribe un mensaje..."
+                  className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50"
+                />
+
                 <Button
                   type="button"
-                  size="sm"
+                  size="icon"
+                  className="size-10 shrink-0 rounded-full"
                   disabled={
                     isSending ||
                     (!message.trim() && pendingAttachments.length === 0)
@@ -583,14 +596,14 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
                   onClick={() => void handleSend()}
                 >
                   <Send />
-                  {isSending ? "Enviando..." : "Enviar"}
+                  <span className="sr-only">
+                    {isSending ? "Enviando..." : "Enviar"}
+                  </span>
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Arrastra archivos aquí o usa Adjuntar. Máximo 50 MB por archivo.
-              </p>
             </div>
           ) : null}
+          </div>
         </CardContent>
       </Card>
 

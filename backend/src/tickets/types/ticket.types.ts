@@ -34,6 +34,8 @@ export interface TicketComment {
   comment: string;
   isInternal: boolean;
   createdAt: Date;
+  authorFirstName: string;
+  authorLastName: string;
 }
 
 export interface TicketStatusHistoryEntry {

@@ -5,8 +5,7 @@ import { FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { formatFileSize } from "@/components/app/shared/format";
 import {
-  MAX_ATTACHMENT_BYTES,
-  pickFirstFile,
+  collectFiles,
   resolveAttachmentDisplayName,
   type PendingAttachment,
 } from "@/components/app/shared/attachment-utils";
@@ -33,57 +32,65 @@ interface AttachmentPickDialogProps {
   onConfirm: (attachment: PendingAttachment) => void;
 }
 
+function rejectOversized(file: File) {
+  toast.error(`"${file.name}" supera el límite de 50 MB.`);
+}
+
 export function AttachmentPickDialog({
   open,
   onOpenChange,
   initialFile = null,
   title = "Adjuntar archivo",
-  description = "Arrastra un archivo o selecciónalo. Puedes definir un nombre visible opcional.",
+  description = "Arrastra archivos o selecciónalos. Puedes definir un nombre visible opcional si adjuntas uno solo.",
   confirmLabel = "Agregar archivo",
   onConfirm,
 }: AttachmentPickDialogProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
   const [displayName, setDisplayName] = React.useState("");
   const [isDragging, setIsDragging] = React.useState(false);
 
+  const singleFile = selectedFiles.length === 1 ? selectedFiles[0] : null;
+
   React.useEffect(() => {
     if (!open) {
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setDisplayName("");
       setIsDragging(false);
       return;
     }
 
-    setSelectedFile(initialFile ?? null);
+    setSelectedFiles(initialFile ? [initialFile] : []);
     setDisplayName("");
   }, [initialFile, open]);
 
-  const assignFile = (file: File | null) => {
-    if (!file) {
-      return;
+  const assignFiles = (files: FileList | null) => {
+    const collected = collectFiles(files, { onRejected: rejectOversized });
+    if (collected.length > 0) {
+      setSelectedFiles(collected);
+      setDisplayName("");
     }
-
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error("El archivo supera el límite de 50 MB.");
-      return;
-    }
-
-    setSelectedFile(file);
   };
 
   const handleConfirm = (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!selectedFile) {
-      toast.error("Selecciona un archivo.");
+    if (selectedFiles.length === 0) {
+      toast.error("Selecciona al menos un archivo.");
       return;
     }
 
-    onConfirm({
-      file: selectedFile,
-      displayName: resolveAttachmentDisplayName(displayName, selectedFile),
-    });
+    if (singleFile) {
+      onConfirm({
+        file: singleFile,
+        displayName: resolveAttachmentDisplayName(displayName, singleFile),
+      });
+    } else {
+      for (const file of selectedFiles) {
+        onConfirm({ file });
+      }
+    }
+
     onOpenChange(false);
   };
 
@@ -96,31 +103,30 @@ export function AttachmentPickDialog({
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleConfirm}>
-          <div className="space-y-2">
-            <Label htmlFor="attachment-display-name">
-              Nombre del archivo (opcional)
-            </Label>
-            <Input
-              id="attachment-display-name"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder={
-                selectedFile
-                  ? `Por defecto: ${selectedFile.name}`
-                  : "Ej: Evidencia del error"
-              }
-              maxLength={255}
-            />
-          </div>
+          {singleFile ? (
+            <div className="space-y-2">
+              <Label htmlFor="attachment-display-name">
+                Nombre del archivo (opcional)
+              </Label>
+              <Input
+                id="attachment-display-name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder={`Por defecto: ${singleFile.name}`}
+                maxLength={255}
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-2">
-            <Label>Archivo</Label>
+            <Label>Archivo{selectedFiles.length === 0 ? "s" : ""}</Label>
             <Input
               ref={fileInputRef}
               type="file"
+              multiple
               className="hidden"
               onChange={(event) => {
-                assignFile(pickFirstFile(event.target.files));
+                assignFiles(event.target.files);
                 event.target.value = "";
               }}
             />
@@ -145,7 +151,7 @@ export function AttachmentPickDialog({
               onDrop={(event) => {
                 event.preventDefault();
                 setIsDragging(false);
-                assignFile(pickFirstFile(event.dataTransfer.files));
+                assignFiles(event.dataTransfer.files);
               }}
               className={cn(
                 "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center transition-colors",
@@ -154,22 +160,40 @@ export function AttachmentPickDialog({
                   : "border-border/70 hover:border-primary/50 hover:bg-muted/30",
               )}
             >
-              {selectedFile ? (
+              {selectedFiles.length > 0 ? (
                 <>
                   <FileUp className="size-8 text-primary" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
-                  </div>
+                  {selectedFiles.length === 1 ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{selectedFiles[0].name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(selectedFiles[0].size)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="w-full space-y-2 text-left">
+                      <p className="text-center text-sm font-medium">
+                        {selectedFiles.length} archivos seleccionados
+                      </p>
+                      <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                        {selectedFiles.map((file) => (
+                          <li key={`${file.name}-${file.size}`} className="truncate">
+                            {file.name} ({formatFileSize(file.size)})
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Haz clic o arrastra para cambiar la selección
+                  </p>
                 </>
               ) : (
                 <>
                   <Upload className="size-8 text-muted-foreground" />
-                  <p className="text-sm font-medium">Arrastra el archivo aquí</p>
+                  <p className="text-sm font-medium">Arrastra archivos aquí</p>
                   <p className="text-xs text-muted-foreground">
-                    o haz clic para seleccionarlo
+                    o haz clic para seleccionarlos (varios a la vez)
                   </p>
                 </>
               )}
@@ -184,8 +208,10 @@ export function AttachmentPickDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={!selectedFile}>
-              {confirmLabel}
+            <Button type="submit" disabled={selectedFiles.length === 0}>
+              {selectedFiles.length > 1
+                ? `Agregar ${selectedFiles.length} archivos`
+                : confirmLabel}
             </Button>
           </DialogFooter>
         </form>

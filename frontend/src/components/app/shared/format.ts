@@ -6,6 +6,13 @@ export function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+export function formatChatTime(value: string) {
+  return new Intl.DateTimeFormat("es-CL", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export function formatFileSize(value: number | null) {
   if (!value) {
     return "—";
