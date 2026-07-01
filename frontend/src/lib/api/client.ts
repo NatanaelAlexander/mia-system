@@ -35,7 +35,11 @@ async function refreshAccessToken(): Promise<boolean> {
 async function request(path: string, options: RequestInit, authenticated: boolean) {
   const headers = new Headers(options.headers);
 
-  if (!headers.has("Content-Type") && options.body) {
+  if (
+    !headers.has("Content-Type") &&
+    options.body &&
+    !(options.body instanceof FormData)
+  ) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -63,6 +67,49 @@ export async function apiFetch<T>(
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       response = await request(path, options, authenticated);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      response.status,
+      parseApiErrorMessage(body, "No se pudo completar la solicitud"),
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  authenticated = false,
+): Promise<T> {
+  let response = await request(
+    path,
+    {
+      method: "POST",
+      body: formData,
+    },
+    authenticated,
+  );
+
+  if (authenticated && response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await request(
+        path,
+        {
+          method: "POST",
+          body: formData,
+        },
+        authenticated,
+      );
     }
   }
 

@@ -292,6 +292,7 @@ export class ProjectsService {
     actorUserId: string,
     projectId: string,
     file: Express.Multer.File,
+    displayName?: string,
   ): Promise<Asset> {
     await this.findProjectRowById(projectId);
 
@@ -302,6 +303,7 @@ export class ProjectsService {
       ownerType: 'projects',
       ownerId: projectId,
       uploadedById: actorUserId,
+      displayFileName: displayName?.trim() || undefined,
     });
 
     await this.db.query(SQL_INSERT_PROJECT_ASSET, [projectId, asset.id]);

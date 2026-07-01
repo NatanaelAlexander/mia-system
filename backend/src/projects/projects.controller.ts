@@ -201,6 +201,10 @@ export class InternalProjectsController {
       properties: {
         file: { type: 'string', format: 'binary' },
         projectId: { type: 'string', format: 'uuid' },
+        displayName: {
+          type: 'string',
+          description: 'Nombre visible opcional. Sin valor usa el nombre del archivo.',
+        },
       },
     },
   })
@@ -216,7 +220,12 @@ export class InternalProjectsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: UploadProjectAssetDto,
   ) {
-    return this.projectsService.uploadAssetToProject(actorUserId, dto.projectId, file);
+    return this.projectsService.uploadAssetToProject(
+      actorUserId,
+      dto.projectId,
+      file,
+      dto.displayName,
+    );
   }
 }
 

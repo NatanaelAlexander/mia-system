@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
+import { apiFetch, apiFetchDetalle, apiUpload } from "@/lib/api/client";
 import type { AssetListItem } from "./assets";
 import type { ResourceSurface } from "./types";
 
@@ -81,6 +81,27 @@ export function listProjectAssets(projectId: string) {
   return apiFetchDetalle<AssetListItem[]>(
     "/internal/projects/archivos/listar",
     { projectId },
+    true,
+  );
+}
+
+export function uploadProjectAsset(
+  projectId: string,
+  file: File,
+  displayName?: string,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("projectId", projectId);
+
+  const trimmedName = displayName?.trim();
+  if (trimmedName) {
+    formData.append("displayName", trimmedName);
+  }
+
+  return apiUpload<AssetListItem>(
+    "/internal/projects/subir-archivo",
+    formData,
     true,
   );
 }
