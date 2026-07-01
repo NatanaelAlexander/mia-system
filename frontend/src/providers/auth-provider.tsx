@@ -3,11 +3,16 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { logoutRequest } from "@/lib/api/auth";
-import { clearSession, getSession, setSession } from "@/lib/auth/session";
-import type { AuthSession, AuthTokensResponse } from "@/lib/auth/types";
+import {
+  clearSession,
+  getRefreshToken,
+  getSession,
+  persistAuthTokens,
+} from "@/lib/auth/session";
+import type { AccessTokenClaims, AuthTokensResponse } from "@/lib/auth/types";
 
 interface AuthContextValue {
-  session: AuthSession | null;
+  claims: AccessTokenClaims | null;
   isLoading: boolean;
   login: (tokens: AuthTokensResponse) => void;
   logout: () => Promise<void>;
@@ -17,41 +22,45 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [session, setSessionState] = React.useState<AuthSession | null>(null);
+  const [claims, setClaims] = React.useState<AccessTokenClaims | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    setSessionState(getSession());
+    // Limpia almacenamiento legacy (sessionStorage + cookie flag).
+    sessionStorage.removeItem("mia_auth_session");
+    document.cookie = "mia_session_flag=; path=/; max-age=0; SameSite=Lax";
+
+    setClaims(getSession()?.claims ?? null);
     setIsLoading(false);
   }, []);
 
   const login = React.useCallback(
     (tokens: AuthTokensResponse) => {
-      const nextSession = setSession(tokens);
-      setSessionState(nextSession);
+      const session = persistAuthTokens(tokens);
+      setClaims(session.claims);
       router.replace("/app");
     },
     [router],
   );
 
   const logout = React.useCallback(async () => {
-    const current = getSession();
+    const refreshToken = getRefreshToken();
 
     try {
-      if (current?.refreshToken) {
-        await logoutRequest(current.refreshToken);
+      if (refreshToken) {
+        await logoutRequest(refreshToken);
       }
     } catch {
-      // Idempotente en backend; limpiamos sesión local igual.
+      // Idempotente en backend; limpiamos cookies igual.
     } finally {
       clearSession();
-      setSessionState(null);
+      setClaims(null);
       router.replace("/login");
     }
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ session, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ claims, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

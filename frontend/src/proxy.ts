@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/auth/cookies";
+import { ACCESS_TOKEN_COOKIE } from "@/lib/auth/cookies";
 
-export function middleware(request: NextRequest) {
-  const hasSession = request.cookies.has(SESSION_COOKIE);
+export function proxy(request: NextRequest) {
+  const hasAccessToken = request.cookies.has(ACCESS_TOKEN_COOKIE);
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/app")) {
-    if (!hasSession) {
+    if (!hasAccessToken) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return NextResponse.next();
   }
 
-  if (pathname === "/login" && hasSession) {
+  if (pathname === "/login" && hasAccessToken) {
     return NextResponse.redirect(new URL("/app", request.url));
   }
 

@@ -1,7 +1,8 @@
 export type AuthSurface = "internal" | "portal";
 
-export interface AuthUser {
-  id: string;
+/** Claims del access token (solo lectura decodificando el payload JWT en cliente). */
+export interface AccessTokenClaims {
+  sub: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -9,6 +10,9 @@ export interface AuthUser {
   surfaces: AuthSurface[];
   permissions: string[];
   permVersion: number;
+  type: "access";
+  exp: number;
+  iat: number;
 }
 
 export interface AuthTokensResponse {
@@ -16,12 +20,10 @@ export interface AuthTokensResponse {
   refreshToken: string;
   expiresIn: number;
   tokenType: "Bearer";
-  user: AuthUser;
+  /** El backend lo envía; en cliente no se persiste — usar decode del access token. */
+  user?: unknown;
 }
 
 export interface AuthSession {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-  user: AuthUser;
+  claims: AccessTokenClaims;
 }

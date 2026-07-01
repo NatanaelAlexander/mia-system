@@ -6,21 +6,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface DashboardHomeProps {
   userName?: string;
   surfaces?: string[];
+  stats: Array<{ label: string; value: number | string; helper: string }>;
+  loadError?: string | null;
 }
 
-export function DashboardHome({ userName, surfaces = [] }: DashboardHomeProps) {
-  const stats = [
-    { label: "Tickets abiertos", value: "—" },
-    { label: "En progreso", value: "—" },
-    { label: "Resueltos hoy", value: "—" },
-    { label: "SLA en riesgo", value: "—" },
-  ];
-
+export function DashboardHome({
+  userName,
+  surfaces = [],
+  stats,
+  loadError,
+}: DashboardHomeProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -51,7 +50,7 @@ export function DashboardHome({ userName, surfaces = [] }: DashboardHomeProps) {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
-                Métricas disponibles cuando se conecte el módulo de tickets.
+                {stat.helper}
               </p>
             </CardContent>
           </Card>
@@ -62,13 +61,19 @@ export function DashboardHome({ userName, surfaces = [] }: DashboardHomeProps) {
         <CardHeader>
           <CardTitle>Actividad reciente</CardTitle>
           <CardDescription>
-            Vista resumen del sistema. Próximamente con datos en vivo.
+            Resumen inicial del sistema según tus permisos.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-5/6" />
+        <CardContent>
+          {loadError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {loadError}
+            </p>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+              Sin actividad reciente para mostrar todavía.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

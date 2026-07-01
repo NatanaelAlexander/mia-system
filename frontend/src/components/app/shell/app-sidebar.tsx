@@ -4,18 +4,18 @@ import {
   LayoutDashboard,
   LifeBuoy,
   LogOut,
-  Settings,
-  Ticket,
+  UserRound,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { canAccessModule } from "@/components/app/shared/permissions";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -35,23 +35,32 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { appModuleNav } from "./navigation";
 
 const mainNav = [
   { title: "Dashboard", href: "/app", icon: LayoutDashboard },
-  { title: "Tickets", href: "/app/tickets", icon: Ticket },
 ];
 
 const systemNav = [
+  { title: "Perfil", href: "/app/profile", icon: UserRound },
   { title: "Soporte", href: "#", icon: LifeBuoy },
-  { title: "Configuración", href: "#", icon: Settings },
 ];
+
+const menuButtonClassName = cn(
+  "rounded-lg",
+  "data-active:bg-primary data-active:font-medium data-active:text-primary-foreground",
+  "data-active:hover:bg-primary/90 data-active:hover:text-primary-foreground",
+  "data-active:[&_svg]:text-primary-foreground",
+);
+const menuListClassName = "gap-2";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { session, logout } = useAuth();
+  const { claims, logout } = useAuth();
+  const moduleNav = appModuleNav.filter((item) => canAccessModule(claims, item));
 
-  const initials = session?.user
-    ? `${session.user.firstName[0] ?? ""}${session.user.lastName[0] ?? ""}`.toUpperCase()
+  const initials = claims
+    ? `${claims.firstName[0] ?? ""}${claims.lastName[0] ?? ""}`.toUpperCase()
     : "M";
 
   return (
@@ -60,18 +69,14 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/app" />}>
-                <Image
+                <img
                   src="/login/team_prime_dg.PNG"
                   alt="Team Prime"
-                  width={120}
-                  height={40}
                   className="h-8 w-auto group-data-[collapsible=icon]:hidden"
                 />
-                <Image
+                <img
                   src="/login/team_prime_dg.PNG"
                   alt="Team Prime"
-                  width={32}
-                  height={32}
                   className="hidden size-8 rounded-md object-contain group-data-[collapsible=icon]:block"
                 />
             </SidebarMenuButton>
@@ -83,16 +88,30 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className={menuListClassName}>
               {mainNav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
+                    className={menuButtonClassName}
                     render={<Link href={item.href} />}
                     isActive={
                       item.href === "/app"
                         ? pathname === "/app"
                         : pathname.startsWith(item.href)
                     }
+                    tooltip={item.title}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {moduleNav.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    className={menuButtonClassName}
+                    render={<Link href={item.href} />}
+                    isActive={pathname.startsWith(item.href)}
                     tooltip={item.title}
                   >
                     <item.icon />
@@ -109,10 +128,14 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Sistema</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className={menuListClassName}>
               {systemNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton render={<Link href={item.href} />} tooltip={item.title}>
+                  <SidebarMenuButton
+                    className={menuButtonClassName}
+                    render={<Link href={item.href} />}
+                    tooltip={item.title}
+                  >
                     <item.icon />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -138,20 +161,22 @@ export function AppSidebar() {
                 </Avatar>
                 <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                   <p className="truncate font-medium">
-                    {session?.user.firstName} {session?.user.lastName}
+                    {claims?.firstName} {claims?.lastName}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {session?.user.email}
+                    {claims?.email}
                   </p>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => logout()}>
-                  <LogOut />
-                  Cerrar sesión
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => logout()}>
+                    <LogOut />
+                    Cerrar sesión
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

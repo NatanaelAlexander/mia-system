@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -56,13 +55,10 @@ export function LoginForm() {
   return (
     <>
       <div className="flex w-full max-w-md flex-col items-center">
-        <Image
+        <img
           src="/login/team_prime_dg.PNG"
           alt="Team Prime"
-          width={180}
-          height={64}
           className="h-16 w-auto"
-          priority
         />
 
         <div className="mt-8 w-full space-y-2 text-center">

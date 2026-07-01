@@ -1,43 +1,63 @@
+import {
+  clearAuthCookies,
+  getAccessTokenCookie,
+  getRefreshTokenCookie,
+  setAuthCookies,
+} from "./cookies";
+import {
+  decodeAccessToken,
+  isAccessTokenExpired,
+  maxAgeSecondsFromJwt,
+} from "./jwt";
 import type { AuthSession, AuthTokensResponse } from "./types";
-import { clearSessionCookie, setSessionCookie } from "./cookies";
-
-const SESSION_STORAGE_KEY = "mia_auth_session";
 
 export function getSession(): AuthSession | null {
-  if (typeof window === "undefined") {
+  const accessToken = getAccessTokenCookie();
+  if (!accessToken) {
     return null;
   }
 
-  const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-  if (!raw) {
+  const claims = decodeAccessToken(accessToken);
+  if (!claims || isAccessTokenExpired(claims)) {
     return null;
   }
 
-  try {
-    return JSON.parse(raw) as AuthSession;
-  } catch {
-    return null;
-  }
+  return { claims };
 }
 
-export function setSession(tokens: AuthTokensResponse): AuthSession {
-  const session: AuthSession = {
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    expiresAt: Date.now() + tokens.expiresIn * 1000,
-    user: tokens.user,
-  };
+export function persistAuthTokens(tokens: AuthTokensResponse): AuthSession {
+  const claims = decodeAccessToken(tokens.accessToken);
+  if (!claims) {
+    throw new Error("Access token inválido");
+  }
 
-  sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-  setSessionCookie();
-  return session;
+  const accessMaxAge = maxAgeSecondsFromJwt(
+    tokens.accessToken,
+    tokens.expiresIn,
+  );
+  const refreshMaxAge = maxAgeSecondsFromJwt(
+    tokens.refreshToken,
+    tokens.expiresIn * 24 * 7,
+  );
+
+  setAuthCookies(
+    tokens.accessToken,
+    tokens.refreshToken,
+    accessMaxAge,
+    refreshMaxAge,
+  );
+
+  return { claims };
 }
 
 export function clearSession(): void {
-  sessionStorage.removeItem(SESSION_STORAGE_KEY);
-  clearSessionCookie();
+  clearAuthCookies();
 }
 
 export function getAccessToken(): string | null {
-  return getSession()?.accessToken ?? null;
+  return getAccessTokenCookie();
+}
+
+export function getRefreshToken(): string | null {
+  return getRefreshTokenCookie();
 }
