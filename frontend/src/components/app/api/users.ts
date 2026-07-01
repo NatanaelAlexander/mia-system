@@ -43,6 +43,15 @@ export function getUserDetail(id: string) {
   return apiFetchDetalle<UserDetail>("/internal/users/detalle", { id }, true);
 }
 
+export interface RoleOption {
+  id: string;
+  name: string;
+}
+
+export function listRoleCatalog() {
+  return apiFetch<RoleOption[]>("/internal/users/catalogos/roles", {}, true);
+}
+
 export function linkUserToCompany(userId: string, companyId: string) {
   return apiFetch<UserDetail>("/internal/users/vincular-empresa", {
     method: "POST",

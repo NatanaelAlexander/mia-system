@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/sidebar";
 import {
   appStandaloneNav,
+  administrationNav,
   companiesNavGroup,
   companiesSectionHrefs,
   type NavModule,
@@ -90,6 +91,9 @@ export function AppSidebar() {
     canAccessCompaniesParent || companiesChildren.length > 0;
 
   const standaloneNav = appStandaloneNav.filter((item) =>
+    canAccessModule(claims, item),
+  );
+  const adminNav = administrationNav.filter((item) =>
     canAccessModule(claims, item),
   );
 
@@ -235,6 +239,17 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {adminNav.length > 0 ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administración</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className={menuListClassName}>
+                {adminNav.map(renderNavItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter>

@@ -1,5 +1,8 @@
 import type React from "react";
 import { assetsModule } from "@/components/app/assets/assets-module";
+import { permissionsModule } from "@/components/app/admin/permissions-module";
+import { rolesModule } from "@/components/app/admin/roles-module";
+import { systemModule } from "@/components/app/admin/system-module";
 import { companiesModule } from "@/components/app/companies/companies-module";
 import { projectsModule } from "@/components/app/projects/projects-module";
 import { ticketsModule } from "@/components/app/tickets/tickets-module";
@@ -26,3 +29,9 @@ export const companiesSectionHrefs = [
 ];
 
 export const appStandaloneNav = [usersModule] satisfies NavModule[];
+
+export const administrationNav = [
+  rolesModule,
+  permissionsModule,
+  systemModule,
+] satisfies NavModule[];
