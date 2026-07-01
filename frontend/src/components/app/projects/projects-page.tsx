@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Edit2, Plus, RefreshCcw } from "lucide-react";
+import Link from "next/link";
+import { Plus, RefreshCcw } from "lucide-react";
 import { listCompanies } from "@/components/app/api/companies";
 import {
   listProjects,
@@ -41,7 +42,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProjectCreateDialog } from "./project-create-dialog";
-import { ProjectEditDialog } from "./project-edit-dialog";
 import { projectsModule } from "./projects-module";
 
 type LoadState =
@@ -65,16 +65,12 @@ export function ProjectsPage() {
   const canAccess = canAccessModule(claims, projectsModule);
   const canCreate =
     isInternalUser(claims) && hasPermission(claims, "projects:create");
-  const canEdit =
-    isInternalUser(claims) && hasPermission(claims, "projects:update");
 
   const [state, setState] = React.useState<LoadState>({
     status: "loading",
     data: [],
   });
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [editingProject, setEditingProject] =
-    React.useState<ProjectListItem | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
   const [companyNames, setCompanyNames] = React.useState<Record<string, string>>(
     {},
@@ -123,7 +119,18 @@ export function ProjectsPage() {
 
   const columns = React.useMemo<DataColumn<ProjectListItem>[]>(() => {
     const base: DataColumn<ProjectListItem>[] = [
-      { key: "name", label: "Proyecto", render: (item) => item.name },
+      {
+        key: "name",
+        label: "Proyecto",
+        render: (item) => (
+          <Link
+            href={`/app/projects/${item.id}`}
+            className="font-medium text-primary hover:underline"
+          >
+            {item.name}
+          </Link>
+        ),
+      },
     ];
 
     if (isInternal) {
@@ -156,26 +163,8 @@ export function ProjectsPage() {
       },
     );
 
-    if (canEdit) {
-      base.push({
-        key: "actions",
-        label: "",
-        render: (item) => (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditingProject(item)}
-          >
-            <Edit2 />
-            Editar
-          </Button>
-        ),
-      });
-    }
-
     return base;
-  }, [canEdit, companyNames, isInternal]);
+  }, [companyNames, isInternal]);
 
   if (!isAuthLoading && !canAccess) {
     return (
@@ -286,23 +275,6 @@ export function ProjectsPage() {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={reload}
-        />
-      ) : null}
-
-      {canEdit ? (
-        <ProjectEditDialog
-          project={editingProject}
-          companyName={
-            editingProject
-              ? (companyNames[editingProject.companyId] ?? "—")
-              : "—"
-          }
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingProject(null);
-            }
-          }}
-          onUpdated={reload}
         />
       ) : null}
     </>

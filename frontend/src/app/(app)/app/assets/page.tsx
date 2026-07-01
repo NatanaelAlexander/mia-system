@@ -1,5 +1,5 @@
-import { AssetsPage } from "@/components/app/assets/assets-page";
+import { redirect } from "next/navigation";
 
-export default function AssetsRoutePage() {
-  return <AssetsPage />;
+export default function LegacyAssetsPage() {
+  redirect("/app/projects");
 }

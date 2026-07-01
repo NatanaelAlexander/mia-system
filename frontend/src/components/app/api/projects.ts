@@ -1,4 +1,5 @@
 import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
+import type { AssetListItem } from "./assets";
 import type { ResourceSurface } from "./types";
 
 export type ProjectType = "internal" | "external";
@@ -11,6 +12,7 @@ export interface ProjectListItem {
   type: ProjectType;
   status: ProjectStatus;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CreateProjectPayload {
@@ -56,4 +58,21 @@ export function updateProject(id: string, payload: UpdateProjectPayload) {
     method: "PATCH",
     body: JSON.stringify(payload),
   }, true);
+}
+
+export function getProjectDetail(surface: ResourceSurface, id: string) {
+  const path =
+    surface === "internal"
+      ? "/internal/projects/detalle"
+      : "/portal/projects/detalle";
+
+  return apiFetchDetalle<ProjectListItem>(path, { id }, true);
+}
+
+export function listProjectAssets(projectId: string) {
+  return apiFetchDetalle<AssetListItem[]>(
+    "/internal/projects/archivos/listar",
+    { projectId },
+    true,
+  );
 }

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
 import type { ResourceSurface } from "./types";
 
 export interface TicketListItem {
@@ -11,6 +11,29 @@ export interface TicketListItem {
   updatedAt: string;
 }
 
-export function listTickets(surface: ResourceSurface) {
-  return apiFetch<TicketListItem[]>(`/${surface}/tickets`, {}, true);
+export interface ListTicketsFilters {
+  projectId?: string;
+}
+
+export function listTickets(
+  surface: ResourceSurface,
+  filters: ListTicketsFilters = {},
+) {
+  if (surface === "internal") {
+    return apiFetchDetalle<TicketListItem[]>(
+      "/internal/tickets/listar",
+      {
+        projectId: filters.projectId,
+      },
+      true,
+    );
+  }
+
+  return apiFetchDetalle<TicketListItem[]>(
+    "/portal/tickets/listar",
+    {
+      projectId: filters.projectId,
+    },
+    true,
+  );
 }

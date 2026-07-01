@@ -141,10 +141,25 @@ export class InternalProjectsController {
   }
 
   @Get('archivos')
-  @ApiOperation({ summary: 'Listar archivos del proyecto' })
+  @ApiOperation({
+    summary: 'Listar archivos del proyecto',
+    description: 'En navegador usar POST /archivos/listar.',
+  })
   @ApiBody({ type: GetProjectAssetsDto })
   @ApiOkResponse({ type: AssetResponseDto, isArray: true })
   getAssets(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetProjectAssetsDto,
+  ) {
+    return this.projectsService.getProjectAssets(actorUserId, dto.projectId);
+  }
+
+  @Post('archivos/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar archivos del proyecto (body)' })
+  @ApiBody({ type: GetProjectAssetsDto })
+  @ApiOkResponse({ type: AssetResponseDto, isArray: true })
+  listAssets(
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: GetProjectAssetsDto,
   ) {
@@ -228,10 +243,25 @@ export class PortalProjectsController {
   }
 
   @Get('detalle')
-  @ApiOperation({ summary: 'Obtener proyecto del cliente por ID' })
+  @ApiOperation({
+    summary: 'Obtener proyecto del cliente por ID',
+    description: 'En navegador usar POST /detalle.',
+  })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: ProjectResponseDto })
   findOne(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.projectsService.findByIdForPortal(userId, dto.id);
+  }
+
+  @Post('detalle')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Obtener proyecto del cliente por ID (body)' })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: ProjectResponseDto })
+  findOneByBody(
     @CurrentUser('sub') userId: string,
     @Body() dto: FindByIdDto,
   ) {

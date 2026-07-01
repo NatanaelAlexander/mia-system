@@ -1,5 +1,5 @@
-import { TicketsPage } from "@/components/app/tickets/tickets-page";
+import { redirect } from "next/navigation";
 
-export default function TicketsRoutePage() {
-  return <TicketsPage />;
+export default function LegacyTicketsPage() {
+  redirect("/app/projects");
 }

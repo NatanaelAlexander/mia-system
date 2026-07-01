@@ -75,7 +75,11 @@ function isActivePath(pathname: string, href: string) {
 }
 
 function isCompaniesSection(pathname: string) {
-  return companiesSectionHrefs.some((href) => isActivePath(pathname, href));
+  if (companiesSectionHrefs.some((href) => isActivePath(pathname, href))) {
+    return true;
+  }
+
+  return pathname.startsWith("/app/projects/");
 }
 
 export function AppSidebar() {

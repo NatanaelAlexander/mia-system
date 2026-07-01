@@ -25,6 +25,7 @@ import { memoryStorage } from 'multer';
 import {
   AuthorizeResource,
   AuthorizeSurface,
+  AuthorizeAction,
 } from '../auth/decorators/authorize.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
@@ -96,10 +97,28 @@ export class InternalTicketsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar tickets (oculta Borrador por defecto)' })
+  @ApiOperation({
+    summary: 'Listar tickets (oculta Borrador por defecto)',
+    description: 'Para filtros desde navegador usar POST /listar.',
+  })
   @ApiBody({ type: FilterTicketsDto, required: false })
   @ApiOkResponse({ type: TicketResponseDto, isArray: true })
   findAll(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() filters: FilterTicketsDto = {},
+  ) {
+    return this.ticketsService.findAll(actorUserId, filters);
+  }
+
+  @Post('listar')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Listar tickets con filtros (body)',
+    description: 'Equivalente a GET con filtros para clientes web.',
+  })
+  @ApiBody({ type: FilterTicketsDto, required: false })
+  @ApiOkResponse({ type: TicketResponseDto, isArray: true })
+  listWithFilters(
     @CurrentUser('sub') actorUserId: string,
     @Body() filters: FilterTicketsDto = {},
   ) {
@@ -347,11 +366,23 @@ export class PortalTicketsController {
   @Get()
   @ApiOperation({
     summary: 'Listar tickets del cliente',
-    description: 'Solo tickets de proyectos de empresas del usuario autenticado.',
+    description: 'Solo proyectos de empresas del usuario. En navegador usar POST /listar.',
   })
   @ApiBody({ type: PortalFilterTicketsDto, required: false })
   @ApiOkResponse({ type: TicketResponseDto, isArray: true })
   findAll(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: PortalFilterTicketsDto = {},
+  ) {
+    return this.ticketsService.findAllForPortal(userId, dto.projectId);
+  }
+
+  @Post('listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar tickets del cliente (body)' })
+  @ApiBody({ type: PortalFilterTicketsDto, required: false })
+  @ApiOkResponse({ type: TicketResponseDto, isArray: true })
+  listWithFilters(
     @CurrentUser('sub') userId: string,
     @Body() dto: PortalFilterTicketsDto = {},
   ) {
