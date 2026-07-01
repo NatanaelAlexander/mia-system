@@ -39,6 +39,7 @@ import {
   type CompanyFormValues,
   type CompanyFormSubmitMeta,
 } from "./company-form";
+import { CompanyRepresentativesSection } from "./company-representatives-section";
 import { CompanyUsersSection } from "./company-users-section";
 
 interface CompanyDetailPageProps {
@@ -250,7 +251,15 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       </Card>
 
       {isInternalUser(claims) ? (
-        <CompanyUsersSection companyId={company.id} />
+        <>
+          <CompanyRepresentativesSection
+            companyId={company.id}
+            representativeLinks={company.representativeLinks}
+            canManage={canEdit}
+            onChanged={loadCompany}
+          />
+          <CompanyUsersSection companyId={company.id} />
+        </>
       ) : null}
     </div>
   );

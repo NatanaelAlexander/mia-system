@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -32,6 +34,7 @@ import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.
 import { LinkRepresentativeDto } from './dto/link-representative.dto';
 import { GetCompanyRepresentativesDto } from './dto/get-company-representatives.dto';
 import { FilterCompaniesDto } from './dto/filter-companies.dto';
+import { UpdateCompanyRepresentativeDto } from './dto/update-company-representative.dto';
 import {
   CompanyRepresentativeResponseDto,
   CompanyResponseDto,
@@ -170,6 +173,7 @@ export class InternalCompaniesController {
   }
 
   @Delete(':id/representatives/:legalRepresentativeId')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Desvincular representante de empresa' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiParam({ name: 'legalRepresentativeId', format: 'uuid' })
@@ -183,6 +187,26 @@ export class InternalCompaniesController {
       actorUserId,
       id,
       legalRepresentativeId,
+    );
+  }
+
+  @Patch(':id/representatives/:legalRepresentativeId')
+  @ApiOperation({ summary: 'Actualizar cargo del representante en la empresa' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'legalRepresentativeId', format: 'uuid' })
+  @ApiBody({ type: UpdateCompanyRepresentativeDto })
+  @ApiOkResponse({ type: CompanyRepresentativeResponseDto })
+  updateRepresentativeLink(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('legalRepresentativeId', ParseUUIDPipe) legalRepresentativeId: string,
+    @Body() dto: UpdateCompanyRepresentativeDto,
+  ) {
+    return this.companiesService.updateCompanyRepresentative(
+      actorUserId,
+      id,
+      legalRepresentativeId,
+      dto,
     );
   }
 }

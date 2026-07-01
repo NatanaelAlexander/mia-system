@@ -33,6 +33,7 @@ import {
   SQL_EXISTS_COMPANY_REPRESENTATIVE_LINK,
   SQL_FIND_COMPANY_REPRESENTATIVES,
   SQL_INSERT_COMPANY_REPRESENTATIVE,
+  SQL_UPDATE_COMPANY_REPRESENTATIVE,
 } from './queries/company-representatives.queries';
 import {
   Company,
@@ -47,6 +48,7 @@ import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.
 import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.dto';
 import { LinkRepresentativeDto } from './dto/link-representative.dto';
 import { FilterCompaniesDto } from './dto/filter-companies.dto';
+import { UpdateCompanyRepresentativeDto } from './dto/update-company-representative.dto';
 
 type CompanyRepresentativeRow = {
   companyId: string;
@@ -352,7 +354,7 @@ export class CompaniesService {
     actorUserId: string,
     companyId: string,
   ): Promise<CompanyRepresentative[]> {
-    await this.findActiveCompanyById(companyId);
+    await this.findCompanyById(companyId);
     const representatives = await this.fetchCompanyRepresentatives(companyId);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.COMPANY_REPRESENTATIVES, companyId, {
@@ -368,7 +370,7 @@ export class CompaniesService {
     companyId: string,
     dto: LinkRepresentativeDto,
   ): Promise<CompanyRepresentative> {
-    await this.findActiveCompanyById(companyId);
+    await this.findCompanyById(companyId);
     await this.findLegalRepresentativeRowById(dto.legalRepresentativeId);
 
     const exists = await this.db.query(SQL_EXISTS_COMPANY_REPRESENTATIVE_LINK, [
@@ -401,6 +403,44 @@ export class CompaniesService {
         legalRepresentativeId: dto.legalRepresentativeId,
         position: dto.position ?? null,
       },
+    });
+
+    return link;
+  }
+
+  async updateCompanyRepresentative(
+    actorUserId: string,
+    companyId: string,
+    legalRepresentativeId: string,
+    dto: UpdateCompanyRepresentativeDto,
+  ): Promise<CompanyRepresentative> {
+    await this.findCompanyById(companyId);
+
+    const previousLinks = await this.fetchCompanyRepresentatives(companyId);
+    const previous = previousLinks.find(
+      (link) => link.legalRepresentativeId === legalRepresentativeId,
+    );
+
+    const { rows } = await this.db.query<CompanyRepresentative>(
+      SQL_UPDATE_COMPANY_REPRESENTATIVE,
+      [companyId, legalRepresentativeId, dto.position ?? null],
+    );
+
+    if (!rows[0]) {
+      throw new VinculoEmpresaRepresentanteNoEncontradoException();
+    }
+
+    const legalRepresentative =
+      await this.findLegalRepresentativeRowById(legalRepresentativeId);
+    const link = { ...rows[0], legalRepresentative };
+
+    await this.auditService.log({
+      userId: actorUserId,
+      action: AuditAction.UPDATE,
+      tableName: AUDIT_TABLE.COMPANY_REPRESENTATIVES,
+      recordId: companyId,
+      oldValues: previous ? this.asJson(previous) : null,
+      newValues: this.asJson(link),
     });
 
     return link;
