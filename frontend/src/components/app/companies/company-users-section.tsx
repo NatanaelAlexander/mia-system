@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ListSkeleton } from "@/components/app/shared/list-states";
+import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 
 interface CompanyUsersSectionProps {
   companyId: string;
@@ -40,6 +41,9 @@ export function CompanyUsersSection({
   const [selectedUserId, setSelectedUserId] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [unassignTarget, setUnassignTarget] = React.useState<UserListItem | null>(
+    null,
+  );
 
   const loadUsers = React.useCallback(async () => {
     setIsLoading(true);
@@ -92,19 +96,17 @@ export function CompanyUsersSection({
     }
   };
 
-  const handleUnassign = async (user: UserListItem) => {
-    const name = `${user.firstName} ${user.lastName}`.trim();
-    const confirmed = window.confirm(`¿Desasignar a ${name} de esta empresa?`);
-
-    if (!confirmed) {
+  const handleUnassign = async () => {
+    if (!unassignTarget) {
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await unassignUserFromCompany(companyId, user.id);
+      await unassignUserFromCompany(companyId, unassignTarget.id);
       toast.success("Usuario desasignado");
+      setUnassignTarget(null);
       await loadUsers();
     } catch (error) {
       const message =
@@ -116,6 +118,10 @@ export function CompanyUsersSection({
       setIsSubmitting(false);
     }
   };
+
+  const unassignTargetName = unassignTarget
+    ? `${unassignTarget.firstName} ${unassignTarget.lastName}`.trim()
+    : "este usuario";
 
   const userSelectItems = React.useMemo(() => {
     const placeholder =
@@ -202,7 +208,7 @@ export function CompanyUsersSection({
                     variant="outline"
                     size="sm"
                     disabled={isSubmitting}
-                    onClick={() => handleUnassign(user)}
+                    onClick={() => setUnassignTarget(user)}
                   >
                     <UserMinus />
                     Desasignar
@@ -213,6 +219,20 @@ export function CompanyUsersSection({
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={unassignTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUnassignTarget(null);
+          }
+        }}
+        title="Desasignar usuario"
+        description={`¿Desasignar a ${unassignTargetName} de esta empresa? El usuario seguirá existiendo, pero dejará de operar con esta empresa.`}
+        confirmLabel="Desasignar"
+        onConfirm={handleUnassign}
+        isConfirming={isSubmitting}
+      />
     </Card>
   );
 }

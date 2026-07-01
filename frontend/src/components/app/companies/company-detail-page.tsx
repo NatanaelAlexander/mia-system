@@ -19,6 +19,7 @@ import {
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { ErrorState } from "@/components/app/shared/list-states";
+import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
 
   const loadCompany = React.useCallback(async () => {
     if (!claims || !canAccess) {
@@ -146,19 +148,12 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `¿Desactivar la empresa "${company.name}"? No se eliminará el registro.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       await deactivateCompany(companyId);
       toast.success("Empresa desactivada");
+      setDeactivateConfirmOpen(false);
       router.push("/app/companies");
     } catch (error) {
       const message =
@@ -220,7 +215,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
               variant="outline"
               size="sm"
               disabled={isSubmitting}
-              onClick={handleDeactivate}
+              onClick={() => setDeactivateConfirmOpen(true)}
             >
               <Trash2 />
               Desactivar
@@ -261,6 +256,16 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
           <CompanyUsersSection companyId={company.id} canManage={canEdit} />
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={deactivateConfirmOpen}
+        onOpenChange={setDeactivateConfirmOpen}
+        title="Desactivar empresa"
+        description={`¿Desactivar la empresa "${company.name}"? No se eliminará el registro; solo dejará de estar activa.`}
+        confirmLabel="Desactivar"
+        onConfirm={handleDeactivate}
+        isConfirming={isSubmitting}
+      />
     </div>
   );
 }

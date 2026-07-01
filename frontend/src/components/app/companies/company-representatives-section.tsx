@@ -13,6 +13,7 @@ import {
   type CompanyRepresentativeLink,
   type LegalRepresentative,
 } from "@/components/app/api/companies";
+import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import {
@@ -195,6 +196,8 @@ export function CompanyRepresentativesSection({
   const [selectedRepresentativeId, setSelectedRepresentativeId] =
     React.useState("");
   const [selectedPosition, setSelectedPosition] = React.useState("");
+  const [unlinkTarget, setUnlinkTarget] =
+    React.useState<CompanyRepresentativeLink | null>(null);
 
   const linkedRepresentativeIds = React.useMemo(
     () => new Set(representativeLinks.map((link) => link.legalRepresentativeId)),
@@ -336,13 +339,8 @@ export function CompanyRepresentativesSection({
     }
   };
 
-  const handleUnlink = async (link: CompanyRepresentativeLink) => {
-    const name = link.legalRepresentative
-      ? representativeName(link.legalRepresentative)
-      : "este representante";
-    const confirmed = window.confirm(`¿Quitar a ${name} de esta empresa?`);
-
-    if (!confirmed) {
+  const handleUnlink = async () => {
+    if (!unlinkTarget) {
       return;
     }
 
@@ -351,9 +349,10 @@ export function CompanyRepresentativesSection({
     try {
       await unlinkRepresentativeFromCompany(
         companyId,
-        link.legalRepresentativeId,
+        unlinkTarget.legalRepresentativeId,
       );
       toast.success("Representante desvinculado");
+      setUnlinkTarget(null);
       await onChanged();
     } catch (error) {
       const message =
@@ -365,6 +364,10 @@ export function CompanyRepresentativesSection({
       setIsSubmitting(false);
     }
   };
+
+  const unlinkTargetName = unlinkTarget?.legalRepresentative
+    ? representativeName(unlinkTarget.legalRepresentative)
+    : "este representante";
 
   return (
     <>
@@ -457,7 +460,7 @@ export function CompanyRepresentativesSection({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => handleUnlink(link)}
+                          onClick={() => setUnlinkTarget(link)}
                           disabled={isSubmitting}
                         >
                           <Trash2 />
@@ -590,6 +593,20 @@ export function CompanyRepresentativesSection({
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={unlinkTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setUnlinkTarget(null);
+          }
+        }}
+        title="Quitar representante"
+        description={`¿Quitar a ${unlinkTargetName} de esta empresa? Solo se desvincula de esta empresa; el representante seguirá existiendo en el sistema.`}
+        confirmLabel="Quitar"
+        onConfirm={handleUnlink}
+        isConfirming={isSubmitting}
+      />
     </>
   );
 }
