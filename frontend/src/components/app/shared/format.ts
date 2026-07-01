@@ -17,3 +17,18 @@ export function formatFileSize(value: number | null) {
 
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+export function formatRole(role: string) {
+  return role
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+export function formatRoles(roles: string[]) {
+  if (roles.length === 0) {
+    return "Sin rol";
+  }
+
+  return roles.map(formatRole).join(", ");
+}

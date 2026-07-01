@@ -1,8 +1,8 @@
 "use client";
 
 import {
+  EllipsisVertical,
   LayoutDashboard,
-  LifeBuoy,
   LogOut,
   UserRound,
 } from "lucide-react";
@@ -10,14 +10,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { canAccessModule } from "@/components/app/shared/permissions";
+import { formatRoles } from "@/components/app/shared/format";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -33,17 +32,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { appModuleNav } from "./navigation";
 
 const mainNav = [
   { title: "Dashboard", href: "/app", icon: LayoutDashboard },
-];
-
-const systemNav = [
-  { title: "Perfil", href: "/app/profile", icon: UserRound },
-  { title: "Soporte", href: "#", icon: LifeBuoy },
 ];
 
 const menuButtonClassName = cn(
@@ -58,6 +51,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { claims, logout } = useAuth();
   const moduleNav = appModuleNav.filter((item) => canAccessModule(claims, item));
+  const roleLabel = formatRoles(claims?.roles ?? []);
 
   const initials = claims
     ? `${claims.firstName[0] ?? ""}${claims.lastName[0] ?? ""}`.toUpperCase()
@@ -122,28 +116,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className={menuListClassName}>
-              {systemNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    className={menuButtonClassName}
-                    render={<Link href={item.href} />}
-                    tooltip={item.title}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
@@ -152,11 +124,11 @@ export function AppSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg p-2 text-left text-sm outline-hidden hover:bg-sidebar-accent",
+                  "flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2 text-left text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
                 )}
                 render={<button type="button" />}
               >
-                <Avatar className="size-8">
+                <Avatar className="size-8 shrink-0">
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
@@ -167,16 +139,52 @@ export function AppSidebar() {
                     {claims?.email}
                   </p>
                 </div>
+                <EllipsisVertical className="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuContent
+                align="start"
+                side="top"
+                sideOffset={8}
+                className="w-(--anchor-width) min-w-56 p-0"
+              >
+                <div className="flex items-center gap-3 border-b px-3 py-3">
+                  <Avatar className="size-10 shrink-0">
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {claims?.firstName} {claims?.lastName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {claims?.email}
+                    </p>
+                    <span className="mt-1 inline-block text-xs font-medium text-primary">
+                      {roleLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-1">
+                  <DropdownMenuItem
+                    className="gap-2 rounded-md px-2 py-2"
+                    render={<Link href="/app/profile" />}
+                  >
+                    <UserRound />
+                    Perfil
+                  </DropdownMenuItem>
+                </div>
+
+                <DropdownMenuSeparator className="mx-0" />
+
+                <div className="p-1">
+                  <DropdownMenuItem
+                    className="gap-2 rounded-md px-2 py-2"
+                    onClick={() => logout()}
+                  >
                     <LogOut />
                     Cerrar sesión
                   </DropdownMenuItem>
-                </DropdownMenuGroup>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
