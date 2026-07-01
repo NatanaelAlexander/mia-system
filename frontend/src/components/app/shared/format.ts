@@ -32,3 +32,15 @@ export function formatRoles(roles: string[]) {
 
   return roles.map(formatRole).join(", ");
 }
+
+export function formatCompanyStatus(status: string) {
+  if (status === "active") {
+    return "Activa";
+  }
+
+  if (status === "inactive") {
+    return "Inactiva";
+  }
+
+  return status;
+}

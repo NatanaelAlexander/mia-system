@@ -23,3 +23,14 @@ export function canAccessModule(
 
   return claims.permissions.includes(access.requiredPermission);
 }
+
+export function hasPermission(
+  claims: AccessTokenClaims | null,
+  permission: string,
+) {
+  return claims?.permissions.includes(permission) ?? false;
+}
+
+export function isInternalUser(claims: AccessTokenClaims | null) {
+  return claims?.surfaces.includes("internal") ?? false;
+}
