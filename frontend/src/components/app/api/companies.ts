@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
 import type { ResourceSurface } from "./types";
 
 export type CompanyStatus = "active" | "inactive";
@@ -40,15 +40,31 @@ export interface UpdateCompanyPayload {
   status?: CompanyStatus;
 }
 
-export function listCompanies(surface: ResourceSurface) {
+export interface ListCompaniesFilters {
+  status?: CompanyStatus;
+  search?: string;
+}
+
+export function listCompanies(
+  surface: ResourceSurface,
+  filters: ListCompaniesFilters = {},
+) {
+  if (surface === "internal") {
+    return apiFetchDetalle<CompanyListItem[]>(
+      "/internal/companies/listar",
+      {
+        status: filters.status,
+        search: filters.search?.trim() || undefined,
+      },
+      true,
+    );
+  }
+
   return apiFetch<CompanyListItem[]>(`/${surface}/companies`, {}, true);
 }
 
 export function getCompanyDetail(surface: ResourceSurface, id: string) {
-  return apiFetch<CompanyDetail>(`/${surface}/companies/detalle`, {
-    method: "GET",
-    body: JSON.stringify({ id }),
-  }, true);
+  return apiFetchDetalle<CompanyDetail>(`/${surface}/companies/detalle`, { id }, true);
 }
 
 export function createCompany(payload: CreateCompanyPayload) {

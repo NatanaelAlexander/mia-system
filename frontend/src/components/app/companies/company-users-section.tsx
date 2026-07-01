@@ -20,6 +20,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ListSkeleton } from "@/components/app/shared/list-states";
 
 interface CompanyUsersSectionProps {
@@ -105,6 +112,21 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
     }
   };
 
+  const userSelectItems = React.useMemo(() => {
+    const placeholder =
+      availableUsers.length === 0
+        ? "No hay usuarios disponibles"
+        : "Selecciona un usuario";
+
+    return [
+      { label: placeholder, value: null },
+      ...availableUsers.map((user) => ({
+        label: `${user.firstName} ${user.lastName} (${user.email})`,
+        value: user.id,
+      })),
+    ];
+  }, [availableUsers]);
+
   return (
     <Card>
       <CardHeader>
@@ -116,23 +138,27 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
       <CardContent className="space-y-4">
         {canManageUsers ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              value={selectedUserId}
-              onChange={(event) => setSelectedUserId(event.target.value)}
+            <Select
+              items={userSelectItems}
+              value={selectedUserId || null}
+              onValueChange={(value) =>
+                setSelectedUserId(typeof value === "string" ? value : "")
+              }
               disabled={isSubmitting || availableUsers.length === 0}
-              className="flex h-8 min-w-0 flex-1 rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <option value="">
-                {availableUsers.length === 0
-                  ? "No hay usuarios disponibles"
-                  : "Selecciona un usuario"}
-              </option>
-              {availableUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.firstName} {user.lastName} ({user.email})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="min-w-0 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {userSelectItems.map((item) =>
+                  item.value === null ? null : (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
               onClick={handleLink}

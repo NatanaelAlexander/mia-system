@@ -8,7 +8,10 @@ export class CompanyResponseDto {
   @ApiProperty({ example: 'Empresa Demo SpA' })
   name: string;
 
-  @ApiProperty({ example: '76123456-7' })
+  @ApiProperty({
+    example: '12.345.678-5',
+    description: 'RUT en formato canónico (12.345.678-5).',
+  })
   taxId: string;
 
   @ApiPropertyOptional({ example: 'Av. Providencia 123', nullable: true })

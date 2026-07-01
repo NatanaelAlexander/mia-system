@@ -22,7 +22,7 @@ import { ErrorState } from "@/components/app/shared/list-states";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -37,6 +37,7 @@ import {
   toCompanyFormValues,
   toCompanyPayload,
   type CompanyFormValues,
+  type CompanyFormSubmitMeta,
 } from "./company-form";
 import { CompanyUsersSection } from "./company-users-section";
 
@@ -86,7 +87,9 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       const message =
         error instanceof ApiError
           ? error.message
-          : "No se pudo cargar la empresa.";
+          : error instanceof Error
+            ? error.message
+            : "No se pudo cargar la empresa.";
       setErrorMessage(message);
       setCompany(null);
     } finally {
@@ -100,7 +103,10 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     }
   }, [isAuthLoading, loadCompany]);
 
-  const handleSubmit = async (values: CompanyFormValues) => {
+  const handleSubmit = async (
+    values: CompanyFormValues,
+    { dirtyFields }: CompanyFormSubmitMeta,
+  ) => {
     if (!canEdit) {
       return;
     }
@@ -108,8 +114,13 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     setIsSubmitting(true);
 
     try {
+      const payload = toCompanyPayload(values);
+      if (!dirtyFields.taxId) {
+        delete payload.taxId;
+      }
+
       const updated = await updateCompany(companyId, {
-        ...toCompanyPayload(values),
+        ...payload,
         email: values.email?.trim() || null,
         phoneNumber: values.phoneNumber?.trim() || null,
         address: values.address?.trim() || null,
@@ -166,10 +177,13 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   if (!canAccess || errorMessage || !company) {
     return (
       <div className="space-y-4">
-        <Button type="button" variant="outline" render={<Link href="/app/companies" />}>
+        <Link
+          href="/app/companies"
+          className={buttonVariants({ variant: "outline" })}
+        >
           <ArrowLeft />
           Volver
-        </Button>
+        </Link>
         <ErrorState
           message={errorMessage ?? "Empresa no disponible."}
           onRetry={loadCompany}
@@ -182,10 +196,13 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <Button type="button" variant="outline" size="sm" render={<Link href="/app/companies" />}>
+          <Link
+            href="/app/companies"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
             <ArrowLeft />
             Empresas
-          </Button>
+          </Link>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
             <p className="text-sm text-muted-foreground">
@@ -222,6 +239,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
         </CardHeader>
         <CardContent>
           <CompanyForm
+            mode="edit"
             defaultValues={toCompanyFormValues(company)}
             onSubmit={handleSubmit}
             readOnly={!canEdit}

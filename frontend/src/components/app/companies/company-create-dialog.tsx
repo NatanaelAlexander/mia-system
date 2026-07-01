@@ -43,7 +43,10 @@ export function CompanyCreateDialog({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
-  const handleSubmit = async (values: CompanyFormValues) => {
+  const handleSubmit = async (
+    values: CompanyFormValues,
+    _meta: CompanyFormSubmitMeta,
+  ) => {
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -83,6 +86,7 @@ export function CompanyCreateDialog({
 
         <CompanyForm
           key={open ? "create-open" : "create-closed"}
+          mode="create"
           defaultValues={emptyValues}
           onSubmit={handleSubmit}
           submitLabel="Crear empresa"

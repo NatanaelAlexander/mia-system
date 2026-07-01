@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuditAction } from '../audit/types/audit.types';
 import { AuditService } from '../audit/audit.service';
 import { PortalAccessService } from '../common/portal/portal-access.service';
-import { formatRut, validateRut } from '../common/utils/rut.util';
+import { normalizeRutForStorage } from '../common/utils/rut.util';
 import { DatabaseService } from '../common/database/database.service';
 import {
   EmpresaNoEncontradaException,
@@ -15,7 +15,7 @@ import {
 import {
   SQL_DEACTIVATE_COMPANY,
   SQL_EXISTS_COMPANY_BY_TAX_ID,
-  SQL_FIND_ALL_ACTIVE_COMPANIES,
+  SQL_FIND_COMPANIES_FILTERED,
   SQL_FIND_COMPANIES_FOR_PORTAL_USER,
   SQL_FIND_COMPANY_BY_ID_ACTIVE,
   SQL_INSERT_COMPANY,
@@ -45,6 +45,7 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.dto';
 import { UpdateLegalRepresentativeDto } from './dto/update-legal-representative.dto';
 import { LinkRepresentativeDto } from './dto/link-representative.dto';
+import { FilterCompaniesDto } from './dto/filter-companies.dto';
 
 type CompanyRepresentativeRow = {
   companyId: string;
@@ -76,13 +77,22 @@ export class CompaniesService {
   ) {}
 
   async findAll(actorUserId: string): Promise<Company[]> {
-    const { rows } = await this.db.query<Company>(SQL_FIND_ALL_ACTIVE_COMPANIES, [
-      CompanyStatus.ACTIVE,
+    return this.findAllFiltered(actorUserId, { status: CompanyStatus.ACTIVE });
+  }
+
+  async findAllFiltered(
+    actorUserId: string,
+    filters: FilterCompaniesDto = {},
+  ): Promise<Company[]> {
+    const { rows } = await this.db.query<Company>(SQL_FIND_COMPANIES_FILTERED, [
+      filters.status ?? null,
+      filters.search?.trim() || null,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.COMPANIES, null, {
       scope: 'list',
       resultCount: rows.length,
+      filters,
     });
 
     return rows;
@@ -135,8 +145,17 @@ export class CompaniesService {
     const previous = await this.findActiveCompanyById(id);
 
     if (dto.taxId) {
-      dto.taxId = this.normalizeTaxId(dto.taxId);
-      await this.ensureTaxIdAvailable(dto.taxId, id);
+      try {
+        const formatted = normalizeRutForStorage(dto.taxId);
+        if (formatted === previous.taxId) {
+          delete dto.taxId;
+        } else {
+          dto.taxId = formatted;
+          await this.ensureTaxIdAvailable(dto.taxId, id);
+        }
+      } catch {
+        throw new RutInvalidoException();
+      }
     }
 
     const { sets, values } = this.buildCompanyUpdate(dto);
@@ -144,9 +163,9 @@ export class CompaniesService {
       return previous;
     }
 
+    const idParam = values.length + 1;
+    const statusParam = values.length + 2;
     values.push(id, CompanyStatus.ACTIVE);
-    const idParam = values.length;
-    const statusParam = values.length + 1;
 
     const { rows } = await this.db.query<Company>(
       `UPDATE companies SET ${sets.join(', ')}, updated_at = NOW()
@@ -559,11 +578,11 @@ export class CompaniesService {
   }
 
   private normalizeTaxId(taxId: string): string {
-    if (!validateRut(taxId)) {
+    try {
+      return normalizeRutForStorage(taxId);
+    } catch {
       throw new RutInvalidoException();
     }
-
-    return formatRut(taxId);
   }
 
   private async ensureTaxIdAvailable(

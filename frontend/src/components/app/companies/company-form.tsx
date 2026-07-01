@@ -2,55 +2,91 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import type { CompanyStatus } from "@/components/app/api/companies";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  formatRutInput,
+  normalizeRutForStorage,
+  validateRut,
+} from "@/components/app/shared/rut";
 
-const companySchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio").max(255),
-  taxId: z.string().min(1, "El RUT es obligatorio").max(50),
-  email: z
-    .string()
-    .email("Ingresa un correo válido")
-    .optional()
-    .or(z.literal("")),
-  phoneNumber: z.string().max(50).optional().or(z.literal("")),
-  address: z.string().optional().or(z.literal("")),
-  status: z.enum(["active", "inactive"]),
-});
+const statusOptions = [
+  { label: "Activa", value: "active" },
+  { label: "Inactiva", value: "inactive" },
+] as const;
 
-export type CompanyFormValues = z.infer<typeof companySchema>;
+function buildCompanySchema(validateTaxId: boolean) {
+  return z.object({
+    name: z.string().min(1, "El nombre es obligatorio").max(255),
+    taxId: validateTaxId
+      ? z
+          .string()
+          .min(1, "El RUT es obligatorio")
+          .max(50)
+          .refine(validateRut, "El RUT no es válido")
+      : z.string().min(1, "El RUT es obligatorio").max(50),
+    email: z
+      .string()
+      .email("Ingresa un correo válido")
+      .optional()
+      .or(z.literal("")),
+    phoneNumber: z.string().max(50).optional().or(z.literal("")),
+    address: z.string().optional().or(z.literal("")),
+    status: z.enum(["active", "inactive"]),
+  });
+}
+
+type CompanyFormValues = z.infer<ReturnType<typeof buildCompanySchema>>;
+
+export type { CompanyFormValues };
+
+export interface CompanyFormSubmitMeta {
+  dirtyFields: Partial<Record<keyof CompanyFormValues, boolean | undefined>>;
+}
 
 interface CompanyFormProps {
   defaultValues: CompanyFormValues;
-  onSubmit: (values: CompanyFormValues) => Promise<void>;
+  mode?: "create" | "edit";
+  onSubmit: (
+    values: CompanyFormValues,
+    meta: CompanyFormSubmitMeta,
+  ) => Promise<void>;
   submitLabel?: string;
   readOnly?: boolean;
   isSubmitting?: boolean;
 }
 
-const selectClassName = cn(
-  "flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none",
-  "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-  "disabled:pointer-events-none disabled:opacity-50",
-);
-
 export function CompanyForm({
   defaultValues,
+  mode = "edit",
   onSubmit,
   submitLabel = "Guardar",
   readOnly = false,
   isSubmitting = false,
 }: CompanyFormProps) {
+  const companySchema = React.useMemo(
+    () => buildCompanySchema(mode === "create"),
+    [mode],
+  );
+
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isDirty },
+    control,
+    setError,
+    formState: { errors, isDirty, dirtyFields },
   } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues,
@@ -60,8 +96,17 @@ export function CompanyForm({
     reset(defaultValues);
   }, [defaultValues, reset]);
 
+  const submitForm = handleSubmit(async (values) => {
+    if (mode === "edit" && dirtyFields.taxId && !validateRut(values.taxId)) {
+      setError("taxId", { message: "El RUT no es válido" });
+      return;
+    }
+
+    await onSubmit(values, { dirtyFields });
+  });
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={submitForm} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="name">Nombre</Label>
@@ -78,12 +123,26 @@ export function CompanyForm({
 
         <div className="space-y-2">
           <Label htmlFor="taxId">RUT</Label>
-          <Input
-            id="taxId"
-            disabled={readOnly}
-            placeholder="76123456-7"
-            aria-invalid={Boolean(errors.taxId)}
-            {...register("taxId")}
+          <Controller
+            name="taxId"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id="taxId"
+                disabled={readOnly}
+                placeholder="12.345.678-5"
+                inputMode="text"
+                autoComplete="off"
+                aria-invalid={Boolean(errors.taxId)}
+                value={field.value}
+                onChange={(event) => {
+                  field.onChange(formatRutInput(event.target.value));
+                }}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+              />
+            )}
           />
           {errors.taxId ? (
             <p className="text-sm text-destructive">{errors.taxId.message}</p>
@@ -92,15 +151,29 @@ export function CompanyForm({
 
         <div className="space-y-2">
           <Label htmlFor="status">Estado</Label>
-          <select
-            id="status"
-            disabled={readOnly}
-            className={selectClassName}
-            {...register("status")}
-          >
-            <option value="active">Activa</option>
-            <option value="inactive">Inactiva</option>
-          </select>
+          <Controller
+            name="status"
+            control={control}
+            render={({ field }) => (
+              <Select
+                items={[...statusOptions]}
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={readOnly}
+              >
+                <SelectTrigger id="status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
 
         <div className="space-y-2">
@@ -167,9 +240,11 @@ export function toCompanyFormValues(company: {
 }
 
 export function toCompanyPayload(values: CompanyFormValues) {
+  const taxId = normalizeRutForStorage(values.taxId.trim());
+
   return {
     name: values.name.trim(),
-    taxId: values.taxId.trim(),
+    ...(taxId ? { taxId } : {}),
     email: values.email?.trim() || undefined,
     phoneNumber: values.phoneNumber?.trim() || undefined,
     address: values.address?.trim() || undefined,

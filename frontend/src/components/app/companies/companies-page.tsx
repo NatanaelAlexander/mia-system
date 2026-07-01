@@ -3,11 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCcw } from "lucide-react";
-import { toast } from "sonner";
+import { Plus, RefreshCcw, Search } from "lucide-react";
 import {
   listCompanies,
   type CompanyListItem,
+  type CompanyStatus,
 } from "@/components/app/api/companies";
 import { formatCompanyStatus } from "@/components/app/shared/format";
 import {
@@ -28,18 +28,64 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { type DataColumn } from "@/components/app/shared/data-table";
 import { CompanyCreateDialog } from "./company-create-dialog";
 import { companiesModule } from "./companies-module";
+
+type StatusFilter = "all" | CompanyStatus;
 
 type LoadState =
   | { status: "loading"; data: CompanyListItem[] }
   | { status: "success"; data: CompanyListItem[] }
   | { status: "error"; message: string; data: CompanyListItem[] };
 
+const statusFilterItems = [
+  { label: "Todas", value: "all" as const },
+  { label: "Activas", value: "active" as const },
+  { label: "Inactivas", value: "inactive" as const },
+];
+
+function filterPortalCompanies(
+  data: CompanyListItem[],
+  search: string,
+  statusFilter: StatusFilter,
+) {
+  const term = search.trim().toLowerCase();
+  const normalizedTerm = term.replace(/[.\-]/g, "");
+
+  return data.filter((company) => {
+    if (statusFilter !== "all" && company.status !== statusFilter) {
+      return false;
+    }
+
+    if (!term) {
+      return true;
+    }
+
+    const normalizedTaxId = company.taxId.replace(/[.\-]/g, "").toLowerCase();
+
+    return (
+      company.name.toLowerCase().includes(term) ||
+      company.taxId.toLowerCase().includes(term) ||
+      normalizedTaxId.includes(normalizedTerm)
+    );
+  });
+}
+
 export function CompaniesPage() {
   const router = useRouter();
   const { claims, isLoading: isAuthLoading } = useAuth();
   const surface = claims ? preferredSurface(claims) : "portal";
+  const isInternal = isInternalUser(claims);
   const canAccess = canAccessModule(claims, companiesModule);
   const canCreate =
     isInternalUser(claims) && hasPermission(claims, "companies:create");
@@ -49,6 +95,28 @@ export function CompaniesPage() {
     data: [],
   });
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const [debouncedSearch, setDebouncedSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
+
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  const apiFilters = React.useMemo(() => {
+    if (!isInternal) {
+      return {};
+    }
+
+    return {
+      status: statusFilter === "all" ? undefined : statusFilter,
+      search: debouncedSearch || undefined,
+    };
+  }, [debouncedSearch, isInternal, statusFilter]);
 
   const reload = React.useCallback(async () => {
     if (!claims || !canAccess) {
@@ -59,7 +127,7 @@ export function CompaniesPage() {
     setState((current) => ({ status: "loading", data: current.data }));
 
     try {
-      const data = await listCompanies(surface);
+      const data = await listCompanies(surface, apiFilters);
       setState({ status: "success", data });
     } catch (error) {
       const message =
@@ -68,13 +136,21 @@ export function CompaniesPage() {
           : "No se pudieron cargar las empresas.";
       setState({ status: "error", message, data: [] });
     }
-  }, [claims, canAccess, surface]);
+  }, [apiFilters, claims, canAccess, surface]);
 
   React.useEffect(() => {
     if (!isAuthLoading) {
       void reload();
     }
   }, [isAuthLoading, reload]);
+
+  const visibleData = React.useMemo(() => {
+    if (isInternal) {
+      return state.data;
+    }
+
+    return filterPortalCompanies(state.data, debouncedSearch, statusFilter);
+  }, [debouncedSearch, isInternal, state.data, statusFilter]);
 
   const columns = React.useMemo<DataColumn<CompanyListItem>[]>(
     () => [
@@ -164,18 +240,60 @@ export function CompaniesPage() {
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="space-y-6 pt-6">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="company-search" className="text-base font-medium">
+                Buscar por nombre o RUT
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="company-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Ej: Empresa Demo o 12.345.678-5"
+                  className="pl-8"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company-status-filter">Estado</Label>
+              <Select
+                items={statusFilterItems}
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter((value as StatusFilter | null) ?? "all")
+                }
+              >
+                <SelectTrigger id="company-status-filter" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilterItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {isAuthLoading || state.status === "loading" ? (
             <ListSkeleton columns={5} />
           ) : state.status === "error" ? (
             <ErrorState message={state.message} onRetry={reload} />
-          ) : state.data.length === 0 ? (
+          ) : visibleData.length === 0 ? (
             <EmptyState
               title="No hay empresas"
               description={
-                canCreate
-                  ? "Crea la primera empresa para comenzar a vincular usuarios y proyectos."
-                  : "Aún no hay empresas disponibles para este usuario."
+                search || statusFilter !== "active"
+                  ? "No se encontraron empresas con los filtros seleccionados."
+                  : canCreate
+                    ? "Crea la primera empresa para comenzar a vincular usuarios y proyectos."
+                    : "Aún no hay empresas disponibles para este usuario."
               }
             />
           ) : (
@@ -198,7 +316,7 @@ export function CompaniesPage() {
                 ))}
               </div>
               <div className="divide-y divide-border/70">
-                {state.data.map((item) => (
+                {visibleData.map((item) => (
                   <div
                     key={item.id}
                     data-company-id={item.id}

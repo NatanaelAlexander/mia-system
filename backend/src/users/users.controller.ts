@@ -21,6 +21,7 @@ import {
   AuthenticatedOnly,
   AuthorizeResource,
   AuthorizeSurface,
+  AuthorizeAction,
 } from '../auth/decorators/authorize.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
@@ -52,18 +53,48 @@ export class InternalUsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar usuarios' })
+  @ApiOperation({
+    summary: 'Listar usuarios',
+    description: 'Filtros opcionales por body. En navegador usar POST /listar.',
+  })
   @ApiBody({ type: FilterUsersDto, required: false })
   @ApiOkResponse({ type: UserResponseDto, isArray: true })
   findAll(@Body() filters: FilterUsersDto = {}) {
     return this.usersService.findAll(filters);
   }
 
+  @Post('listar')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Listar usuarios con filtros (body)',
+    description: 'Equivalente a GET con filtros para clientes web.',
+  })
+  @ApiBody({ type: FilterUsersDto, required: false })
+  @ApiOkResponse({ type: UserResponseDto, isArray: true })
+  listWithFilters(@Body() filters: FilterUsersDto = {}) {
+    return this.usersService.findAll(filters);
+  }
+
   @Get('detalle')
-  @ApiOperation({ summary: 'Obtener usuario por ID (con roles, cargos y empresas)' })
+  @ApiOperation({
+    summary: 'Obtener usuario por ID (con roles, cargos y empresas)',
+    description: 'Recibe el id por body. En navegador usar POST /detalle.',
+  })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: UserDetailResponseDto })
   findOne(@Body() dto: FindByIdDto) {
+    return this.usersService.findById(dto.id);
+  }
+
+  @Post('detalle')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Obtener usuario por ID (body)',
+    description: 'Equivalente a GET /detalle para clientes web.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: UserDetailResponseDto })
+  findOneByBody(@Body() dto: FindByIdDto) {
     return this.usersService.findById(dto.id);
   }
 

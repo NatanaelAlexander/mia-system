@@ -1,14 +1,14 @@
-/** Validación y formato de RUT chileno (misma lógica que edificio-alcazar). */
+/** Validación y formato de RUT chileno (misma lógica que el backend). */
 
 /** Formato canónico de almacenamiento y API: `12.345.678-5` */
 export const CANONICAL_RUT_PATTERN = /^\d{1,2}(?:\.\d{3}){2}-[\dkK]$/;
 
 export function cleanRut(rut: string): string {
-  return rut.replace(/[.-]/g, '').toUpperCase();
+  return rut.replace(/[.-]/g, "").toUpperCase();
 }
 
 export function validateRut(rut: string): boolean {
-  if (!rut || typeof rut !== 'string') {
+  if (!rut) {
     return false;
   }
 
@@ -28,7 +28,7 @@ export function validateRut(rut: string): boolean {
   let multiplier = 2;
 
   for (let i = body.length - 1; i >= 0; i--) {
-    sum += Number.parseInt(body[i], 10) * multiplier;
+    sum += Number.parseInt(body[i]!, 10) * multiplier;
     multiplier = multiplier === 7 ? 2 : multiplier + 1;
   }
 
@@ -36,9 +36,9 @@ export function validateRut(rut: string): boolean {
   let expectedDv: string;
 
   if (calculatedDv === 11) {
-    expectedDv = '0';
+    expectedDv = "0";
   } else if (calculatedDv === 10) {
-    expectedDv = 'K';
+    expectedDv = "K";
   } else {
     expectedDv = String(calculatedDv);
   }
@@ -54,7 +54,7 @@ export function formatRut(rut: string): string {
 
   const body = clean.slice(0, -1);
   const dv = clean.slice(-1);
-  const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
   return `${formattedBody}-${dv}`;
 }
@@ -63,11 +63,33 @@ export function isCanonicalRutFormat(rut: string): boolean {
   return CANONICAL_RUT_PATTERN.test(rut) && rut === formatRut(rut);
 }
 
-/** Valida el RUT y devuelve el formato canónico para guardar o responder. */
-export function normalizeRutForStorage(rut: string): string {
+/** Valida y devuelve el RUT en formato canónico para enviar al API. */
+export function normalizeRutForStorage(rut: string): string | null {
   if (!validateRut(rut)) {
-    throw new Error('INVALID_RUT');
+    return null;
   }
 
   return formatRut(rut);
+}
+
+/** Formatea el RUT mientras el usuario escribe (puntos y guión). */
+export function formatRutInput(value: string): string {
+  const clean = value.replace(/[^0-9kK]/g, "").toUpperCase().slice(0, 9);
+  if (!clean) {
+    return "";
+  }
+
+  if (clean.length === 1) {
+    return clean;
+  }
+
+  if (clean.length <= 8) {
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  }
+
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  return `${formattedBody}-${dv}`;
 }

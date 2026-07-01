@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
 
 export interface UserListItem {
   id: string;
@@ -30,17 +30,17 @@ export interface ListUsersFilters {
 }
 
 export function listUsers(filters: ListUsersFilters = {}) {
-  return apiFetch<UserListItem[]>("/internal/users", {
-    method: "GET",
-    body: JSON.stringify(filters),
-  }, true);
+  const hasFilters = Object.values(filters).some((value) => value !== undefined);
+
+  if (!hasFilters) {
+    return apiFetch<UserListItem[]>("/internal/users", {}, true);
+  }
+
+  return apiFetchDetalle<UserListItem[]>("/internal/users/listar", filters, true);
 }
 
 export function getUserDetail(id: string) {
-  return apiFetch<UserDetail>("/internal/users/detalle", {
-    method: "GET",
-    body: JSON.stringify({ id }),
-  }, true);
+  return apiFetchDetalle<UserDetail>("/internal/users/detalle", { id }, true);
 }
 
 export function linkUserToCompany(userId: string, companyId: string) {

@@ -80,3 +80,19 @@ export async function apiFetch<T>(
 
   return response.json() as Promise<T>;
 }
+
+/** Lecturas con filtros/id en body (el navegador no permite GET con body). */
+export async function apiFetchDetalle<T>(
+  path: string,
+  body: unknown,
+  authenticated = false,
+): Promise<T> {
+  return apiFetch<T>(
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    authenticated,
+  );
+}
