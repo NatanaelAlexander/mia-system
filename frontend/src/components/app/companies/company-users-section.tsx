@@ -32,6 +32,8 @@ interface CompanyUsersSectionProps {
   canManage: boolean;
 }
 
+const PORTAL_CLIENT_ROLE = "cliente";
+
 export function CompanyUsersSection({
   companyId,
   canManage,
@@ -49,14 +51,16 @@ export function CompanyUsersSection({
     setIsLoading(true);
 
     try {
-      const [linked, allActive] = await Promise.all([
+      const [linked, availableClientUsers] = await Promise.all([
         listUsers({ companyId }),
-        listUsers({ isActive: true }),
+        listUsers({ isActive: true, roleName: PORTAL_CLIENT_ROLE }),
       ]);
 
       setLinkedUsers(linked);
       setAvailableUsers(
-        allActive.filter((user) => !linked.some((linkedUser) => linkedUser.id === user.id)),
+        availableClientUsers.filter(
+          (user) => !linked.some((linkedUser) => linkedUser.id === user.id),
+        ),
       );
     } catch (error) {
       const message =
@@ -126,8 +130,8 @@ export function CompanyUsersSection({
   const userSelectItems = React.useMemo(() => {
     const placeholder =
       availableUsers.length === 0
-        ? "No hay usuarios disponibles"
-        : "Selecciona un usuario";
+        ? "No hay usuarios cliente disponibles"
+        : "Selecciona un usuario cliente";
 
     return [
       { label: placeholder, value: null },
@@ -144,8 +148,8 @@ export function CompanyUsersSection({
         <CardTitle>Usuarios vinculados</CardTitle>
         <CardDescription>
           {canManage
-            ? "Asigna o desasigna usuarios del portal que operan con esta empresa."
-            : "Usuarios del portal que pueden operar con esta empresa."}
+            ? "Asigna o desasigna usuarios con rol cliente que operan en el portal de esta empresa."
+            : "Usuarios con rol cliente que operan en el portal de esta empresa."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -187,7 +191,7 @@ export function CompanyUsersSection({
           <ListSkeleton columns={3} rows={3} />
         ) : linkedUsers.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
-            Esta empresa aún no tiene usuarios asignados.
+            Esta empresa aún no tiene usuarios cliente asignados.
           </p>
         ) : (
           <div className="divide-y divide-border/70 rounded-xl border border-border/70">

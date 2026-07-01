@@ -51,3 +51,12 @@ export class SoloPuedesModificarTuPerfilException extends AppException {
     );
   }
 }
+
+export class SoloClientesPuedenVincularseEmpresaException extends AppException {
+  constructor() {
+    super(
+      'Solo los usuarios con rol cliente pueden vincularse a una empresa',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+}

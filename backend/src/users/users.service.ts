@@ -21,6 +21,7 @@ import {
   EmailUsuarioDuplicadoException,
   NoPuedesDesactivarTuCuentaException,
   RolNoEncontradoException,
+  SoloClientesPuedenVincularseEmpresaException,
   SoloPuedesModificarTuPerfilException,
   UsuarioNoEncontradoException,
   VinculoUsuarioEmpresaNoEncontradoException,
@@ -38,6 +39,7 @@ import {
   SQL_FIND_USER_COMPANIES,
   SQL_FIND_USER_JOB_TITLES,
   SQL_FIND_USER_ROLE_IDS,
+  SQL_FIND_USER_ROLE_NAMES,
   SQL_INSERT_USER_COMPANY,
   SQL_INSERT_USER_JOB_TITLE,
   SQL_INSERT_USER_ROLE,
@@ -70,6 +72,9 @@ const AUDIT_TABLE = {
   USERS_COMPANIES: 'users_companies',
   USERS_JOB_TITLES: 'users_job_titles',
 } as const;
+
+const PORTAL_CLIENT_ROLE = 'cliente';
+const INTERNAL_ROLES = new Set(['admin', 'super_admin']);
 
 @Injectable()
 export class UsersService {
@@ -230,6 +235,7 @@ export class UsersService {
     audit = true,
   ): Promise<UserDetail> {
     await this.findUserById(userId);
+    await this.ensurePortalClientUser(userId);
     await this.ensureActiveCompany(dto.companyId);
 
     await this.db.query(SQL_INSERT_USER_COMPANY, [userId, dto.companyId]);
@@ -481,6 +487,21 @@ export class UsersService {
     ]);
     if (!rowCount) {
       throw new EmpresaNoEncontradaException();
+    }
+  }
+
+  private async ensurePortalClientUser(userId: string): Promise<void> {
+    const { rows } = await this.db.query<{ name: string }>(
+      SQL_FIND_USER_ROLE_NAMES,
+      [userId],
+    );
+    const roles = rows.map((row) => row.name);
+    const isPortalClient =
+      roles.includes(PORTAL_CLIENT_ROLE) &&
+      !roles.some((role) => INTERNAL_ROLES.has(role));
+
+    if (!isPortalClient) {
+      throw new SoloClientesPuedenVincularseEmpresaException();
     }
   }
 
