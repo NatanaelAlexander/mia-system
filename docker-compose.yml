@@ -69,6 +69,7 @@ services:
       JWT_ACCESS_EXPIRES_IN_INTERNAL: ${JWT_ACCESS_EXPIRES_IN_INTERNAL:-1d}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
     depends_on:
       bd_main:
         condition: service_healthy
