@@ -66,7 +66,7 @@ export function DashboardHomeClient() {
 
       if (claims!.permissions.includes("projects:read")) {
         tasks.push(
-          listProjects(surface).then((projects) => ({
+          listProjects(surface, { status: "active" }).then((projects) => ({
             label: "Proyectos",
             value: projects.length,
             helper:

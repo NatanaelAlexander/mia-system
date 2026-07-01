@@ -15,6 +15,13 @@ export const SQL_FIND_ALL_ACTIVE_PROJECTS = `
   ORDER BY name ASC
 `;
 
+export const SQL_FIND_PROJECTS_FILTERED = `
+  SELECT ${PROJECT_COLUMNS}
+  FROM projects
+  WHERE ($1::text IS NULL OR status = $1)
+  ORDER BY name ASC
+`;
+
 export const SQL_FIND_PROJECTS_FOR_PORTAL_USER = `
   SELECT ${PROJECT_COLUMNS}
   FROM projects p

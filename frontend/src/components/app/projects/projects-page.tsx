@@ -1,9 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Plus, RefreshCcw } from "lucide-react";
+import { Edit2, Plus, RefreshCcw } from "lucide-react";
 import { listCompanies } from "@/components/app/api/companies";
-import { listProjects, type ProjectListItem } from "@/components/app/api/projects";
+import {
+  listProjects,
+  type ProjectListItem,
+  type ProjectStatus,
+} from "@/components/app/api/projects";
 import { DataTable, type DataColumn } from "@/components/app/shared/data-table";
 import {
   formatDate,
@@ -28,13 +32,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ProjectCreateDialog } from "./project-create-dialog";
+import { ProjectEditDialog } from "./project-edit-dialog";
 import { projectsModule } from "./projects-module";
 
 type LoadState =
   | { status: "loading"; data: ProjectListItem[] }
   | { status: "success"; data: ProjectListItem[] }
   | { status: "error"; message: string; data: ProjectListItem[] };
+
+type StatusFilter = "all" | ProjectStatus;
+
+const statusFilterItems = [
+  { label: "Todos", value: "all" as const },
+  { label: "Activos", value: "active" as const },
+  { label: "Inactivos", value: "inactive" as const },
+  { label: "Completados", value: "completed" as const },
+];
 
 export function ProjectsPage() {
   const { claims, isLoading: isAuthLoading } = useAuth();
@@ -43,14 +65,26 @@ export function ProjectsPage() {
   const canAccess = canAccessModule(claims, projectsModule);
   const canCreate =
     isInternalUser(claims) && hasPermission(claims, "projects:create");
+  const canEdit =
+    isInternalUser(claims) && hasPermission(claims, "projects:update");
 
   const [state, setState] = React.useState<LoadState>({
     status: "loading",
     data: [],
   });
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [editingProject, setEditingProject] =
+    React.useState<ProjectListItem | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("active");
   const [companyNames, setCompanyNames] = React.useState<Record<string, string>>(
     {},
+  );
+
+  const apiFilters = React.useMemo(
+    () => ({
+      status: statusFilter === "all" ? undefined : statusFilter,
+    }),
+    [statusFilter],
   );
 
   const reload = React.useCallback(async () => {
@@ -63,8 +97,8 @@ export function ProjectsPage() {
 
     try {
       const [projects, companies] = await Promise.all([
-        listProjects(surface),
-        listCompanies(surface, isInternal ? { status: "active" } : {}),
+        listProjects(surface, isInternal ? apiFilters : {}),
+        listCompanies(surface, isInternal ? {} : {}),
       ]);
 
       setCompanyNames(
@@ -79,7 +113,7 @@ export function ProjectsPage() {
           : "No se pudieron cargar los proyectos.";
       setState({ status: "error", message, data: [] });
     }
-  }, [canAccess, claims, isInternal, surface]);
+  }, [apiFilters, canAccess, claims, isInternal, surface]);
 
   React.useEffect(() => {
     if (!isAuthLoading) {
@@ -122,8 +156,26 @@ export function ProjectsPage() {
       },
     );
 
+    if (canEdit) {
+      base.push({
+        key: "actions",
+        label: "",
+        render: (item) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEditingProject(item)}
+          >
+            <Edit2 />
+            Editar
+          </Button>
+        ),
+      });
+    }
+
     return base;
-  }, [companyNames, isInternal]);
+  }, [canEdit, companyNames, isInternal]);
 
   if (!isAuthLoading && !canAccess) {
     return (
@@ -183,7 +235,33 @@ export function ProjectsPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="pt-6">
+        <CardContent className="space-y-6 pt-6">
+          {isInternal ? (
+            <div className="max-w-xs space-y-2">
+              <Label htmlFor="project-status-filter">Estado</Label>
+              <Select
+                items={statusFilterItems}
+                value={statusFilter}
+                onValueChange={(value) =>
+                  setStatusFilter(
+                    typeof value === "string" ? (value as StatusFilter) : "active",
+                  )
+                }
+              >
+                <SelectTrigger id="project-status-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusFilterItems.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
           {state.status === "loading" || isAuthLoading ? (
             <ListSkeleton columns={columns.length} />
           ) : state.status === "error" ? (
@@ -208,6 +286,23 @@ export function ProjectsPage() {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={reload}
+        />
+      ) : null}
+
+      {canEdit ? (
+        <ProjectEditDialog
+          project={editingProject}
+          companyName={
+            editingProject
+              ? (companyNames[editingProject.companyId] ?? "—")
+              : "—"
+          }
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingProject(null);
+            }
+          }}
+          onUpdated={reload}
         />
       ) : null}
     </>

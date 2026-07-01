@@ -25,6 +25,7 @@ import { memoryStorage } from 'multer';
 import {
   AuthorizeResource,
   AuthorizeSurface,
+  AuthorizeAction,
 } from '../auth/decorators/authorize.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
@@ -39,6 +40,7 @@ import {
 } from './dto/project-assets.dto';
 import { ProjectResponseDto } from './dto/responses/project-response.dto';
 import { PortalFilterProjectsDto } from './dto/portal-filter-projects.dto';
+import { FilterProjectsDto } from './dto/filter-projects.dto';
 import { ProjectsService } from './projects.service';
 
 @ApiBearerAuth('access-token')
@@ -50,17 +52,53 @@ export class InternalProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar proyectos activos' })
+  @ApiOperation({
+    summary: 'Listar proyectos activos',
+    description: 'Solo activos. Para filtros usar POST /listar.',
+  })
   @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
   findAll(@CurrentUser('sub') actorUserId: string) {
     return this.projectsService.findAllActive(actorUserId);
   }
 
+  @Post('listar')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Listar proyectos con filtros',
+    description: 'Filtra por estado. Sin filtro devuelve todos los estados.',
+  })
+  @ApiBody({ type: FilterProjectsDto, required: false })
+  @ApiOkResponse({ type: ProjectResponseDto, isArray: true })
+  listWithFilters(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() filters: FilterProjectsDto = {},
+  ) {
+    return this.projectsService.findAllFiltered(actorUserId, filters);
+  }
+
   @Get('detalle')
-  @ApiOperation({ summary: 'Obtener proyecto por ID' })
+  @ApiOperation({
+    summary: 'Obtener proyecto por ID',
+    description: 'Recibe el id por body. En navegador usar POST /detalle.',
+  })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: ProjectResponseDto })
   findOne(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.projectsService.findById(actorUserId, dto.id);
+  }
+
+  @Post('detalle')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Obtener proyecto por ID (body)',
+    description: 'Equivalente a GET /detalle para clientes web.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: ProjectResponseDto })
+  findOneByBody(
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: FindByIdDto,
   ) {

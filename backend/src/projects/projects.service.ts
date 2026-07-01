@@ -21,12 +21,14 @@ import {
   PROJECT_COLUMNS,
   SQL_DEACTIVATE_PROJECT,
   SQL_FIND_ALL_ACTIVE_PROJECTS,
+  SQL_FIND_PROJECTS_FILTERED,
   SQL_FIND_PROJECTS_FOR_PORTAL_USER,
   SQL_FIND_PROJECT_BY_ID,
   SQL_INSERT_PROJECT,
 } from './queries/projects.queries';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { FilterProjectsDto } from './dto/filter-projects.dto';
 import { Project, ProjectStatus } from './types/project.types';
 
 const AUDIT_TABLE = {
@@ -51,6 +53,23 @@ export class ProjectsService {
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
       scope: 'list',
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
+  async findAllFiltered(
+    actorUserId: string,
+    filters: FilterProjectsDto = {},
+  ): Promise<Project[]> {
+    const { rows } = await this.db.query<Project>(SQL_FIND_PROJECTS_FILTERED, [
+      filters.status ?? null,
+    ]);
+
+    await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
+      scope: 'list_filtered',
+      status: filters.status ?? null,
       resultCount: rows.length,
     });
 

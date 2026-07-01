@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ProjectForm, type ProjectFormValues } from "./project-form";
+import { ProjectCreateForm, type CreateProjectFormValues } from "./project-form";
 
 interface ProjectCreateDialogProps {
   open: boolean;
@@ -72,7 +72,7 @@ export function ProjectCreateDialog({
     };
   }, [open]);
 
-  const handleSubmit = async (values: ProjectFormValues) => {
+  const handleSubmit = async (values: CreateProjectFormValues) => {
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -121,7 +121,7 @@ export function ProjectCreateDialog({
             registrar un proyecto.
           </p>
         ) : (
-          <ProjectForm
+          <ProjectCreateForm
             key={open ? "create-open" : "create-closed"}
             companies={companies}
             onSubmit={handleSubmit}
