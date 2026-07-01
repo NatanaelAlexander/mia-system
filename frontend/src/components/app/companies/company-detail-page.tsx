@@ -258,7 +258,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
             canManage={canEdit}
             onChanged={loadCompany}
           />
-          <CompanyUsersSection companyId={company.id} />
+          <CompanyUsersSection companyId={company.id} canManage={canEdit} />
         </>
       ) : null}
     </div>

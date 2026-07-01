@@ -190,3 +190,17 @@ export function unlinkRepresentativeFromCompany(
     true,
   );
 }
+
+export function assignUserToCompany(companyId: string, userId: string) {
+  return apiFetch<void>(`/internal/companies/${companyId}/vincular-usuario`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  }, true);
+}
+
+export function unassignUserFromCompany(companyId: string, userId: string) {
+  return apiFetch<void>(`/internal/companies/${companyId}/desvincular-usuario`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  }, true);
+}

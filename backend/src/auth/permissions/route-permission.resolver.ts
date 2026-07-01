@@ -98,7 +98,15 @@ const PATH_RULES: PathRule[] = [
   {
     test: (path, method) =>
       path.includes('representatives') &&
-      (method === 'POST' || method === 'DELETE'),
+      (method === 'POST' || method === 'DELETE' || method === 'PATCH'),
+    permission: 'companies:update',
+  },
+  {
+    test: (path, method) =>
+      path.includes('companies') &&
+      (path.includes('vincular-usuario') ||
+        path.includes('desvincular-usuario')) &&
+      method === 'POST',
     permission: 'companies:update',
   },
 ];

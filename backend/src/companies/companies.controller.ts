@@ -27,6 +27,9 @@ import {
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { CompaniesService } from './companies.service';
+import { UsersService } from '../users/users.service';
+import { LinkUserToCompanyDto } from './dto/link-user-to-company.dto';
+import { UserDetailResponseDto } from '../users/dto/responses/user-response.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CreateLegalRepresentativeDto } from './dto/create-legal-representative.dto';
@@ -47,7 +50,10 @@ import {
 @ApiTags('Companies — Internal')
 @Controller('internal/companies')
 export class InternalCompaniesController {
-  constructor(private readonly companiesService: CompaniesService) {}
+  constructor(
+    private readonly companiesService: CompaniesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -152,6 +158,40 @@ export class InternalCompaniesController {
     return this.companiesService.getCompanyRepresentatives(
       actorUserId,
       dto.companyId,
+    );
+  }
+
+  @Post(':id/vincular-usuario')
+  @ApiOperation({ summary: 'Asignar usuario a esta empresa' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la empresa' })
+  @ApiBody({ type: LinkUserToCompanyDto })
+  @ApiOkResponse({ type: UserDetailResponseDto })
+  linkUser(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) companyId: string,
+    @Body() dto: LinkUserToCompanyDto,
+  ) {
+    return this.usersService.linkCompany(
+      dto.userId,
+      { companyId },
+      actorUserId,
+    );
+  }
+
+  @Post(':id/desvincular-usuario')
+  @ApiOperation({ summary: 'Desasignar usuario de esta empresa' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la empresa' })
+  @ApiBody({ type: LinkUserToCompanyDto })
+  @ApiOkResponse({ type: UserDetailResponseDto })
+  unlinkUser(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) companyId: string,
+    @Body() dto: LinkUserToCompanyDto,
+  ) {
+    return this.usersService.unlinkCompany(
+      dto.userId,
+      companyId,
+      actorUserId,
     );
   }
 

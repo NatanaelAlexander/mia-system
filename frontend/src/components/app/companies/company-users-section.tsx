@@ -4,13 +4,10 @@ import * as React from "react";
 import { toast } from "sonner";
 import { UserPlus, UserMinus } from "lucide-react";
 import {
-  linkUserToCompany,
-  listUsers,
-  unlinkUserFromCompany,
-  type UserListItem,
-} from "@/components/app/api/users";
-import { hasPermission } from "@/components/app/shared/permissions";
-import { useAuth } from "@/hooks/use-auth";
+  assignUserToCompany,
+  unassignUserFromCompany,
+} from "@/components/app/api/companies";
+import { listUsers, type UserListItem } from "@/components/app/api/users";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,12 +28,13 @@ import { ListSkeleton } from "@/components/app/shared/list-states";
 
 interface CompanyUsersSectionProps {
   companyId: string;
+  canManage: boolean;
 }
 
-export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
-  const { claims } = useAuth();
-  const canManageUsers = hasPermission(claims, "users:update");
-
+export function CompanyUsersSection({
+  companyId,
+  canManage,
+}: CompanyUsersSectionProps) {
   const [linkedUsers, setLinkedUsers] = React.useState<UserListItem[]>([]);
   const [availableUsers, setAvailableUsers] = React.useState<UserListItem[]>([]);
   const [selectedUserId, setSelectedUserId] = React.useState("");
@@ -71,7 +69,7 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
     void loadUsers();
   }, [loadUsers]);
 
-  const handleLink = async () => {
+  const handleAssign = async () => {
     if (!selectedUserId) {
       return;
     }
@@ -79,33 +77,40 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
     setIsSubmitting(true);
 
     try {
-      await linkUserToCompany(selectedUserId, companyId);
-      toast.success("Usuario vinculado a la empresa");
+      await assignUserToCompany(companyId, selectedUserId);
+      toast.success("Usuario asignado a la empresa");
       setSelectedUserId("");
       await loadUsers();
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
-          : "No se pudo vincular el usuario.";
+          : "No se pudo asignar el usuario.";
       toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUnlink = async (userId: string) => {
+  const handleUnassign = async (user: UserListItem) => {
+    const name = `${user.firstName} ${user.lastName}`.trim();
+    const confirmed = window.confirm(`¿Desasignar a ${name} de esta empresa?`);
+
+    if (!confirmed) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await unlinkUserFromCompany(userId, companyId);
-      toast.success("Usuario desvinculado");
+      await unassignUserFromCompany(companyId, user.id);
+      toast.success("Usuario desasignado");
       await loadUsers();
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
-          : "No se pudo desvincular el usuario.";
+          : "No se pudo desasignar el usuario.";
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -132,11 +137,13 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
       <CardHeader>
         <CardTitle>Usuarios vinculados</CardTitle>
         <CardDescription>
-          Usuarios del portal que pueden operar con esta empresa.
+          {canManage
+            ? "Asigna o desasigna usuarios del portal que operan con esta empresa."
+            : "Usuarios del portal que pueden operar con esta empresa."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {canManageUsers ? (
+        {canManage ? (
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select
               items={userSelectItems}
@@ -161,11 +168,11 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
             </Select>
             <Button
               type="button"
-              onClick={handleLink}
+              onClick={handleAssign}
               disabled={!selectedUserId || isSubmitting}
             >
               <UserPlus />
-              Vincular
+              Asignar
             </Button>
           </div>
         ) : null}
@@ -174,7 +181,7 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
           <ListSkeleton columns={3} rows={3} />
         ) : linkedUsers.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
-            Esta empresa aún no tiene usuarios vinculados.
+            Esta empresa aún no tiene usuarios asignados.
           </p>
         ) : (
           <div className="divide-y divide-border/70 rounded-xl border border-border/70">
@@ -189,16 +196,16 @@ export function CompanyUsersSection({ companyId }: CompanyUsersSectionProps) {
                   </p>
                   <p className="truncate text-muted-foreground">{user.email}</p>
                 </div>
-                {canManageUsers ? (
+                {canManage ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={isSubmitting}
-                    onClick={() => handleUnlink(user.id)}
+                    onClick={() => handleUnassign(user)}
                   >
                     <UserMinus />
-                    Quitar
+                    Desasignar
                   </Button>
                 ) : null}
               </div>
