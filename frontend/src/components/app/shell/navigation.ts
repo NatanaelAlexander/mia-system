@@ -6,16 +6,23 @@ import { ticketsModule } from "@/components/app/tickets/tickets-module";
 import { usersModule } from "@/components/app/users/users-module";
 import type { ModuleAccess } from "@/components/app/shared/permissions";
 
-export const appModuleNav = [
-  ticketsModule,
-  companiesModule,
-  projectsModule,
-  assetsModule,
-  usersModule,
-] satisfies Array<
-  ModuleAccess & {
-    title: string;
-    href: string;
-    icon: React.ComponentType;
-  }
->;
+export type NavModule = ModuleAccess & {
+  title: string;
+  href: string;
+  icon: React.ComponentType;
+};
+
+export const companiesNavGroup = {
+  parent: companiesModule,
+  children: [ticketsModule, projectsModule, assetsModule],
+} satisfies {
+  parent: NavModule;
+  children: NavModule[];
+};
+
+export const companiesSectionHrefs = [
+  companiesModule.href,
+  ...companiesNavGroup.children.map((item) => item.href),
+];
+
+export const appStandaloneNav = [usersModule] satisfies NavModule[];
