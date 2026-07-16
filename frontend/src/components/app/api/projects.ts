@@ -9,6 +9,7 @@ export interface ProjectListItem {
   id: string;
   companyId: string;
   name: string;
+  description: string | null;
   type: ProjectType;
   status: ProjectStatus;
   createdAt: string;
@@ -18,11 +19,13 @@ export interface ProjectListItem {
 export interface CreateProjectPayload {
   companyId: string;
   name: string;
+  description?: string | null;
   type: ProjectType;
 }
 
 export interface UpdateProjectPayload {
   name?: string;
+  description?: string | null;
   type?: ProjectType;
   status?: ProjectStatus;
 }

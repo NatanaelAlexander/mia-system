@@ -2,6 +2,7 @@ export const PROJECT_COLUMNS = `
   id,
   company_id AS "companyId",
   name,
+  description,
   type,
   status,
   created_at AS "createdAt",
@@ -20,6 +21,7 @@ export const SQL_FIND_PROJECTS_FILTERED = `
     p.id,
     p.company_id AS "companyId",
     p.name,
+    p.description,
     p.type,
     p.status,
     p.created_at AS "createdAt",
@@ -41,6 +43,7 @@ export const SQL_FIND_PROJECTS_FOR_PORTAL_USER = `
     p.id,
     p.company_id AS "companyId",
     p.name,
+    p.description,
     p.type,
     p.status,
     p.created_at AS "createdAt",
@@ -73,8 +76,8 @@ export const SQL_FIND_PROJECTS_BY_COMPANY = `
 `;
 
 export const SQL_INSERT_PROJECT = `
-  INSERT INTO projects (company_id, name, type, status)
-  VALUES ($1, $2, $3, $4)
+  INSERT INTO projects (company_id, name, description, type, status)
+  VALUES ($1, $2, $3, $4, $5)
   RETURNING ${PROJECT_COLUMNS}
 `;
 

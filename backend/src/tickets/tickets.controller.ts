@@ -31,9 +31,14 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AssetResponseDto } from '../assets/dto/responses/asset-response.dto';
 import { ChangeTicketStatusDto } from './dto/change-ticket-status.dto';
+import {
+  AssignTicketUsersDto,
+  GetTicketAssigneesDto,
+} from './dto/assign-ticket-users.dto';
 import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { FilterTicketsDto } from './dto/filter-tickets.dto';
+import { FilterTicketTimelineDto } from './dto/filter-ticket-timeline.dto';
 import {
   GetCommentAssetsDto,
   GetTicketAssetsDto,
@@ -54,9 +59,11 @@ import {
 } from './dto/portal-tickets.dto';
 import {
   CatalogItemResponseDto,
+  TicketAssigneeResponseDto,
   TicketCommentResponseDto,
   TicketResponseDto,
   TicketStatusHistoryResponseDto,
+  TicketTimelinePointResponseDto,
 } from './dto/responses/ticket-response.dto';
 import { TicketsService } from './tickets.service';
 
@@ -125,14 +132,27 @@ export class InternalTicketsController {
     return this.ticketsService.findAll(actorUserId, filters);
   }
 
+  @Post('estadisticas/timeline')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Serie temporal de tickets para dashboard',
+    description:
+      'Agrupa tickets creados por hora (día), día (mes) o mes (año).',
+  })
+  @ApiBody({ type: FilterTicketTimelineDto })
+  @ApiOkResponse({ type: TicketTimelinePointResponseDto, isArray: true })
+  getTimeline(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: FilterTicketTimelineDto,
+  ) {
+    return this.ticketsService.getTimeline(actorUserId, dto.range);
+  }
+
   @Get('detalle')
   @ApiOperation({ summary: 'Obtener ticket por ID' })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: TicketResponseDto })
-  findOne(
-    @CurrentUser('sub') actorUserId: string,
-    @Body() dto: FindByIdDto,
-  ) {
+  findOne(@CurrentUser('sub') actorUserId: string, @Body() dto: FindByIdDto) {
     return this.ticketsService.findById(actorUserId, dto.id);
   }
 
@@ -146,6 +166,18 @@ export class InternalTicketsController {
     @Body() dto: FindByIdDto,
   ) {
     return this.ticketsService.findById(actorUserId, dto.id);
+  }
+
+  @Post('asignados/listar')
+  @AuthorizeAction('read')
+  @ApiOperation({ summary: 'Listar responsables del ticket' })
+  @ApiBody({ type: GetTicketAssigneesDto })
+  @ApiOkResponse({ type: TicketAssigneeResponseDto, isArray: true })
+  listAssignees(
+    @CurrentUser('sub') actorUserId: string,
+    @Body() dto: GetTicketAssigneesDto,
+  ) {
+    return this.ticketsService.getAssignees(actorUserId, dto.ticketId);
   }
 
   @Post()
@@ -170,6 +202,21 @@ export class InternalTicketsController {
     @Body() dto: UpdateTicketDto,
   ) {
     return this.ticketsService.update(actorUserId, id, dto);
+  }
+
+  @Patch(':id/asignados')
+  @ApiOperation({
+    summary: 'Reemplazar responsables del ticket (solo superadmin)',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiBody({ type: AssignTicketUsersDto })
+  @ApiOkResponse({ type: TicketAssigneeResponseDto, isArray: true })
+  replaceAssignees(
+    @CurrentUser('sub') actorUserId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignTicketUsersDto,
+  ) {
+    return this.ticketsService.replaceAssignees(actorUserId, id, dto);
   }
 
   @Patch(':id/estado')
@@ -275,7 +322,11 @@ export class InternalTicketsController {
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: LinkTicketAssetDto,
   ) {
-    return this.ticketsService.linkAsset(actorUserId, dto.ticketId, dto.assetId);
+    return this.ticketsService.linkAsset(
+      actorUserId,
+      dto.ticketId,
+      dto.assetId,
+    );
   }
 
   @Post('desvincular-archivo')
@@ -286,7 +337,11 @@ export class InternalTicketsController {
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: UnlinkTicketAssetDto,
   ) {
-    return this.ticketsService.unlinkAsset(actorUserId, dto.ticketId, dto.assetId);
+    return this.ticketsService.unlinkAsset(
+      actorUserId,
+      dto.ticketId,
+      dto.assetId,
+    );
   }
 
   @Post('subir-archivo')
@@ -330,7 +385,10 @@ export class InternalTicketsController {
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: GetCommentAssetsDto,
   ) {
-    return this.ticketsService.getCommentAssets(actorUserId, dto.ticketCommentId);
+    return this.ticketsService.getCommentAssets(
+      actorUserId,
+      dto.ticketCommentId,
+    );
   }
 
   @Post('comentarios/archivos/listar')
@@ -342,7 +400,10 @@ export class InternalTicketsController {
     @CurrentUser('sub') actorUserId: string,
     @Body() dto: GetCommentAssetsDto,
   ) {
-    return this.ticketsService.getCommentAssets(actorUserId, dto.ticketCommentId);
+    return this.ticketsService.getCommentAssets(
+      actorUserId,
+      dto.ticketCommentId,
+    );
   }
 
   @Post('comentarios/vincular-archivo')
@@ -431,10 +492,18 @@ export class PortalTicketsController {
     return this.ticketsService.findAllCategories(userId);
   }
 
+  @Get('catalogos/estados')
+  @ApiOperation({ summary: 'Listar estados de ticket (portal)' })
+  @ApiOkResponse({ type: CatalogItemResponseDto, isArray: true })
+  findAllStatuses(@CurrentUser('sub') userId: string) {
+    return this.ticketsService.findAllStatusesForPortal(userId);
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Listar tickets del cliente',
-    description: 'Solo proyectos de empresas del usuario. En navegador usar POST /listar.',
+    description:
+      'Solo proyectos de empresas del usuario. En navegador usar POST /listar.',
   })
   @ApiBody({ type: PortalFilterTicketsDto, required: false })
   @ApiOkResponse({ type: TicketResponseDto, isArray: true })
@@ -442,7 +511,7 @@ export class PortalTicketsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: PortalFilterTicketsDto = {},
   ) {
-    return this.ticketsService.findAllForPortal(userId, dto.projectId);
+    return this.ticketsService.findAllForPortal(userId, dto);
   }
 
   @Post('listar')
@@ -454,17 +523,14 @@ export class PortalTicketsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: PortalFilterTicketsDto = {},
   ) {
-    return this.ticketsService.findAllForPortal(userId, dto.projectId);
+    return this.ticketsService.findAllForPortal(userId, dto);
   }
 
   @Get('detalle')
   @ApiOperation({ summary: 'Obtener ticket por ID (portal)' })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: TicketResponseDto })
-  findOne(
-    @CurrentUser('sub') userId: string,
-    @Body() dto: FindByIdDto,
-  ) {
+  findOne(@CurrentUser('sub') userId: string, @Body() dto: FindByIdDto) {
     return this.ticketsService.findByIdForPortal(userId, dto.id);
   }
 
@@ -473,10 +539,7 @@ export class PortalTicketsController {
   @ApiOperation({ summary: 'Obtener ticket por ID (body, portal)' })
   @ApiBody({ type: FindByIdDto })
   @ApiOkResponse({ type: TicketResponseDto })
-  findOneByBody(
-    @CurrentUser('sub') userId: string,
-    @Body() dto: FindByIdDto,
-  ) {
+  findOneByBody(@CurrentUser('sub') userId: string, @Body() dto: FindByIdDto) {
     return this.ticketsService.findByIdForPortal(userId, dto.id);
   }
 
@@ -582,7 +645,10 @@ export class PortalTicketsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: GetCommentAssetsDto,
   ) {
-    return this.ticketsService.getCommentAssetsForPortal(userId, dto.ticketCommentId);
+    return this.ticketsService.getCommentAssetsForPortal(
+      userId,
+      dto.ticketCommentId,
+    );
   }
 
   @Post('comentarios/subir-archivo')

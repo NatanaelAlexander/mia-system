@@ -45,6 +45,7 @@ import {
   SQL_FIND_ROLE_BY_ID,
   SQL_FIND_USER_COMPANIES,
   SQL_FIND_USER_JOB_TITLES,
+  SQL_FIND_JOB_TITLES_BY_USER_IDS,
   SQL_FIND_USER_ROLE_IDS,
   SQL_FIND_USER_ROLE_NAMES,
   SQL_INSERT_USER_COMPANY,
@@ -67,6 +68,7 @@ import {
   RoleOption,
   User,
   UserDetail,
+  UserListItem,
 } from './types/user.types';
 
 interface UpdateUserOptions {
@@ -94,14 +96,14 @@ export class UsersService {
     private readonly authService: AuthService,
   ) {}
 
-  async findAll(filters: FilterUsersDto = {}): Promise<User[]> {
+  async findAll(filters: FilterUsersDto = {}): Promise<UserListItem[]> {
     const { rows } = await this.db.query<User>(SQL_FIND_ALL_USERS, [
       filters.isActive ?? null,
       filters.roleName ?? null,
       filters.companyId ?? null,
     ]);
 
-    return rows;
+    return this.attachJobTitles(rows);
   }
 
   async findById(id: string): Promise<UserDetail> {
@@ -513,6 +515,42 @@ export class UsersService {
         newValues: { jobTitleIds: uniqueIds },
       });
     }
+  }
+
+  private async attachJobTitles(users: User[]): Promise<UserListItem[]> {
+    if (users.length === 0) {
+      return [];
+    }
+
+    const { rows } = await this.db.query<{
+      userId: string;
+      id: string;
+      name: string;
+    }>(SQL_FIND_JOB_TITLES_BY_USER_IDS, [users.map((user) => user.id)]);
+
+    const titlesByUserId = new Map<
+      string,
+      { jobTitles: string[]; jobTitleIds: string[] }
+    >();
+
+    for (const row of rows) {
+      const current = titlesByUserId.get(row.userId) ?? {
+        jobTitles: [],
+        jobTitleIds: [],
+      };
+      current.jobTitles.push(row.name);
+      current.jobTitleIds.push(row.id);
+      titlesByUserId.set(row.userId, current);
+    }
+
+    return users.map((user) => {
+      const titles = titlesByUserId.get(user.id);
+      return {
+        ...user,
+        jobTitles: titles?.jobTitles ?? [],
+        jobTitleIds: titles?.jobTitleIds ?? [],
+      };
+    });
   }
 
   private async toUserDetail(user: User): Promise<UserDetail> {

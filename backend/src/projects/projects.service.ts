@@ -138,6 +138,7 @@ export class ProjectsService {
     const { rows } = await this.db.query<Project>(SQL_INSERT_PROJECT, [
       dto.companyId,
       dto.name,
+      dto.description?.trim() || null,
       dto.type,
       ProjectStatus.ACTIVE,
     ]);
@@ -365,6 +366,7 @@ export class ProjectsService {
 
     const columns: Array<{ field: keyof UpdateProjectDto; column: string }> = [
       { field: 'name', column: 'name' },
+      { field: 'description', column: 'description' },
       { field: 'type', column: 'type' },
       { field: 'status', column: 'status' },
     ];
@@ -372,7 +374,11 @@ export class ProjectsService {
     for (const { field, column } of columns) {
       if (dto[field] !== undefined) {
         sets.push(`${column} = $${index++}`);
-        values.push(dto[field]);
+        const value =
+          field === 'description' && typeof dto.description === 'string'
+            ? dto.description.trim() || null
+            : dto[field];
+        values.push(value);
       }
     }
 

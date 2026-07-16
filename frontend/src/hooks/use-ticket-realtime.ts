@@ -1,13 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { io, type Socket } from "socket.io-client";
 import type { AssetListItem } from "@/components/app/api/assets";
 import type { TicketComment } from "@/components/app/api/tickets";
-import { getAccessToken } from "@/lib/auth/session";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+import { useRealtime } from "@/providers/realtime-provider";
 
 export interface TicketPresenceUser {
   userId: string;
@@ -64,8 +60,7 @@ export function useTicketRealtime({
   onTyping,
   onPresence,
 }: UseTicketRealtimeOptions) {
-  const socketRef = React.useRef<Socket | null>(null);
-  const [isConnected, setIsConnected] = React.useState(false);
+  const { socket, isConnected, joinTicket, leaveTicket } = useRealtime();
   const hasConnectedRef = React.useRef(false);
 
   const onCommentCreatedRef = React.useRef(onCommentCreated);
@@ -95,36 +90,16 @@ export function useTicketRealtime({
   ]);
 
   React.useEffect(() => {
-    if (!enabled || !ticketId) {
+    if (!enabled || !ticketId || !socket) {
       return;
     }
-
-    const token = getAccessToken();
-    if (!token) {
-      return;
-    }
-
-    const socket = io(`${API_BASE_URL}/tickets`, {
-      auth: { token },
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-    });
-
-    socketRef.current = socket;
 
     const handleConnect = () => {
-      setIsConnected(true);
-      socket.emit("ticket.join", { ticketId });
-
+      joinTicket(ticketId);
       if (hasConnectedRef.current) {
         onReconnectRef.current?.();
       }
-
       hasConnectedRef.current = true;
-    };
-
-    const handleDisconnect = () => {
-      setIsConnected(false);
     };
 
     const handleCommentCreated = (comment: TicketComment) => {
@@ -175,7 +150,6 @@ export function useTicketRealtime({
     };
 
     socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
     socket.on("comment.created", handleCommentCreated);
     socket.on("comment.assets_uploading", handleCommentAssetsUploading);
     socket.on("comment.asset_added", handleCommentAssetAdded);
@@ -184,47 +158,44 @@ export function useTicketRealtime({
     socket.on("ticket.presence", handlePresence);
 
     if (socket.connected) {
-      handleConnect();
+      joinTicket(ticketId);
+      hasConnectedRef.current = true;
     }
 
     return () => {
-      socket.emit("ticket.leave", { ticketId });
+      leaveTicket(ticketId);
       socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
       socket.off("comment.created", handleCommentCreated);
       socket.off("comment.assets_uploading", handleCommentAssetsUploading);
       socket.off("comment.asset_added", handleCommentAssetAdded);
       socket.off("comment.assets_updated", handleCommentAssetsUpdated);
       socket.off("comment.typing", handleTyping);
       socket.off("ticket.presence", handlePresence);
-      socket.disconnect();
-      socketRef.current = null;
-      setIsConnected(false);
       hasConnectedRef.current = false;
     };
-  }, [enabled, ticketId]);
+  }, [enabled, joinTicket, leaveTicket, socket, ticketId]);
 
   const emitTyping = React.useCallback(
     (isTyping: boolean, isInternal = false) => {
-      socketRef.current?.emit("comment.typing", {
+      socket?.emit("comment.typing", {
         ticketId,
         isTyping,
         isInternal,
       });
     },
-    [ticketId],
+    [socket, ticketId],
   );
 
   const emitAssetsUploading = React.useCallback(
     (commentId: string, count: number, isInternal = false) => {
-      socketRef.current?.emit("comment.assets_uploading", {
+      socket?.emit("comment.assets_uploading", {
         ticketId,
         commentId,
         count,
         isInternal,
       });
     },
-    [ticketId],
+    [socket, ticketId],
   );
 
   return { isConnected, emitTyping, emitAssetsUploading };

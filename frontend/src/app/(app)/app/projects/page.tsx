@@ -1,5 +1,6 @@
-import { ProjectsPage } from "@/components/app/projects/projects-page";
+import { redirect } from "next/navigation";
 
-export default function ProjectsRoutePage() {
-  return <ProjectsPage />;
+/** La lista global de proyectos quedó deprecada; se navega desde cada empresa. */
+export default function LegacyProjectsPage() {
+  redirect("/app/companies");
 }

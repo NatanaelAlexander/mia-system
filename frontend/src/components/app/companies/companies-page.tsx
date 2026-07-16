@@ -3,13 +3,23 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, RefreshCcw, Search } from "lucide-react";
+import {
+  Building2,
+  Filter,
+  IdCard,
+  Mail,
+  Phone,
+  Plus,
+  RefreshCcw,
+  Search,
+} from "lucide-react";
 import {
   listCompanies,
   type CompanyListItem,
   type CompanyStatus,
 } from "@/components/app/api/companies";
 import { formatCompanyStatus } from "@/components/app/shared/format";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import {
   canAccessModule,
   hasPermission,
@@ -40,6 +50,20 @@ import {
 import { type DataColumn } from "@/components/app/shared/data-table";
 import { CompanyCreateDialog } from "./company-create-dialog";
 import { companiesModule } from "./companies-module";
+
+const SURFACE_HELP: Record<string, string> = {
+  internal:
+    "Acceso interno del equipo: gestión completa de empresas, proyectos, tickets y usuarios.",
+  portal:
+    "Acceso portal del cliente: ve solo las empresas vinculadas a tu cuenta y su operación permitida.",
+};
+
+const STATUS_HELP: Record<CompanyStatus, string> = {
+  active:
+    "Empresa operativa. Puede tener proyectos activos, usuarios vinculados y tickets en curso.",
+  inactive:
+    "Empresa deshabilitada. No se usa en la operación diaria; se mantiene el historial.",
+};
 
 type StatusFilter = "all" | CompanyStatus;
 
@@ -160,27 +184,57 @@ export function CompaniesPage() {
         render: (item) => (
           <Link
             href={`/app/companies/${item.id}`}
-            className="font-medium text-primary hover:underline"
+            className="inline-flex max-w-full items-center gap-2 font-medium text-primary hover:underline"
           >
-            {item.name}
+            <Building2 className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{item.name}</span>
           </Link>
         ),
       },
-      { key: "taxId", label: "RUT", render: (item) => item.taxId },
+      {
+        key: "taxId",
+        label: "RUT",
+        render: (item) => (
+          <span className="inline-flex max-w-full items-center gap-2">
+            <IdCard className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{item.taxId}</span>
+          </span>
+        ),
+      },
       {
         key: "status",
         label: "Estado",
         render: (item) => (
-          <Badge variant={item.status === "active" ? "secondary" : "outline"}>
-            {formatCompanyStatus(item.status)}
-          </Badge>
+          <span className="inline-flex items-center gap-1.5">
+            <Badge variant={item.status === "active" ? "secondary" : "outline"}>
+              {formatCompanyStatus(item.status)}
+            </Badge>
+            <HelpHint
+              label={`Qué significa ${formatCompanyStatus(item.status)}`}
+              text={STATUS_HELP[item.status]}
+            />
+          </span>
         ),
       },
-      { key: "email", label: "Email", render: (item) => item.email ?? "—" },
+      {
+        key: "email",
+        label: "Email",
+        render: (item) => (
+          <span className="inline-flex max-w-full items-center gap-2">
+            <Mail className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{item.email ?? "—"}</span>
+          </span>
+        ),
+      },
       {
         key: "phone",
         label: "Teléfono",
-        render: (item) => item.phoneNumber ?? "—",
+        render: (item) => (
+          <span className="inline-flex max-w-full items-center gap-2">
+            <Phone className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{item.phoneNumber ?? "—"}</span>
+          </span>
+        ),
       },
     ],
     [],
@@ -208,17 +262,27 @@ export function CompaniesPage() {
       <Card>
         <CardHeader className="border-b">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Empresas</CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="size-5 text-primary" />
+                Empresas
+              </CardTitle>
               <CardDescription>
                 Gestiona empresas, usuarios vinculados y su operación.
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {claims?.surfaces.map((item) => (
-                <Badge key={item} variant="secondary">
-                  {item}
-                </Badge>
+                <span key={item} className="inline-flex items-center gap-1">
+                  <Badge variant="secondary">{item}</Badge>
+                  <HelpHint
+                    label={`Qué es ${item}`}
+                    text={
+                      SURFACE_HELP[item] ??
+                      "Superficie de acceso asignada a tu usuario."
+                    }
+                  />
+                </span>
               ))}
               {canCreate ? (
                 <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
@@ -259,7 +323,17 @@ export function CompaniesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="company-status-filter">Estado</Label>
+              <Label
+                htmlFor="company-status-filter"
+                className="inline-flex items-center gap-1.5"
+              >
+                <Filter className="size-3.5 text-muted-foreground" />
+                Estado
+                <HelpHint
+                  label="Qué significa el filtro de estado"
+                  text="Activa: empresa operativa. Inactiva: empresa deshabilitada. Todas: muestra ambos estados."
+                />
+              </Label>
               <Select
                 items={statusFilterItems}
                 value={statusFilter}
@@ -312,7 +386,22 @@ export function CompaniesPage() {
                 style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
               >
                 {columns.map((column) => (
-                  <div key={column.key}>{column.label}</div>
+                  <div key={column.key} className="inline-flex items-center gap-1.5">
+                    {column.key === "name" ? (
+                      <Building2 className="size-3.5" />
+                    ) : null}
+                    {column.key === "taxId" ? (
+                      <IdCard className="size-3.5" />
+                    ) : null}
+                    {column.key === "status" ? (
+                      <Filter className="size-3.5" />
+                    ) : null}
+                    {column.key === "email" ? <Mail className="size-3.5" /> : null}
+                    {column.key === "phone" ? (
+                      <Phone className="size-3.5" />
+                    ) : null}
+                    {column.label}
+                  </div>
                 ))}
               </div>
               <div className="divide-y divide-border/70">

@@ -27,6 +27,12 @@ export class UserResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt: Date;
+
+  @ApiPropertyOptional({ example: ['Backend Dev'], isArray: true })
+  jobTitles?: string[];
+
+  @ApiPropertyOptional({ type: [String], format: 'uuid', isArray: true })
+  jobTitleIds?: string[];
 }
 
 export class UserCompanySummaryDto {
@@ -43,12 +49,6 @@ export class UserDetailResponseDto extends UserResponseDto {
 
   @ApiProperty({ type: [String], format: 'uuid', isArray: true })
   roleIds: string[];
-
-  @ApiProperty({ example: ['Backend Dev'], isArray: true })
-  jobTitles: string[];
-
-  @ApiProperty({ type: [String], format: 'uuid', isArray: true })
-  jobTitleIds: string[];
 
   @ApiProperty({ type: UserCompanySummaryDto, isArray: true })
   companies: UserCompanySummaryDto[];

@@ -5,6 +5,14 @@ export interface ModuleAccess {
   internalOnly?: boolean;
 }
 
+/** Mirrors backend PermissionsService.bypassesPermissionChecks. */
+function bypassesPermissionChecks(claims: AccessTokenClaims): boolean {
+  return (
+    claims.roles.includes("super_admin") ||
+    claims.permissions.includes("system:manage")
+  );
+}
+
 export function canAccessModule(
   claims: AccessTokenClaims | null,
   access: ModuleAccess,
@@ -21,14 +29,22 @@ export function canAccessModule(
     return true;
   }
 
-  return claims.permissions.includes(access.requiredPermission);
+  return hasPermission(claims, access.requiredPermission);
 }
 
 export function hasPermission(
   claims: AccessTokenClaims | null,
   permission: string,
 ) {
-  return claims?.permissions.includes(permission) ?? false;
+  if (!claims) {
+    return false;
+  }
+
+  if (bypassesPermissionChecks(claims)) {
+    return true;
+  }
+
+  return claims.permissions.includes(permission);
 }
 
 export function isInternalUser(claims: AccessTokenClaims | null) {

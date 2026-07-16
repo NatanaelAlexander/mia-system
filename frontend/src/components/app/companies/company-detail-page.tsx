@@ -2,16 +2,26 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Building2,
+  FolderKanban,
+  IdCard,
+  Scale,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   deactivateCompany,
   getCompanyDetail,
   updateCompany,
   type CompanyDetail,
+  type CompanyStatus,
 } from "@/components/app/api/companies";
 import { formatCompanyStatus } from "@/components/app/shared/format";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import {
   canAccessModule,
   hasPermission,
@@ -33,7 +43,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { companiesModule } from "./companies-module";
+import {
+  Tabs,
+  TabsIndicator,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+} from "@/components/ui/tabs";
+import {
+  companiesModule,
+  companyDetailHref,
+  type CompanyDetailTab,
+} from "./companies-module";
 import {
   CompanyForm,
   toCompanyFormValues,
@@ -49,6 +70,38 @@ interface CompanyDetailPageProps {
   companyId: string;
 }
 
+const COMPANY_TABS = [
+  "datos",
+  "representantes",
+  "usuarios",
+  "proyectos",
+] as const satisfies readonly CompanyDetailTab[];
+
+const STATUS_HELP: Record<CompanyStatus, string> = {
+  active:
+    "Empresa operativa. Puede tener proyectos activos, usuarios vinculados y tickets en curso.",
+  inactive:
+    "Empresa deshabilitada. No se usa en la operación diaria; se mantiene el historial.",
+};
+
+const TAB_HELP: Record<CompanyDetailTab, string> = {
+  datos:
+    "Información general de la empresa: RUT, contacto, dirección y estado.",
+  representantes:
+    "Personas naturales con facultades legales para representar a la empresa ante terceros.",
+  usuarios:
+    "Cuentas del sistema vinculadas a esta empresa. Pueden acceder al portal o a la operación según su rol.",
+  proyectos:
+    "Proyectos asociados a esta empresa. Puedes filtrar por activos, inactivos o completados.",
+};
+
+function isCompanyDetailTab(value: string | null): value is CompanyDetailTab {
+  return (
+    typeof value === "string" &&
+    (COMPANY_TABS as readonly string[]).includes(value)
+  );
+}
+
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
@@ -59,8 +112,24 @@ function DetailSkeleton() {
   );
 }
 
+function TabLabel({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="size-3.5 shrink-0" />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { claims, isLoading: isAuthLoading } = useAuth();
   const surface = claims ? preferredSurface(claims) : "portal";
   const canAccess = canAccessModule(claims, companiesModule);
@@ -69,12 +138,43 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const canDeactivate =
     isInternalUser(claims) && hasPermission(claims, "companies:delete");
   const canViewProjects = canAccessModule(claims, projectsModule);
+  const isInternal = isInternalUser(claims);
 
   const [company, setCompany] = React.useState<CompanyDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
+
+  const allowedTabs = React.useMemo(() => {
+    const tabs: CompanyDetailTab[] = ["datos"];
+    if (isInternal) {
+      tabs.push("representantes", "usuarios");
+    }
+    if (canViewProjects) {
+      tabs.push("proyectos");
+    }
+    return tabs;
+  }, [canViewProjects, isInternal]);
+
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab: CompanyDetailTab = isCompanyDetailTab(tabFromUrl)
+    ? allowedTabs.includes(tabFromUrl)
+      ? tabFromUrl
+      : "datos"
+    : "datos";
+
+  const handleTabChange = (value: string | number | null) => {
+    if (typeof value !== "string" || !isCompanyDetailTab(value)) {
+      return;
+    }
+
+    if (!allowedTabs.includes(value)) {
+      return;
+    }
+
+    router.replace(companyDetailHref(companyId, value), { scroll: false });
+  };
 
   const loadCompany = React.useCallback(async () => {
     if (!claims || !canAccess) {
@@ -202,16 +302,34 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
             <ArrowLeft />
             Empresas
           </Link>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              RUT {company.taxId} · {formatCompanyStatus(company.status)}
+          <div className="space-y-1">
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+              <Building2 className="size-6 shrink-0 text-primary" />
+              {company.name}
+            </h1>
+            <p className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <IdCard className="size-3.5" />
+                RUT {company.taxId}
+              </span>
+              <span aria-hidden>·</span>
+              <span>{formatCompanyStatus(company.status)}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">{company.status}</Badge>
+          <span className="inline-flex items-center gap-1.5">
+            <Badge
+              variant={company.status === "active" ? "secondary" : "outline"}
+            >
+              {formatCompanyStatus(company.status)}
+            </Badge>
+            <HelpHint
+              label={`Qué significa ${formatCompanyStatus(company.status)}`}
+              text={STATUS_HELP[company.status]}
+            />
+          </span>
           {canDeactivate && company.status === "active" ? (
             <Button
               type="button"
@@ -227,42 +345,81 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Datos de la empresa</CardTitle>
-          <CardDescription>
-            {canEdit
-              ? "Edita la información general de la empresa."
-              : "Vista de solo lectura."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CompanyForm
-            mode="edit"
-            defaultValues={toCompanyFormValues(company)}
-            onSubmit={handleSubmit}
-            readOnly={!canEdit}
-            isSubmitting={isSubmitting}
-            submitLabel="Guardar cambios"
-          />
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTab value="datos">
+            <TabLabel icon={Building2} label="Datos de la empresa" />
+          </TabsTab>
+          {isInternal ? (
+            <>
+              <TabsTab value="representantes">
+                <TabLabel icon={Scale} label="Representantes legales" />
+              </TabsTab>
+              <TabsTab value="usuarios">
+                <TabLabel icon={Users} label="Usuarios vinculados" />
+              </TabsTab>
+            </>
+          ) : null}
+          {canViewProjects ? (
+            <TabsTab value="proyectos">
+              <TabLabel icon={FolderKanban} label="Proyectos" />
+            </TabsTab>
+          ) : null}
+          <TabsIndicator />
+        </TabsList>
 
-      {isInternalUser(claims) ? (
-        <>
-          <CompanyRepresentativesSection
-            companyId={company.id}
-            representativeLinks={company.representativeLinks}
-            canManage={canEdit}
-            onChanged={loadCompany}
-          />
-          <CompanyUsersSection companyId={company.id} canManage={canEdit} />
-        </>
-      ) : null}
+        <TabsPanel value="datos">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="size-4 text-primary" />
+                Datos de la empresa
+                <HelpHint
+                  label="Qué son los datos de la empresa"
+                  text={TAB_HELP.datos}
+                />
+              </CardTitle>
+              <CardDescription>
+                {canEdit
+                  ? "Edita la información general de la empresa."
+                  : "Vista de solo lectura."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CompanyForm
+                mode="edit"
+                defaultValues={toCompanyFormValues(company)}
+                onSubmit={handleSubmit}
+                readOnly={!canEdit}
+                isSubmitting={isSubmitting}
+                submitLabel="Guardar cambios"
+              />
+            </CardContent>
+          </Card>
+        </TabsPanel>
 
-      {canViewProjects ? (
-        <CompanyProjectsSection companyId={company.id} surface={surface} />
-      ) : null}
+        {isInternal ? (
+          <>
+            <TabsPanel value="representantes">
+              <CompanyRepresentativesSection
+                companyId={company.id}
+                representativeLinks={company.representativeLinks}
+                canManage={canEdit}
+                onChanged={loadCompany}
+              />
+            </TabsPanel>
+            <TabsPanel value="usuarios">
+              <CompanyUsersSection companyId={company.id} canManage={canEdit} />
+            </TabsPanel>
+          </>
+        ) : null}
+
+        {canViewProjects ? (
+          <TabsPanel value="proyectos">
+            <CompanyProjectsSection companyId={company.id} surface={surface} />
+          </TabsPanel>
+        ) : null}
+      </Tabs>
 
       <ConfirmDialog
         open={deactivateConfirmOpen}

@@ -1,5 +1,22 @@
 import type { AccessTokenClaims } from "./types";
 
+function decodeBase64UrlToUtf8(base64Url: string): string {
+  const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(
+    base64.length + ((4 - (base64.length % 4)) % 4),
+    "=",
+  );
+
+  if (typeof window === "undefined") {
+    return Buffer.from(padded, "base64").toString("utf-8");
+  }
+
+  // atob() returns a binary Latin-1 string; re-decode as UTF-8 for ñ, accents, etc.
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
 function decodeJwtPayload<T>(token: string): T | null {
   try {
     const parts = token.split(".");
@@ -7,18 +24,7 @@ function decodeJwtPayload<T>(token: string): T | null {
       return null;
     }
 
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(
-      base64.length + ((4 - (base64.length % 4)) % 4),
-      "=",
-    );
-
-    const json =
-      typeof window !== "undefined"
-        ? atob(padded)
-        : Buffer.from(padded, "base64").toString("utf-8");
-
+    const json = decodeBase64UrlToUtf8(parts[1]);
     return JSON.parse(json) as T;
   } catch {
     return null;

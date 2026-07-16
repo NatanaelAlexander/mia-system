@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
+  description TEXT,
   type VARCHAR(20) NOT NULL CHECK (type IN ('internal', 'external')),
   status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'completed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

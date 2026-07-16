@@ -11,3 +11,21 @@ export const companiesModule = {
   href: string;
   icon: typeof Building2;
 };
+
+export type CompanyDetailTab =
+  | "datos"
+  | "representantes"
+  | "usuarios"
+  | "proyectos";
+
+/** Enlace a la ficha de empresa con una pestaña concreta (p. ej. proyectos). */
+export function companyDetailHref(
+  companyId: string,
+  tab?: CompanyDetailTab,
+): string {
+  if (!tab || tab === "datos") {
+    return `/app/companies/${companyId}`;
+  }
+
+  return `/app/companies/${companyId}?tab=${tab}`;
+}

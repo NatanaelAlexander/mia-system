@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Edit2, LinkIcon, Plus, Trash2, UserRound } from "lucide-react";
+import { Edit2, LinkIcon, Plus, Scale, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   createLegalRepresentative,
@@ -14,6 +14,7 @@ import {
   type LegalRepresentative,
 } from "@/components/app/api/companies";
 import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import {
@@ -375,7 +376,14 @@ export function CompanyRepresentativesSection({
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Representantes legales</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Scale className="size-4 text-primary" />
+                Representantes legales
+                <HelpHint
+                  label="Qué son los representantes legales"
+                  text="Personas naturales con facultades legales para representar a la empresa ante terceros."
+                />
+              </CardTitle>
               <CardDescription>
                 Personas que representan legalmente a esta empresa.
               </CardDescription>
