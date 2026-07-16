@@ -1,4 +1,5 @@
 import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
+import type { ResourceSurface } from "./types";
 
 export interface AssetListItem {
   id: string;
@@ -17,9 +18,12 @@ export function listAssets() {
   return apiFetch<AssetListItem[]>("/internal/assets", {}, true);
 }
 
-export function getAssetDownloadUrl(assetId: string) {
+export function getAssetDownloadUrl(
+  surface: ResourceSurface,
+  assetId: string,
+) {
   return apiFetchDetalle<AssetDownloadUrl>(
-    "/internal/assets/descarga",
+    `/${surface}/assets/descarga`,
     { id: assetId },
     true,
   );

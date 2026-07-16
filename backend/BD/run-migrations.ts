@@ -16,6 +16,12 @@ const MIGRATIONS = [
   'ticket_comments_internal',
   'ticket_notifications',
   'audit_logs',
+  'quotes',
+  'quote_workflow',
+  'quote_presets',
+  'quote_pdf_style',
+  'quote_pdf_theme',
+  'quote_pdf_layouts_v2',
 ] as const;
 
 const SEPARATOR = '----------------------------------------';

@@ -2,18 +2,32 @@ import { AlertCircle, Database, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function ListSkeleton({ columns = 4, rows = 5 }: { columns?: number; rows?: number }) {
+export function ListSkeleton({
+  columns = 4,
+  rows = 5,
+}: {
+  columns?: number;
+  rows?: number;
+}) {
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, index) => (
-        <div
-          key={index}
-          className="grid gap-3 rounded-lg border border-border/60 p-3"
-          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-        >
-          {Array.from({ length: columns }).map((__, colIndex) => (
-            <Skeleton key={colIndex} className="h-5 w-full" />
-          ))}
+        <div key={index}>
+          <div className="space-y-2 rounded-lg border border-border/60 p-3 md:hidden">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div
+            className="hidden gap-3 rounded-lg border border-border/60 p-3 md:grid"
+            style={{
+              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            }}
+          >
+            {Array.from({ length: columns }).map((__, colIndex) => (
+              <Skeleton key={colIndex} className="h-5 w-full" />
+            ))}
+          </div>
         </div>
       ))}
     </div>

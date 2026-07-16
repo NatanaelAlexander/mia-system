@@ -6,7 +6,9 @@ import {
   Inter,
   JetBrains_Mono,
   Merriweather,
+  Montserrat,
   Outfit,
+  Source_Code_Pro,
 } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -48,6 +50,16 @@ const firaCode = Fira_Code({
   subsets: ["latin"],
 });
 
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+});
+
+const sourceCodePro = Source_Code_Pro({
+  variable: "--font-source-code-pro",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "MIA System",
   description: "Sistema de gestión interna y portal de tickets",
@@ -68,7 +80,7 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistMono.variable} ${jetbrainsMono.variable} ${inter.variable} ${merriweather.variable} ${outfit.variable} ${firaCode.variable} dark h-full antialiased`}
+      className={`${geistMono.variable} ${jetbrainsMono.variable} ${inter.variable} ${merriweather.variable} ${outfit.variable} ${firaCode.variable} ${montserrat.variable} ${sourceCodePro.variable} dark h-full antialiased`}
       data-style={styleId}
       suppressHydrationWarning
     >

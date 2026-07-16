@@ -16,17 +16,20 @@ import type { AppStyleId } from "@/lib/themes/registry";
 
 export function StyleThemeSwitcher() {
   const { styleId, setStyleId, styles } = useStyleTheme();
-  const activeStyle = styles.find((style) => style.id === styleId) ?? styles[0];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="ghost" size="sm" aria-label="Cambiar estilo" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            aria-label="Cambiar estilo"
+          />
         }
       >
         <Palette />
-        <span className="hidden sm:inline">{activeStyle.label}</span>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={8} className="min-w-56 p-1">

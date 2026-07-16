@@ -100,6 +100,15 @@ export function TicketsKanbanBoard({
   >(null);
   const [assigneeDialogTicket, setAssigneeDialogTicket] =
     React.useState<TicketKanbanItem | null>(null);
+  const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
+
+  React.useEffect(() => {
+    const mql = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsCoarsePointer(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -141,15 +150,13 @@ export function TicketsKanbanBoard({
     return map;
   }, [filteredTickets, statuses]);
 
-  const handleDrop = async (statusId: string) => {
-    if (!draggingTicketId || !claims) {
+  const changeStatus = async (ticketId: string, statusId: string) => {
+    if (!claims) {
       return;
     }
 
-    const ticket = tickets.find((item) => item.id === draggingTicketId);
+    const ticket = tickets.find((item) => item.id === ticketId);
     if (!ticket || ticket.statusId === statusId || !canDragTicket(ticket, claims)) {
-      setDraggingTicketId(null);
-      setDropTargetStatusId(null);
       return;
     }
 
@@ -157,7 +164,7 @@ export function TicketsKanbanBoard({
     const nextStatus = statuses.find((status) => status.id === statusId);
     onTicketsChange(
       tickets.map((item) =>
-        item.id === draggingTicketId
+        item.id === ticketId
           ? {
               ...item,
               statusId,
@@ -165,19 +172,22 @@ export function TicketsKanbanBoard({
               isClosed:
                 nextStatus?.name === "Terminado" ||
                 nextStatus?.name === "Cancelado",
-              isWorking: ["Tomado", "En desarrollo", "QA", "Esperando cliente"].includes(
-                nextStatus?.name ?? "",
-              ),
+              isWorking: [
+                "Tomado",
+                "En desarrollo",
+                "QA",
+                "Esperando cliente",
+              ].includes(nextStatus?.name ?? ""),
             }
           : item,
       ),
     );
 
     try {
-      const updated = await changeTicketStatus(draggingTicketId, statusId);
+      const updated = await changeTicketStatus(ticketId, statusId);
       onTicketsChange(
         tickets.map((item) =>
-          item.id === draggingTicketId
+          item.id === ticketId
             ? {
                 ...item,
                 ...updated,
@@ -206,6 +216,16 @@ export function TicketsKanbanBoard({
           ? error.message
           : "No se pudo mover el ticket.",
       );
+    }
+  };
+
+  const handleDrop = async (statusId: string) => {
+    if (!draggingTicketId) {
+      return;
+    }
+
+    try {
+      await changeStatus(draggingTicketId, statusId);
     } finally {
       setDraggingTicketId(null);
       setDropTargetStatusId(null);
@@ -272,12 +292,14 @@ export function TicketsKanbanBoard({
 
         {isInternal ? (
           <p className="text-xs text-muted-foreground">
-            Arrastra las tarjetas para cambiar el estado si tienes permiso.
+            {isCoarsePointer
+              ? "Usa el selector de estado en cada tarjeta para mover tickets."
+              : "Arrastra las tarjetas para cambiar el estado si tienes permiso."}
           </p>
         ) : null}
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 md:mx-0 md:gap-4 md:px-0">
         {statuses.map((status) => {
           const columnTickets = ticketsByStatus.get(status.id) ?? [];
           const isDropTarget = dropTargetStatusId === status.id;
@@ -286,11 +308,11 @@ export function TicketsKanbanBoard({
             <section
               key={status.id}
               className={cn(
-                "flex w-72 shrink-0 flex-col rounded-xl border border-border/70 bg-muted/20",
+                "flex w-[min(85vw,18rem)] shrink-0 snap-start flex-col rounded-xl border border-border/70 bg-muted/20 md:w-72",
                 isDropTarget && "border-primary ring-2 ring-primary/20",
               )}
               onDragOver={(event) => {
-                if (!draggingTicketId || !isInternal) {
+                if (!draggingTicketId || !isInternal || isCoarsePointer) {
                   return;
                 }
                 event.preventDefault();
@@ -306,12 +328,12 @@ export function TicketsKanbanBoard({
                 void handleDrop(status.id);
               }}
             >
-              <header className="flex items-center justify-between border-b border-border/60 px-3 py-2">
+              <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 backdrop-blur">
                 <h3 className="text-sm font-semibold">{status.name}</h3>
                 <Badge variant="secondary">{columnTickets.length}</Badge>
               </header>
 
-              <div className="flex min-h-32 flex-col gap-2 p-2">
+              <div className="flex max-h-[min(70dvh,32rem)] min-h-32 flex-col gap-2 overflow-y-auto p-2">
                 {columnTickets.length === 0 ? (
                   <p className="px-1 py-6 text-center text-xs text-muted-foreground">
                     Sin tickets
@@ -322,8 +344,16 @@ export function TicketsKanbanBoard({
                       key={ticket.id}
                       ticket={ticket}
                       projectId={projectId}
-                      draggable={canDragTicket(ticket, claims)}
+                      draggable={
+                        !isCoarsePointer && canDragTicket(ticket, claims)
+                      }
                       canManageAssignees={isSuperAdmin}
+                      statuses={statuses}
+                      canChangeStatus={canDragTicket(ticket, claims)}
+                      showStatusSelect={isCoarsePointer}
+                      onStatusChange={(statusId) =>
+                        void changeStatus(ticket.id, statusId)
+                      }
                       onEditAssignees={setAssigneeDialogTicket}
                       onDragStart={setDraggingTicketId}
                       onDragEnd={() => {

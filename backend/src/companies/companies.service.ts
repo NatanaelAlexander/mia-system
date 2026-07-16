@@ -236,10 +236,9 @@ export class CompaniesService {
   }
 
   async findByIdForPortal(userId: string, id: string): Promise<CompanyDetail> {
-    const hasAccess = await this.portalAccess.userHasCompany(userId, id);
-    if (!hasAccess) {
+    await this.portalAccess.assertCompany(userId, id, () => {
       throw new EmpresaNoEncontradaException();
-    }
+    });
 
     const company = await this.findActiveCompanyById(id);
     const representativeLinks = await this.fetchCompanyRepresentatives(id);

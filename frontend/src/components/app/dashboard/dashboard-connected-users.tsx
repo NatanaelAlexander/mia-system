@@ -48,7 +48,7 @@ export function DashboardConnectedUsers({
   return (
     <DashboardCard className={cn("h-full", className)}>
       <div className="flex h-full flex-col gap-4 p-5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -73,12 +73,12 @@ export function DashboardConnectedUsers({
                   <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
                 </span>
                 <Wifi className="size-3.5" />
-                En vivo
+                <span className="hidden sm:inline">En vivo</span>
               </>
             ) : (
               <>
                 <WifiOff className="size-3.5" />
-                Desconectado
+                <span className="hidden sm:inline">Desconectado</span>
               </>
             )}
           </Badge>

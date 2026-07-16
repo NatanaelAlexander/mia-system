@@ -1,7 +1,14 @@
 /**
  * Catálogo de artículos de ayuda.
  * Para agregar uno nuevo: registra la categoría (si aplica) y el artículo aquí.
+ *
+ * audience:
+ * - "internal" → solo equipo (admin / superadmin)
+ * - "portal"   → solo clientes
+ * - "both"     → ambos
  */
+
+export type HelpAudience = "internal" | "portal" | "both";
 
 export type HelpCategoryId =
   | "general"
@@ -36,6 +43,7 @@ export type HelpArticle = {
   categoryId: HelpCategoryId;
   title: string;
   description?: string;
+  audience: HelpAudience;
   sections: HelpSection[];
 };
 
@@ -54,11 +62,115 @@ export const HELP_CATEGORIES = [
 ] as const satisfies readonly HelpCategory[];
 
 export const HELP_ARTICLES = [
+  // ── Portal (cliente) ──────────────────────────────────────────────
+  {
+    id: "portal-intro",
+    categoryId: "general",
+    title: "Bienvenida al portal",
+    description: "Qué puedes hacer como cliente en MIA System.",
+    audience: "portal",
+    sections: [
+      {
+        paragraphs: [
+          "Este portal te permite seguir el trabajo de tus proyectos y comunicarte con el equipo de soporte o desarrollo.",
+          "Solo ves la información de las empresas a las que estás vinculado: empresas, proyectos y tickets relacionados.",
+        ],
+        bullets: [
+          "Dashboard: resumen de tus empresas y tickets",
+          "Empresas: datos y proyectos de tu organización",
+          "Tickets: crear solicitudes, seguir el estado y conversar con el equipo",
+          "Notificaciones: avisos cuando hay actividad en tus tickets",
+        ],
+      },
+    ],
+  },
+  {
+    id: "portal-navigation",
+    categoryId: "general",
+    title: "Cómo moverte por el sistema",
+    description: "Menú, dashboard y secciones principales.",
+    audience: "portal",
+    sections: [
+      {
+        paragraphs: [
+          "Usa el menú de la izquierda para ir al Dashboard o a Empresas. Desde una empresa puedes abrir sus proyectos y, desde ahí, los tickets.",
+        ],
+        bullets: [
+          "Dashboard: números clave y evolución de tus tickets",
+          "Empresas: listado de las empresas asociadas a tu usuario",
+          "Campana de notificaciones (arriba a la derecha): avisos recientes",
+          "Ayuda (?): esta guía, siempre disponible",
+        ],
+      },
+    ],
+  },
+  {
+    id: "portal-companies-projects",
+    categoryId: "workflow",
+    title: "Empresas y proyectos",
+    description: "Cómo revisar tu organización y sus proyectos.",
+    audience: "portal",
+    sections: [
+      {
+        paragraphs: [
+          "Todo el trabajo se organiza así: Empresa → Proyecto → Ticket. Un ticket siempre pertenece a un proyecto.",
+        ],
+        bullets: [
+          "En Empresas verás solo las que tienes asignadas",
+          "Al abrir una empresa puedes revisar sus datos y la pestaña de Proyectos",
+          "Cada proyecto concentra los tickets y archivos de ese trabajo",
+          "No puedes crear empresas ni proyectos: eso lo gestiona el equipo interno",
+        ],
+      },
+    ],
+  },
+  {
+    id: "portal-tickets",
+    categoryId: "workflow",
+    title: "Tickets: crear y seguir",
+    description: "Abrir una solicitud y ver su avance.",
+    audience: "portal",
+    sections: [
+      {
+        paragraphs: [
+          "Los tickets son el canal para pedir soporte, reportar un problema o solicitar un cambio dentro de un proyecto.",
+        ],
+        bullets: [
+          "Crea un ticket desde el proyecto correspondiente (título, descripción y prioridad)",
+          "Sigue el estado en el tablero o en el detalle del ticket",
+          "Los estados avanzan cuando el equipo trabaja tu solicitud (por ejemplo: tomado, en desarrollo, esperando cliente, terminado)",
+          "Si el equipo te pide información, el ticket puede quedar en «Esperando cliente»",
+        ],
+      },
+    ],
+  },
+  {
+    id: "portal-chat-files",
+    categoryId: "workflow",
+    title: "Conversación y archivos",
+    description: "Chatear en el ticket y adjuntar documentos.",
+    audience: "portal",
+    sections: [
+      {
+        paragraphs: [
+          "Dentro de cada ticket tienes un chat para hablar con el equipo y adjuntar archivos que ayuden a resolver la solicitud.",
+        ],
+        bullets: [
+          "Escribe mensajes en el chat del ticket; el equipo los ve en tiempo real",
+          "Puedes subir archivos al mensaje o al ticket (capturas, documentos, etc.)",
+          "Solo ves la conversación pública: los notas internas del equipo no aparecen en tu portal",
+          "Revisa las notificaciones para enterarte de respuestas nuevas",
+        ],
+      },
+    ],
+  },
+  // ── Interno (equipo) ──────────────────────────────────────────────
   {
     id: "intro",
     categoryId: "general",
     title: "Introducción",
     description: "Qué es MIA System y cómo está organizado.",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -77,6 +189,7 @@ export const HELP_ARTICLES = [
     id: "urls",
     categoryId: "general",
     title: "URLs y acceso",
+    audience: "internal",
     sections: [
       {
         table: {
@@ -107,6 +220,7 @@ export const HELP_ARTICLES = [
     id: "system-overview",
     categoryId: "specs",
     title: "Descripción del sistema",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -126,6 +240,7 @@ export const HELP_ARTICLES = [
     id: "api-surfaces",
     categoryId: "specs",
     title: "API y superficies",
+    audience: "internal",
     sections: [
       {
         table: {
@@ -150,6 +265,7 @@ export const HELP_ARTICLES = [
     id: "domain-flow",
     categoryId: "workflow",
     title: "Empresas → Proyectos → Tickets",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -160,6 +276,7 @@ export const HELP_ARTICLES = [
           "Proyectos: activos vinculados a una empresa",
           "Tickets: soporte y desarrollo dentro de un proyecto",
           "Assets: archivos en R2 referenciados desde proyectos, tickets o comentarios",
+          "Asignación: solo superadmin asigna; admin solo ve tickets donde está asignado",
         ],
       },
     ],
@@ -168,6 +285,7 @@ export const HELP_ARTICLES = [
     id: "backend-request",
     categoryId: "workflow",
     title: "Flujo de una request (backend)",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -186,6 +304,7 @@ export const HELP_ARTICLES = [
     id: "setup-windows",
     categoryId: "commands",
     title: "Setup — Windows",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -216,6 +335,7 @@ export const HELP_ARTICLES = [
     id: "setup-linux",
     categoryId: "commands",
     title: "Setup — Linux",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -250,6 +370,7 @@ export const HELP_ARTICLES = [
     id: "daily-commands",
     categoryId: "commands",
     title: "Comandos del día a día",
+    audience: "internal",
     sections: [
       {
         commands: [
@@ -275,6 +396,7 @@ export const HELP_ARTICLES = [
     id: "schema-migrate",
     categoryId: "database",
     title: "Migración de esquema",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -298,6 +420,7 @@ export const HELP_ARTICLES = [
     id: "data-migrate",
     categoryId: "database",
     title: "Migración de datos",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -326,6 +449,7 @@ export const HELP_ARTICLES = [
     id: "db-persistence",
     categoryId: "database",
     title: "Persistencia y reset",
+    audience: "internal",
     sections: [
       {
         table: {
@@ -354,6 +478,7 @@ export const HELP_ARTICLES = [
     id: "docker-up",
     categoryId: "docker",
     title: "Levantar el proyecto",
+    audience: "internal",
     sections: [
       {
         paragraphs: [
@@ -376,6 +501,7 @@ export const HELP_ARTICLES = [
     id: "docker-troubleshoot",
     categoryId: "docker",
     title: "Problemas frecuentes",
+    audience: "internal",
     sections: [
       {
         table: {
@@ -399,14 +525,38 @@ const articleMap = new Map<string, HelpArticle>(
   HELP_ARTICLES.map((article) => [article.id, article]),
 );
 
+export function articleMatchesAudience(
+  article: HelpArticle,
+  audience: Exclude<HelpAudience, "both">,
+): boolean {
+  return article.audience === "both" || article.audience === audience;
+}
+
 export function getHelpArticle(id: string): HelpArticle | undefined {
   return articleMap.get(id);
 }
 
 export function getHelpArticlesByCategory(
   categoryId: HelpCategoryId,
+  audience?: Exclude<HelpAudience, "both">,
 ): HelpArticle[] {
-  return HELP_ARTICLES.filter((article) => article.categoryId === categoryId);
+  return HELP_ARTICLES.filter((article) => {
+    if (article.categoryId !== categoryId) {
+      return false;
+    }
+    if (!audience) {
+      return true;
+    }
+    return articleMatchesAudience(article, audience);
+  });
+}
+
+export function getHelpCategoriesForAudience(
+  audience: Exclude<HelpAudience, "both">,
+): HelpCategory[] {
+  return HELP_CATEGORIES.filter(
+    (category) => getHelpArticlesByCategory(category.id, audience).length > 0,
+  );
 }
 
 export function getHelpCategory(

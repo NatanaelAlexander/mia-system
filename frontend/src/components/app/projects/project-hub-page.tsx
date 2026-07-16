@@ -17,6 +17,14 @@ import { cn } from "@/lib/utils";
 import { projectsModule } from "./projects-module";
 import { ProjectHubPanel } from "./project-hub-panel";
 import { ProjectTicketsSection } from "./project-tickets-section";
+import { EntityQuotesList } from "@/components/app/quotes/company-quotes-section";
+import { quotesModule } from "@/components/app/quotes/quotes-module";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 interface ProjectHubPageProps {
   projectId: string;
@@ -27,6 +35,7 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
   const { claims, isLoading: isAuthLoading } = useAuth();
   const surface = claims ? preferredSurface(claims) : "portal";
   const canAccess = canAccessModule(claims, projectsModule);
+  const canViewQuotes = canAccessModule(claims, quotesModule);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -120,6 +129,20 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
           }
         }}
       />
+
+      {canViewQuotes ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cotizaciones del proyecto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EntityQuotesList
+              companyId={project.companyId}
+              projectId={project.id}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <ProjectTicketsSection projectId={project.id} surface={surface} />
     </div>

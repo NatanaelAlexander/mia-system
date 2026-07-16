@@ -16,6 +16,7 @@ import { AuditModule } from './audit/audit.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
+import { QuotesModule } from './quotes/quotes.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     TicketsModule,
     NotificationsModule,
     UsersModule,
+    QuotesModule,
   ],
   controllers: [AppController],
   providers: [

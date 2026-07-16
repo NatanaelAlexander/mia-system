@@ -16,7 +16,8 @@ export type CompanyDetailTab =
   | "datos"
   | "representantes"
   | "usuarios"
-  | "proyectos";
+  | "proyectos"
+  | "cotizaciones";
 
 /** Enlace a la ficha de empresa con una pestaña concreta (p. ej. proyectos). */
 export function companyDetailHref(

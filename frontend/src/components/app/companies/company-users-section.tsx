@@ -206,7 +206,7 @@ export function CompanyUsersSection({
             {linkedUsers.map((user) => (
               <div
                 key={user.id}
-                className="flex items-center justify-between gap-3 p-3 text-sm"
+                className="flex flex-col gap-3 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <p className="font-medium">
@@ -219,6 +219,7 @@ export function CompanyUsersSection({
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="w-full sm:w-auto"
                     disabled={isSubmitting}
                     onClick={() => setUnassignTarget(user)}
                   >

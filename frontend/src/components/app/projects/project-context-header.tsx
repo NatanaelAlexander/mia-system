@@ -35,7 +35,9 @@ export function ProjectContextHeader({
           {companyName ? `${companyName} · ` : ""}
           {projectName}
         </p>
-        <h1 className="text-3xl font-bold tracking-tight">{sectionTitle}</h1>
+        <h1 className="line-clamp-2 text-xl font-bold tracking-tight break-words sm:text-2xl lg:text-3xl">
+          {sectionTitle}
+        </h1>
         {sectionDescription ? (
           <p className="text-sm text-muted-foreground">{sectionDescription}</p>
         ) : null}

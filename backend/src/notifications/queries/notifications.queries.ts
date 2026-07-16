@@ -13,33 +13,66 @@ export const SQL_INSERT_TICKET_NOTIFICATION = `
 `;
 
 export const SQL_FIND_NOTIFICATIONS_BY_USER = `
-  SELECT
-    n.id,
-    n.user_id AS "userId",
-    n.ticket_id AS "ticketId",
-    n.project_id AS "projectId",
-    n.type,
-    n.comment_id AS "commentId",
-    n.actor_user_id AS "actorUserId",
-    actor.first_name AS "actorFirstName",
-    actor.last_name AS "actorLastName",
-    t.title AS "ticketTitle",
-    n.message,
-    n.read_at AS "readAt",
-    n.created_at AS "createdAt"
-  FROM ticket_notifications n
-  INNER JOIN tickets t ON t.id = n.ticket_id
-  INNER JOIN users actor ON actor.id = n.actor_user_id
-  WHERE n.user_id = $1
-  ORDER BY n.created_at DESC
+  SELECT * FROM (
+    SELECT
+      n.id,
+      'ticket'::text AS kind,
+      n.user_id AS "userId",
+      n.ticket_id AS "ticketId",
+      n.project_id AS "projectId",
+      NULL::uuid AS "quoteId",
+      NULL::uuid AS "companyId",
+      NULL::text AS "shareToken",
+      n.type,
+      n.comment_id AS "commentId",
+      n.actor_user_id AS "actorUserId",
+      actor.first_name AS "actorFirstName",
+      actor.last_name AS "actorLastName",
+      t.title AS "ticketTitle",
+      n.message,
+      n.read_at AS "readAt",
+      n.created_at AS "createdAt"
+    FROM ticket_notifications n
+    INNER JOIN tickets t ON t.id = n.ticket_id
+    INNER JOIN users actor ON actor.id = n.actor_user_id
+    WHERE n.user_id = $1
+
+    UNION ALL
+
+    SELECT
+      qn.id,
+      'quote'::text AS kind,
+      qn.user_id AS "userId",
+      NULL::uuid AS "ticketId",
+      NULL::uuid AS "projectId",
+      qn.quote_id AS "quoteId",
+      qn.company_id AS "companyId",
+      qn.share_token AS "shareToken",
+      qn.type,
+      NULL::uuid AS "commentId",
+      qn.actor_user_id AS "actorUserId",
+      actor.first_name AS "actorFirstName",
+      actor.last_name AS "actorLastName",
+      NULL::text AS "ticketTitle",
+      qn.message,
+      qn.read_at AS "readAt",
+      qn.created_at AS "createdAt"
+    FROM quote_notifications qn
+    INNER JOIN users actor ON actor.id = qn.actor_user_id
+    WHERE qn.user_id = $1
+  ) notifications
+  ORDER BY "createdAt" DESC
   LIMIT $2
 `;
 
 export const SQL_COUNT_UNREAD_NOTIFICATIONS = `
-  SELECT COUNT(*)::int AS count
-  FROM ticket_notifications
-  WHERE user_id = $1
-    AND read_at IS NULL
+  SELECT (
+    (SELECT COUNT(*)::int FROM ticket_notifications
+     WHERE user_id = $1 AND read_at IS NULL)
+    +
+    (SELECT COUNT(*)::int FROM quote_notifications
+     WHERE user_id = $1 AND read_at IS NULL)
+  ) AS count
 `;
 
 export const SQL_MARK_NOTIFICATION_READ = `
@@ -51,11 +84,33 @@ export const SQL_MARK_NOTIFICATION_READ = `
   RETURNING id
 `;
 
-export const SQL_MARK_ALL_NOTIFICATIONS_READ = `
-  UPDATE ticket_notifications
+export const SQL_MARK_QUOTE_NOTIFICATION_READ = `
+  UPDATE quote_notifications
   SET read_at = NOW()
-  WHERE user_id = $1
+  WHERE id = $1
+    AND user_id = $2
     AND read_at IS NULL
+  RETURNING id
+`;
+
+export const SQL_MARK_ALL_NOTIFICATIONS_READ = `
+  WITH ticket_upd AS (
+    UPDATE ticket_notifications
+    SET read_at = NOW()
+    WHERE user_id = $1
+      AND read_at IS NULL
+    RETURNING id
+  ),
+  quote_upd AS (
+    UPDATE quote_notifications
+    SET read_at = NOW()
+    WHERE user_id = $1
+      AND read_at IS NULL
+    RETURNING id
+  )
+  SELECT
+    (SELECT COUNT(*)::int FROM ticket_upd)
+    + (SELECT COUNT(*)::int FROM quote_upd) AS count
 `;
 
 export const SQL_MARK_TICKET_NOTIFICATIONS_READ = `

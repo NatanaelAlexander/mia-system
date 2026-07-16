@@ -33,6 +33,7 @@ import { ErrorState } from "@/components/app/shared/list-states";
 import {
   hasPermission,
   isInternalUser,
+  canAccessModule,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
@@ -42,8 +43,10 @@ import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectContextHeader } from "../projects/project-context-header";
+import { EntityQuotesList } from "@/components/app/quotes/company-quotes-section";
+import { quotesModule } from "@/components/app/quotes/quotes-module";
 import {
   TicketChatMessage,
   TicketChatTypingIndicator,
@@ -195,6 +198,7 @@ export function TicketDetailPage({
   const canDownload = hasPermission(claims, "assets:read");
   const canPostInternal =
     isInternal && hasPermission(claims, "ticket_comments:create");
+  const canViewQuotes = canAccessModule(claims, quotesModule);
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -209,6 +213,7 @@ export function TicketDetailPage({
   const [ticket, setTicket] = React.useState<TicketDetail | null>(null);
   const [projectName, setProjectName] = React.useState("");
   const [companyName, setCompanyName] = React.useState("");
+  const [companyId, setCompanyId] = React.useState("");
   const [comments, setComments] = React.useState<CommentWithAssets[]>([]);
   const [ticketAssets, setTicketAssets] = React.useState<AssetListItem[]>([]);
   const [message, setMessage] = React.useState("");
@@ -394,6 +399,7 @@ export function TicketDetailPage({
       );
 
       setProjectName(project.name);
+      setCompanyId(project.companyId);
       setCompanyName(
         companies.find((company) => company.id === project.companyId)?.name ??
           "",
@@ -616,7 +622,7 @@ export function TicketDetailPage({
     }
 
     try {
-      const { url } = await getAssetDownloadUrl(asset.id);
+      const { url } = await getAssetDownloadUrl(surface, asset.id);
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = asset.fileName;
@@ -721,6 +727,21 @@ export function TicketDetailPage({
         sectionDescription="Conversación y archivos del ticket."
       />
 
+      {canViewQuotes && companyId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cotizaciones del ticket</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EntityQuotesList
+              companyId={companyId}
+              projectId={projectId}
+              ticketId={ticketId}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader className="border-b">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -821,8 +842,8 @@ export function TicketDetailPage({
             </div>
           ) : null}
 
-          <div className="flex max-h-[32rem] min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40">
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="flex min-h-[min(70dvh,32rem)] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40 md:max-h-[32rem] md:min-h-[18rem]">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">
                   Cargando conversación...
@@ -852,7 +873,7 @@ export function TicketDetailPage({
             {canComment ? (
               <div
                 className={cn(
-                  "relative border-t border-border/70 bg-card/60 p-3 transition-colors",
+                  "sticky bottom-0 relative border-t border-border/70 bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-colors supports-backdrop-filter:bg-card/80",
                   isComposerDragging && "ring-2 ring-inset ring-primary/20",
                 )}
                 onDragOver={(event) => {
