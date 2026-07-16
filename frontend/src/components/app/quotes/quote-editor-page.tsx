@@ -28,6 +28,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import {
   createQuote,
   createQuotePreset,
@@ -370,6 +371,9 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [savePresetOpen, setSavePresetOpen] = React.useState(false);
   const [loadPresetOpen, setLoadPresetOpen] = React.useState(false);
   const [presetName, setPresetName] = React.useState("");
+  const [confirmDelete, setConfirmDelete] = React.useState<
+    "quote" | "preset" | "signed" | null
+  >(null);
 
   const backHref = companyDetailHref(companyId, "cotizaciones");
 
@@ -650,7 +654,8 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         toast.success("Cotización creada");
         router.replace(companyQuoteHref(companyId, created.id));
       } else if (quoteId) {
-        const updated = await updateQuote(quoteId, payload);
+        const { companyId: _companyId, ...updatePayload } = payload;
+        const updated = await updateQuote(quoteId, updatePayload);
         setQuote(updated);
         setSections(sectionsFromQuote(updated));
         toast.success("Cotización actualizada");
@@ -781,7 +786,6 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const handleDeletePreset = async () => {
     if (!selectedPresetId) return;
-    if (!window.confirm("¿Eliminar este preset?")) return;
     setIsSaving(true);
     try {
       await deleteQuotePreset(selectedPresetId);
@@ -789,6 +793,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         current.filter((item) => item.id !== selectedPresetId),
       );
       setSelectedPresetId("");
+      setConfirmDelete(null);
       toast.success("Preset eliminado");
     } catch (error) {
       toast.error(
@@ -801,10 +806,10 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const handleDelete = async () => {
     if (!quoteId || !canDelete) return;
-    if (!window.confirm("¿Eliminar esta cotización?")) return;
     setIsSaving(true);
     try {
       await deleteQuote(quoteId);
+      setConfirmDelete(null);
       toast.success("Cotización eliminada");
       router.push(backHref);
     } catch (error) {
@@ -907,11 +912,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const handleRemoveSigned = async () => {
     if (!quoteId || !canUpdate) return;
-    if (!window.confirm("¿Eliminar el documento firmado?")) return;
     setIsSaving(true);
     try {
       const updated = await removeQuoteSignedDocument(quoteId);
       setQuote(updated);
+      setConfirmDelete(null);
       toast.success("Documento firmado eliminado");
     } catch (error) {
       toast.error(
@@ -1084,7 +1089,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                     size="sm"
                     className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     disabled={isSaving}
-                    onClick={() => void handleDelete()}
+                    onClick={() => setConfirmDelete("quote")}
                   >
                     <Trash2 />
                     Eliminar
@@ -1738,7 +1743,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                         variant="destructive"
                         size="sm"
                         disabled={isSaving}
-                        onClick={() => void handleRemoveSigned()}
+                        onClick={() => setConfirmDelete("signed")}
                       >
                         <Trash2 />
                         Eliminar
@@ -1982,7 +1987,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 type="button"
                 variant="ghost"
                 disabled={isSaving}
-                onClick={() => void handleDeletePreset()}
+                onClick={() => setConfirmDelete("preset")}
               >
                 <Trash2 />
                 Eliminar
@@ -2049,6 +2054,34 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null);
+        }}
+        title={
+          confirmDelete === "quote"
+            ? "Eliminar cotización"
+            : confirmDelete === "preset"
+              ? "Eliminar preset"
+              : "Eliminar documento firmado"
+        }
+        description={
+          confirmDelete === "quote"
+            ? "¿Eliminar esta cotización? Esta acción no se puede deshacer."
+            : confirmDelete === "preset"
+              ? "¿Eliminar este preset? Ya no podrás cargarlo en nuevas cotizaciones."
+              : "¿Eliminar el documento firmado asociado a esta cotización?"
+        }
+        confirmLabel="Eliminar"
+        onConfirm={() => {
+          if (confirmDelete === "quote") return handleDelete();
+          if (confirmDelete === "preset") return handleDeletePreset();
+          return handleRemoveSigned();
+        }}
+        isConfirming={isSaving}
+      />
     </div>
   );
 }
