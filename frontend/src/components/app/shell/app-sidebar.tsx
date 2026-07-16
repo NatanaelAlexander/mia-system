@@ -2,14 +2,13 @@
 
 import {
   EllipsisVertical,
-  ChevronDown,
+  CircleHelp,
   LayoutDashboard,
   LogOut,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { canAccessModule } from "@/components/app/shared/permissions";
 import { formatRoles } from "@/components/app/shared/format";
@@ -33,18 +32,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import {
   appStandaloneNav,
   administrationNav,
-  companiesNavGroup,
-  companiesSectionHrefs,
   type NavModule,
 } from "./navigation";
+import { NotificationsMenu } from "./notifications-menu";
 
 const mainNav = [
   { title: "Dashboard", href: "/app", icon: LayoutDashboard },
@@ -52,13 +47,6 @@ const mainNav = [
 
 const menuButtonClassName = cn(
   "rounded-lg",
-  "data-active:bg-primary data-active:font-medium data-active:text-primary-foreground",
-  "data-active:hover:bg-primary/90 data-active:hover:text-primary-foreground",
-  "data-active:[&_svg]:text-primary-foreground",
-);
-
-const subMenuButtonClassName = cn(
-  "rounded-md",
   "data-active:bg-primary data-active:font-medium data-active:text-primary-foreground",
   "data-active:hover:bg-primary/90 data-active:hover:text-primary-foreground",
   "data-active:[&_svg]:text-primary-foreground",
@@ -74,25 +62,10 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function isCompaniesSection(pathname: string) {
-  if (companiesSectionHrefs.some((href) => isActivePath(pathname, href))) {
-    return true;
-  }
-
-  return pathname.startsWith("/app/projects/");
-}
-
 export function AppSidebar() {
   const pathname = usePathname();
   const { claims, logout } = useAuth();
   const roleLabel = formatRoles(claims?.roles ?? []);
-
-  const companiesChildren = companiesNavGroup.children.filter((item) =>
-    canAccessModule(claims, item),
-  );
-  const canAccessCompaniesParent = canAccessModule(claims, companiesNavGroup.parent);
-  const showCompaniesGroup =
-    canAccessCompaniesParent || companiesChildren.length > 0;
 
   const standaloneNav = appStandaloneNav.filter((item) =>
     canAccessModule(claims, item),
@@ -100,16 +73,6 @@ export function AppSidebar() {
   const adminNav = administrationNav.filter((item) =>
     canAccessModule(claims, item),
   );
-
-  const [companiesOpen, setCompaniesOpen] = React.useState(() =>
-    isCompaniesSection(pathname),
-  );
-
-  React.useEffect(() => {
-    if (isCompaniesSection(pathname)) {
-      setCompaniesOpen(true);
-    }
-  }, [pathname]);
 
   const initials = claims
     ? `${claims.firstName[0] ?? ""}${claims.lastName[0] ?? ""}`.toUpperCase()
@@ -169,76 +132,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
 
-              {showCompaniesGroup ? (
-                <SidebarMenuItem>
-                  <div className="flex items-center gap-1">
-                    {canAccessCompaniesParent ? (
-                      <SidebarMenuButton
-                        className={cn(menuButtonClassName, "min-w-0 flex-1")}
-                        render={<Link href={companiesNavGroup.parent.href} />}
-                        isActive={isActivePath(
-                          pathname,
-                          companiesNavGroup.parent.href,
-                        )}
-                        tooltip={companiesNavGroup.parent.title}
-                      >
-                        <companiesNavGroup.parent.icon />
-                        <span>{companiesNavGroup.parent.title}</span>
-                      </SidebarMenuButton>
-                    ) : (
-                      <SidebarMenuButton
-                        className={cn(menuButtonClassName, "min-w-0 flex-1")}
-                        tooltip={companiesNavGroup.parent.title}
-                        onClick={() => setCompaniesOpen((open) => !open)}
-                      >
-                        <companiesNavGroup.parent.icon />
-                        <span>{companiesNavGroup.parent.title}</span>
-                      </SidebarMenuButton>
-                    )}
-
-                    {companiesChildren.length > 0 ? (
-                      <button
-                        type="button"
-                        aria-label={
-                          companiesOpen
-                            ? "Ocultar submenú de empresas"
-                            : "Mostrar submenú de empresas"
-                        }
-                        aria-expanded={companiesOpen}
-                        onClick={() => setCompaniesOpen((open) => !open)}
-                        className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-hidden transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden",
-                        )}
-                      >
-                        <ChevronDown
-                          className={cn(
-                            "size-4 transition-transform",
-                            companiesOpen && "rotate-180",
-                          )}
-                        />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {companiesOpen && companiesChildren.length > 0 ? (
-                    <SidebarMenuSub className="mt-1 gap-1.5 border-l border-sidebar-border/80">
-                      {companiesChildren.map((item) => (
-                        <SidebarMenuSubItem key={item.href}>
-                          <SidebarMenuSubButton
-                            className={subMenuButtonClassName}
-                            render={<Link href={item.href} />}
-                            isActive={isActivePath(pathname, item.href)}
-                          >
-                            <item.icon />
-                            <span>{item.title}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  ) : null}
-                </SidebarMenuItem>
-              ) : null}
-
               {standaloneNav.map(renderNavItem)}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -257,7 +150,10 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
+        <SidebarMenu className="gap-2">
+          <SidebarMenuItem>
+            <NotificationsMenu />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -309,6 +205,13 @@ export function AppSidebar() {
                   >
                     <UserRound />
                     Perfil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="gap-2 rounded-md px-2 py-2"
+                    render={<Link href="/app/help" />}
+                  >
+                    <CircleHelp />
+                    Ayuda
                   </DropdownMenuItem>
                 </div>
 

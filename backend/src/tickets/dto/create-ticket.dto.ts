@@ -36,9 +36,4 @@ export class CreateTicketDto {
   @IsOptional()
   @IsUUID('4', { message: 'El ID de estado de pago no es válido' })
   paymentStatusId?: string;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID('4', { message: 'El ID del asignado no es válido' })
-  assignedToId?: string;
 }

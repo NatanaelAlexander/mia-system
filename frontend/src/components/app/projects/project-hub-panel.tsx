@@ -1,12 +1,24 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import {
+  AlignLeft,
+  Building2,
+  CalendarDays,
+  FolderKanban,
+  Files,
+  Layers,
+  SquarePen,
+  Tag,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   updateProject,
   type ProjectListItem,
 } from "@/components/app/api/projects";
 import {
+  formatDate,
   formatProjectStatus,
   formatProjectType,
 } from "@/components/app/shared/format";
@@ -16,34 +28,73 @@ import {
   isInternalUser,
 } from "@/components/app/shared/permissions";
 import { assetsModule } from "@/components/app/assets/assets-module";
-import { ticketsModule } from "@/components/app/tickets/tickets-module";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { ProjectEditForm, type EditProjectFormValues } from "./project-form";
-import { ProjectSectionCards } from "./project-section-cards";
 
 interface ProjectHubPanelProps {
   project: ProjectListItem;
   companyName: string;
   onUpdated?: (project: ProjectListItem) => void;
-  showSectionCards?: boolean;
+}
+
+function InfoField({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5",
+        className,
+      )}
+    >
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <Icon className="size-4" />
+      </div>
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <div className="text-sm font-medium wrap-break-word">{value}</div>
+      </div>
+    </div>
+  );
 }
 
 export function ProjectHubPanel({
   project,
   companyName,
   onUpdated,
-  showSectionCards = true,
 }: ProjectHubPanelProps) {
   const { claims } = useAuth();
   const canEdit =
     isInternalUser(claims) && hasPermission(claims, "projects:update");
-  const canAccessTickets = canAccessModule(claims, ticketsModule);
   const canAccessAssets =
     isInternalUser(claims) && canAccessModule(claims, assetsModule);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
   const [currentProject, setCurrentProject] = React.useState(project);
 
   React.useEffect(() => {
@@ -56,11 +107,13 @@ export function ProjectHubPanel({
     try {
       const updated = await updateProject(currentProject.id, {
         name: values.name.trim(),
+        description: values.description?.trim() || null,
         type: values.type,
         status: values.status,
       });
       setCurrentProject(updated);
       onUpdated?.(updated);
+      setEditOpen(false);
       toast.success("Proyecto actualizado");
     } catch (error) {
       const message =
@@ -74,72 +127,99 @@ export function ProjectHubPanel({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">{companyName}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-xl font-semibold tracking-tight">
-            {currentProject.name}
-          </h2>
-          <Badge variant="secondary">
-            {formatProjectStatus(currentProject.status)}
-          </Badge>
-          <Badge variant="outline">{formatProjectType(currentProject.type)}</Badge>
-        </div>
-      </div>
-
-      {canEdit ? (
-        <ProjectEditForm
-          key={currentProject.id}
-          companyName={companyName}
-          defaultValues={{
-            name: currentProject.name,
-            type: currentProject.type,
-            status: currentProject.status,
-          }}
-          onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-        />
-      ) : (
-        <div className="grid gap-4 rounded-xl border border-border/70 p-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label className="text-muted-foreground">Empresa</Label>
-            <p className="text-sm font-medium">{companyName}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-muted-foreground">Nombre</Label>
-            <p className="text-sm font-medium">{currentProject.name}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-muted-foreground">Tipo</Label>
-            <p className="text-sm font-medium">
-              {formatProjectType(currentProject.type)}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-muted-foreground">Estado</Label>
-            <p className="text-sm font-medium">
+    <Card>
+      <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <p className="truncate text-sm text-muted-foreground">{companyName}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-xl">{currentProject.name}</CardTitle>
+            <Badge variant="secondary">
               {formatProjectStatus(currentProject.status)}
-            </p>
+            </Badge>
+            <Badge variant="outline">
+              {formatProjectType(currentProject.type)}
+            </Badge>
           </div>
         </div>
-      )}
 
-      {showSectionCards ? (
-        <div className="space-y-3 border-t border-border/70 pt-6">
-          <div>
-            <p className="text-sm font-medium">Secciones del proyecto</p>
-            <p className="text-sm text-muted-foreground">
-              Revisa tickets o archivos con el contexto de este proyecto.
-            </p>
-          </div>
-          <ProjectSectionCards
-            projectId={currentProject.id}
-            showTickets={canAccessTickets}
-            showAssets={canAccessAssets}
+        <div className="flex shrink-0 items-center gap-2">
+          {canAccessAssets ? (
+            <Link
+              href={`/app/projects/${currentProject.id}/assets`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <Files />
+              Archivos
+            </Link>
+          ) : null}
+
+          {canEdit ? (
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+              <DialogTrigger
+                render={<Button type="button" size="sm" variant="outline" />}
+              >
+                <SquarePen />
+                Editar
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Editar proyecto</DialogTitle>
+                </DialogHeader>
+                <ProjectEditForm
+                  key={currentProject.id}
+                  companyName={companyName}
+                  defaultValues={{
+                    name: currentProject.name,
+                    description: currentProject.description ?? "",
+                    type: currentProject.type,
+                    status: currentProject.status,
+                  }}
+                  onSubmit={handleSubmit}
+                  isSubmitting={isSubmitting}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : null}
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3 pt-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoField icon={Building2} label="Empresa" value={companyName} />
+          <InfoField
+            icon={FolderKanban}
+            label="Nombre"
+            value={currentProject.name}
+          />
+          <InfoField
+            icon={Tag}
+            label="Tipo"
+            value={formatProjectType(currentProject.type)}
+          />
+          <InfoField
+            icon={Layers}
+            label="Estado"
+            value={formatProjectStatus(currentProject.status)}
           />
         </div>
-      ) : null}
-    </div>
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <InfoField
+            icon={AlignLeft}
+            label="Descripción"
+            value={
+              currentProject.description?.trim()
+                ? currentProject.description
+                : "Sin descripción"
+            }
+          />
+          <InfoField
+            icon={CalendarDays}
+            label="Creado"
+            value={formatDate(currentProject.createdAt)}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

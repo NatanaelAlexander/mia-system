@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { UserPlus, UserMinus } from "lucide-react";
+import { UserPlus, UserMinus, Users } from "lucide-react";
 import {
   assignUserToCompany,
   unassignUserFromCompany,
 } from "@/components/app/api/companies";
 import { listUsers, type UserListItem } from "@/components/app/api/users";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,7 +146,14 @@ export function CompanyUsersSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Usuarios vinculados</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="size-4 text-primary" />
+          Usuarios vinculados
+          <HelpHint
+            label="Qué son los usuarios vinculados"
+            text="Cuentas del sistema vinculadas a esta empresa. Pueden acceder al portal o a la operación según su rol."
+          />
+        </CardTitle>
         <CardDescription>
           {canManage
             ? "Asigna o desasigna usuarios con rol cliente que operan en el portal de esta empresa."

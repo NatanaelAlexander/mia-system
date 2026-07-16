@@ -3,13 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Download,
-  Paperclip,
-  RefreshCcw,
-  Send,
-  X,
-} from "lucide-react";
+import { Download, Paperclip, RefreshCcw, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAssetDownloadUrl,
@@ -43,21 +37,23 @@ import {
 import { preferredSurface } from "@/components/app/shared/surface";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotifications } from "@/providers/notifications-provider";
 import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProjectContextHeader } from "../projects/project-context-header";
 import {
   TicketChatMessage,
   TicketChatTypingIndicator,
   type TicketChatComment,
 } from "./ticket-chat-message";
+import {
+  TicketAssigneesControl,
+  TicketStatusControl,
+  useTicketManagement,
+} from "./ticket-management-controls";
 
 type CommentWithAssets = TicketChatComment;
 
@@ -106,7 +102,10 @@ function mergeComments(
 
   const initialAssets = assets ?? pendingAssets;
 
-  return [...current, { ...incoming, assets: initialAssets, assetSyncStatus }].sort(
+  return [
+    ...current,
+    { ...incoming, assets: initialAssets, assetSyncStatus },
+  ].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 }
@@ -182,15 +181,20 @@ function TicketMetaField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps) {
+export function TicketDetailPage({
+  projectId,
+  ticketId,
+}: TicketDetailPageProps) {
   const router = useRouter();
   const { claims, isLoading: isAuthLoading } = useAuth();
+  const { markTicketAsRead } = useNotifications();
   const surface = claims ? preferredSurface(claims) : "portal";
   const isInternal = isInternalUser(claims);
   const canComment = hasPermission(claims, "ticket_comments:create");
   const canUpload = hasPermission(claims, "assets:create");
   const canDownload = hasPermission(claims, "assets:read");
-  const canPostInternal = isInternal && hasPermission(claims, "ticket_comments:create");
+  const canPostInternal =
+    isInternal && hasPermission(claims, "ticket_comments:create");
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -213,6 +217,12 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     PendingAttachment[]
   >([]);
   const [typingUsers, setTypingUsers] = React.useState<string[]>([]);
+
+  const management = useTicketManagement({
+    ticket,
+    onTicketChange: setTicket,
+    enabled: isInternal,
+  });
 
   const commentsRef = React.useRef(comments);
   const pendingCommentAssetsRef = React.useRef(
@@ -276,7 +286,9 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     async (commentId: string) => {
       try {
         const assets = await listTicketCommentAssets(surface, commentId);
-        setComments((current) => replaceCommentAssets(current, commentId, assets));
+        setComments((current) =>
+          replaceCommentAssets(current, commentId, assets),
+        );
       } catch {
         // Ignorar fallos puntuales de sincronización.
       }
@@ -353,12 +365,14 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
     try {
       const [project, companies, ticketData, commentData, assetsData] =
         await Promise.all([
-        getProjectDetail(surface, projectId),
-        listCompanies(surface, {}),
-        getTicketDetail(surface, ticketId),
-        listTicketComments(surface, ticketId),
-        listTicketAssets(surface, ticketId).catch(() => [] as AssetListItem[]),
-      ]);
+          getProjectDetail(surface, projectId),
+          listCompanies(surface, {}),
+          getTicketDetail(surface, ticketId),
+          listTicketComments(surface, ticketId),
+          listTicketAssets(surface, ticketId).catch(
+            () => [] as AssetListItem[],
+          ),
+        ]);
 
       if (ticketData.projectId !== projectId) {
         throw new ApiError(404, "El ticket no pertenece a este proyecto.");
@@ -381,7 +395,8 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
 
       setProjectName(project.name);
       setCompanyName(
-        companies.find((company) => company.id === project.companyId)?.name ?? "",
+        companies.find((company) => company.id === project.companyId)?.name ??
+          "",
       );
       setTicket(ticketData);
       setTicketAssets(assetsData);
@@ -416,6 +431,14 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
 
     return () => window.clearTimeout(timerId);
   }, [isAuthLoading, loadThread]);
+
+  React.useEffect(() => {
+    if (!ticket) {
+      return;
+    }
+
+    void markTicketAsRead(ticket.id);
+  }, [markTicketAsRead, ticket?.id]);
 
   React.useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -674,9 +697,10 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
           : "No se pudo enviar el mensaje.";
       toast.error(errorText);
     } finally {
-      if (createdCommentId) {
+      const commentId = createdCommentId;
+      if (commentId) {
         setComments((current) =>
-          setCommentAssetSyncStatus(current, createdCommentId),
+          setCommentAssetSyncStatus(current, commentId),
         );
       }
       setIsSending(false);
@@ -684,12 +708,7 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
   };
 
   if (!isAuthLoading && errorMessage && !ticket) {
-    return (
-      <ErrorState
-        message={errorMessage}
-        onRetry={loadThread}
-      />
-    );
+    return <ErrorState message={errorMessage} onRetry={loadThread} />;
   }
 
   return (
@@ -707,17 +726,35 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             {ticket ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <TicketMetaField label="Estado" value={ticket.statusName} />
-                <TicketMetaField label="Prioridad" value={ticket.priorityName} />
+                <TicketMetaField
+                  label="Prioridad"
+                  value={ticket.priorityName}
+                />
                 {ticket.categoryName ? (
-                  <TicketMetaField label="Categoría" value={ticket.categoryName} />
+                  <TicketMetaField
+                    label="Categoría"
+                    value={ticket.categoryName}
+                  />
                 ) : null}
+                {isInternal ? (
+                  <TicketStatusControl
+                    ticket={ticket}
+                    management={management}
+                  />
+                ) : (
+                  <TicketMetaField label="Estado" value={ticket.statusName} />
+                )}
                 {ticket.paymentStatusName ? (
-                  <TicketMetaField label="Pago" value={ticket.paymentStatusName} />
+                  <TicketMetaField
+                    label="Pago"
+                    value={ticket.paymentStatusName}
+                  />
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Cargando detalle del ticket...</p>
+              <p className="text-sm text-muted-foreground">
+                Cargando detalle del ticket...
+              </p>
             )}
             <div className="flex shrink-0 items-center gap-2">
               <Badge variant={isConnected ? "secondary" : "outline"}>
@@ -743,6 +780,11 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
               <p className="text-sm leading-relaxed text-foreground">
                 {ticket.description}
               </p>
+            </div>
+          ) : null}
+          {ticket && isInternal ? (
+            <div className="mt-4 border-t border-border/60 pt-4">
+              <TicketAssigneesControl management={management} />
             </div>
           ) : null}
         </CardHeader>
@@ -782,7 +824,9 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
           <div className="flex max-h-[32rem] min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40">
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
               {isLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando conversación...</p>
+                <p className="text-sm text-muted-foreground">
+                  Cargando conversación...
+                </p>
               ) : comments.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground">
                   Aún no hay mensajes. Escribe el primero o adjunta archivos.
@@ -805,152 +849,159 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
               <div ref={threadEndRef} />
             </div>
 
-          {canComment ? (
-            <div
-              className={cn(
-                "relative border-t border-border/70 bg-card/60 p-3 transition-colors",
-                isComposerDragging && "ring-2 ring-inset ring-primary/20",
-              )}
-              onDragOver={(event) => {
-                if (!canUpload || attachmentPickOpen) {
-                  return;
-                }
-                event.preventDefault();
-                setIsComposerDragging(true);
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                const nextTarget = event.relatedTarget as Node | null;
-                if (nextTarget && event.currentTarget.contains(nextTarget)) {
-                  return;
-                }
-                setIsComposerDragging(false);
-              }}
-              onDrop={(event) => {
-                if (!canUpload || attachmentPickOpen) {
-                  return;
-                }
-                event.preventDefault();
-                setIsComposerDragging(false);
-                addFiles(event.dataTransfer.files);
-              }}
-            >
-              {isComposerDragging ? (
-                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary/5">
-                  <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
-                    Suelta los archivos para adjuntarlos al mensaje
+            {canComment ? (
+              <div
+                className={cn(
+                  "relative border-t border-border/70 bg-card/60 p-3 transition-colors",
+                  isComposerDragging && "ring-2 ring-inset ring-primary/20",
+                )}
+                onDragOver={(event) => {
+                  if (!canUpload || attachmentPickOpen) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setIsComposerDragging(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  const nextTarget = event.relatedTarget as Node | null;
+                  if (nextTarget && event.currentTarget.contains(nextTarget)) {
+                    return;
+                  }
+                  setIsComposerDragging(false);
+                }}
+                onDrop={(event) => {
+                  if (!canUpload || attachmentPickOpen) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setIsComposerDragging(false);
+                  addFiles(event.dataTransfer.files);
+                }}
+              >
+                {isComposerDragging ? (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary/5">
+                    <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
+                      Suelta los archivos para adjuntarlos al mensaje
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {canPostInternal ? (
-                <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={isInternalComment}
-                    disabled={isSending}
-                    onChange={(event) => setIsInternalComment(event.target.checked)}
-                  />
-                  Comentario interno (solo equipo)
-                </label>
-              ) : null}
+                {canPostInternal ? (
+                  <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={isInternalComment}
+                      disabled={isSending}
+                      onChange={(event) =>
+                        setIsInternalComment(event.target.checked)
+                      }
+                    />
+                    Comentario interno (solo equipo)
+                  </label>
+                ) : null}
 
-              {pendingAttachments.length > 0 ? (
-                <div className="mb-2 space-y-1.5">
-                  {pendingAttachments.map((attachment, index) => (
-                    <div
-                      key={`${getAttachmentLabel(attachment)}-${index}`}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1.5 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">
-                          {getAttachmentLabel(attachment)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(attachment.file.size)}
-                        </p>
+                {pendingAttachments.length > 0 ? (
+                  <div className="mb-2 space-y-1.5">
+                    {pendingAttachments.map((attachment, index) => (
+                      <div
+                        key={`${getAttachmentLabel(attachment)}-${index}`}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1.5 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {getAttachmentLabel(attachment)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(attachment.file.size)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() =>
+                            setPendingAttachments((current) =>
+                              current.filter(
+                                (_, itemIndex) => itemIndex !== index,
+                              ),
+                            )
+                          }
+                        >
+                          <X />
+                        </Button>
                       </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="flex items-end gap-2">
+                  {canUpload ? (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        disabled={isSending}
+                        onChange={(event) => {
+                          addFiles(event.target.files);
+                          event.target.value = "";
+                        }}
+                      />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() =>
-                          setPendingAttachments((current) =>
-                            current.filter((_, itemIndex) => itemIndex !== index),
-                          )
-                        }
+                        className="shrink-0 text-muted-foreground"
+                        disabled={isSending}
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        <X />
+                        <Paperclip />
                       </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+                    </>
+                  ) : null}
 
-              <div className="flex items-end gap-2">
-                {canUpload ? (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      disabled={isSending}
-                      onChange={(event) => {
-                        addFiles(event.target.files);
-                        event.target.value = "";
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 text-muted-foreground"
-                      disabled={isSending}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip />
-                    </Button>
-                  </>
-                ) : null}
+                  <textarea
+                    id="ticket-message"
+                    rows={1}
+                    value={message}
+                    disabled={isSending}
+                    onChange={(event) => {
+                      setMessage(event.target.value);
+                      emitTyping(
+                        event.target.value.trim().length > 0,
+                        isInternalComment,
+                      );
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void handleSend();
+                      }
+                    }}
+                    placeholder="Escribe un mensaje..."
+                    className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50"
+                  />
 
-                <textarea
-                  id="ticket-message"
-                  rows={1}
-                  value={message}
-                  disabled={isSending}
-                  onChange={(event) => {
-                    setMessage(event.target.value);
-                    emitTyping(event.target.value.trim().length > 0, isInternalComment);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void handleSend();
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="size-10 shrink-0 rounded-full"
+                    disabled={
+                      isSending ||
+                      (!message.trim() && pendingAttachments.length === 0)
                     }
-                  }}
-                  placeholder="Escribe un mensaje..."
-                  className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50"
-                />
-
-                <Button
-                  type="button"
-                  size="icon"
-                  className="size-10 shrink-0 rounded-full"
-                  disabled={
-                    isSending ||
-                    (!message.trim() && pendingAttachments.length === 0)
-                  }
-                  onClick={() => void handleSend()}
-                >
-                  <Send />
-                  <span className="sr-only">
-                    {isSending ? "Enviando..." : "Enviar"}
-                  </span>
-                </Button>
+                    onClick={() => void handleSend()}
+                  >
+                    <Send />
+                    <span className="sr-only">
+                      {isSending ? "Enviando..." : "Enviar"}
+                    </span>
+                  </Button>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -977,7 +1028,10 @@ export function TicketDetailPage({ projectId, ticketId }: TicketDetailPageProps)
         >
           Volver a tickets del proyecto
         </button>
-        <Link href={`/app/projects/${projectId}`} className="text-primary hover:underline">
+        <Link
+          href={`/app/projects/${projectId}`}
+          className="text-primary hover:underline"
+        >
           Volver al proyecto
         </Link>
       </div>

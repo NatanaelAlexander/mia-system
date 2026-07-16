@@ -11,11 +11,17 @@ import { CreateTicketCommentDto } from './dto/create-ticket-comment.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { FilterTicketsDto } from './dto/filter-tickets.dto';
 import {
+  TicketTimelineRange,
+} from './dto/filter-ticket-timeline.dto';
+import {
   PortalCreateTicketCommentDto,
   PortalCreateTicketDto,
+  PortalFilterTicketsDto,
 } from './dto/portal-tickets.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { AssignTicketUsersDto } from './dto/assign-ticket-users.dto';
 import {
+  AsignadoTicketInvalidoException,
   ArchivoYaVinculadoAlTicketException,
   CategoriaTicketNoEncontradaException,
   ComentarioTicketNoEncontradoException,
@@ -59,8 +65,19 @@ import {
   SQL_INSERT_TICKET_STATUS_HISTORY,
 } from './queries/ticket-status-history.queries';
 import {
-  SQL_FIND_ALL_TICKETS,
-  SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER,
+  SQL_ASSIGN_ACTIVE_SUPER_ADMINS,
+  SQL_FIND_ASSIGNEES_BY_TICKET_IDS,
+  SQL_FIND_TICKET_ASSIGNEES,
+  SQL_FIND_VALID_INTERNAL_ASSIGNEES,
+  SQL_IS_TICKET_ASSIGNEE,
+  SQL_REPLACE_TICKET_ASSIGNEES,
+} from './queries/ticket-assignees.queries';
+import {
+  SQL_FIND_ALL_TICKETS_KANBAN,
+  SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER_KANBAN,
+} from './queries/ticket-kanban.queries';
+import { SQL_TICKET_TIMELINE } from './queries/ticket-timeline.queries';
+import {
   SQL_FIND_TICKET_BY_ID,
   SQL_INSERT_TICKET,
   SQL_UPDATE_TICKET_STATUS,
@@ -68,12 +85,20 @@ import {
 import {
   CatalogItem,
   Ticket,
+  TicketAssignee,
   TicketComment,
+  TicketKanbanItem,
   TicketStatusHistoryEntry,
+  TicketTimelinePoint,
+  TICKET_CLOSED_STATUS_NAMES,
+  TICKET_WORKING_STATUS_NAMES,
   TicketStatusName,
 } from './types/ticket.types';
 import { JwtAccessPayload } from '../auth/types/auth.types';
 import { TicketsRealtimeService } from './realtime/tickets-realtime.service';
+import { PermissionsService } from '../auth/permissions/permissions.service';
+import { PermisoDenegadoException } from '../auth/exceptions/auth.exceptions';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const AUDIT_TABLE = {
   TICKETS: 'tickets',
@@ -85,6 +110,7 @@ const AUDIT_TABLE = {
   TICKET_PRIORITIES: 'ticket_priorities',
   TICKET_CATEGORIES: 'ticket_categories',
   PAYMENT_STATUSES: 'payment_statuses',
+  TICKET_ASSIGNEES: 'ticket_assignees',
 } as const;
 
 @Injectable()
@@ -96,6 +122,8 @@ export class TicketsService {
     private readonly projectsService: ProjectsService,
     private readonly assetsService: AssetsService,
     private readonly realtimeService: TicketsRealtimeService,
+    private readonly permissionsService: PermissionsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async assertRealtimeTicketAccess(
@@ -110,7 +138,10 @@ export class TicketsService {
     }
 
     if (user.surfaces.includes('portal')) {
-      const hasAccess = await this.portalAccess.userHasTicket(user.sub, ticketId);
+      const hasAccess = await this.portalAccess.userHasTicket(
+        user.sub,
+        ticketId,
+      );
       if (!hasAccess) {
         throw new TicketNoEncontradoException();
       }
@@ -127,7 +158,9 @@ export class TicketsService {
   }
 
   async findAllStatuses(actorUserId: string): Promise<CatalogItem[]> {
-    const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_STATUSES);
+    const { rows } = await this.db.query<CatalogItem>(
+      SQL_FIND_ALL_TICKET_STATUSES,
+    );
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_STATUSES, null, {
       scope: 'list',
       resultCount: rows.length,
@@ -135,8 +168,15 @@ export class TicketsService {
     return rows;
   }
 
+  async findAllStatusesForPortal(actorUserId: string): Promise<CatalogItem[]> {
+    const statuses = await this.findAllStatuses(actorUserId);
+    return statuses.filter((status) => status.name !== TicketStatusName.DRAFT);
+  }
+
   async findAllPriorities(actorUserId: string): Promise<CatalogItem[]> {
-    const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_PRIORITIES);
+    const { rows } = await this.db.query<CatalogItem>(
+      SQL_FIND_ALL_TICKET_PRIORITIES,
+    );
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_PRIORITIES, null, {
       scope: 'list',
       resultCount: rows.length,
@@ -145,7 +185,9 @@ export class TicketsService {
   }
 
   async findAllCategories(actorUserId: string): Promise<CatalogItem[]> {
-    const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_TICKET_CATEGORIES);
+    const { rows } = await this.db.query<CatalogItem>(
+      SQL_FIND_ALL_TICKET_CATEGORIES,
+    );
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_CATEGORIES, null, {
       scope: 'list',
       resultCount: rows.length,
@@ -154,7 +196,9 @@ export class TicketsService {
   }
 
   async findAllPaymentStatuses(actorUserId: string): Promise<CatalogItem[]> {
-    const { rows } = await this.db.query<CatalogItem>(SQL_FIND_ALL_PAYMENT_STATUSES);
+    const { rows } = await this.db.query<CatalogItem>(
+      SQL_FIND_ALL_PAYMENT_STATUSES,
+    );
     await this.auditRead(actorUserId, AUDIT_TABLE.PAYMENT_STATUSES, null, {
       scope: 'list',
       resultCount: rows.length,
@@ -165,19 +209,49 @@ export class TicketsService {
   async findAll(
     actorUserId: string,
     filters: FilterTicketsDto = {},
-  ): Promise<Ticket[]> {
+  ): Promise<TicketKanbanItem[]> {
     const includeDrafts = filters.includeDrafts ?? false;
-    const { rows } = await this.db.query<Ticket>(SQL_FIND_ALL_TICKETS, [
-      includeDrafts,
-      TicketStatusName.DRAFT,
-      filters.projectId ?? null,
-    ]);
+    const { rows } = await this.db.query<TicketKanbanItem>(
+      SQL_FIND_ALL_TICKETS_KANBAN,
+      [
+        includeDrafts,
+        TicketStatusName.DRAFT,
+        filters.projectId ?? null,
+        filters.lifecycle ?? null,
+        filters.workingOnly ?? false,
+      ],
+    );
+
+    const items = rows.map((row) => this.toKanbanItem(row));
+    const withAssignees = await this.attachAssigneesToTickets(items);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, null, {
       scope: 'list',
-      resultCount: rows.length,
+      resultCount: withAssignees.length,
       projectId: filters.projectId ?? null,
       includeDrafts,
+      lifecycle: filters.lifecycle ?? null,
+      workingOnly: filters.workingOnly ?? false,
+    });
+
+    return withAssignees;
+  }
+
+  async getTimeline(
+    actorUserId: string,
+    range: TicketTimelineRange,
+  ): Promise<TicketTimelinePoint[]> {
+    const { trunc, interval, start } = this.resolveTimelineBounds(range);
+
+    const { rows } = await this.db.query<TicketTimelinePoint>(
+      SQL_TICKET_TIMELINE,
+      [trunc, start.toISOString(), interval],
+    );
+
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, null, {
+      scope: 'timeline',
+      range,
+      resultCount: rows.length,
     });
 
     return rows;
@@ -185,8 +259,9 @@ export class TicketsService {
 
   async findAllForPortal(
     userId: string,
-    projectId?: string,
-  ): Promise<Ticket[]> {
+    filters: PortalFilterTicketsDto = {},
+  ): Promise<TicketKanbanItem[]> {
+    const projectId = filters.projectId;
     if (projectId) {
       const hasAccess = await this.portalAccess.userHasProject(
         userId,
@@ -197,24 +272,36 @@ export class TicketsService {
       }
     }
 
-    const { rows } = await this.db.query<Ticket>(
-      SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER,
-      [userId, TicketStatusName.DRAFT, projectId ?? null],
+    const { rows } = await this.db.query<TicketKanbanItem>(
+      SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER_KANBAN,
+      [
+        userId,
+        TicketStatusName.DRAFT,
+        projectId ?? null,
+        filters.lifecycle ?? null,
+        filters.workingOnly ?? false,
+      ],
     );
+
+    const items = rows.map((row) => this.toKanbanItem(row));
 
     await this.auditRead(userId, AUDIT_TABLE.TICKETS, null, {
       scope: 'portal_list',
       projectId: projectId ?? null,
-      resultCount: rows.length,
+      resultCount: items.length,
+      lifecycle: filters.lifecycle ?? null,
+      workingOnly: filters.workingOnly ?? false,
     });
 
-    return rows;
+    return items;
   }
 
   async findById(actorUserId: string, id: string): Promise<Ticket> {
     const ticket = await this.findTicketRowById(id);
 
-    await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, id, { scope: 'detail' });
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, id, {
+      scope: 'detail',
+    });
 
     return ticket;
   }
@@ -276,10 +363,12 @@ export class TicketsService {
       dto.priorityId,
       dto.categoryId ?? null,
       dto.paymentStatusId ?? null,
-      dto.assignedToId ?? null,
+      null,
     ]);
 
     const ticketId = rows[0].id;
+
+    await this.db.query(SQL_ASSIGN_ACTIVE_SUPER_ADMINS, [ticketId]);
 
     await this.db.query(SQL_INSERT_TICKET_STATUS_HISTORY, [
       ticketId,
@@ -296,6 +385,8 @@ export class TicketsService {
       recordId: ticketId,
       newValues: this.asJson(ticket),
     });
+
+    await this.notificationsService.notifyTicketCreated(actorUserId, ticket);
 
     return ticket;
   }
@@ -358,16 +449,17 @@ export class TicketsService {
     dto: ChangeTicketStatusDto,
   ): Promise<Ticket> {
     const previous = await this.findTicketRowById(id);
+    await this.assertCanChangeStatus(actorUserId, id);
     await this.ensureStatusExists(dto.statusId);
 
     if (previous.statusId === dto.statusId) {
       return previous;
     }
 
-    const { rows } = await this.db.query<{ id: string }>(SQL_UPDATE_TICKET_STATUS, [
-      dto.statusId,
-      id,
-    ]);
+    const { rows } = await this.db.query<{ id: string }>(
+      SQL_UPDATE_TICKET_STATUS,
+      [dto.statusId, id],
+    );
 
     if (!rows[0]) {
       throw new TicketNoEncontradoException();
@@ -408,18 +500,71 @@ export class TicketsService {
     return updated;
   }
 
+  async getAssignees(
+    actorUserId: string,
+    ticketId: string,
+  ): Promise<TicketAssignee[]> {
+    await this.findTicketRowById(ticketId);
+    const { rows } = await this.db.query<TicketAssignee>(
+      SQL_FIND_TICKET_ASSIGNEES,
+      [ticketId],
+    );
+
+    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_ASSIGNEES, ticketId, {
+      scope: 'list_by_ticket',
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
+  async replaceAssignees(
+    actorUserId: string,
+    ticketId: string,
+    dto: AssignTicketUsersDto,
+  ): Promise<TicketAssignee[]> {
+    await this.findTicketRowById(ticketId);
+    await this.assertSuperAdmin(actorUserId);
+
+    if (dto.userIds.length > 0) {
+      const { rows } = await this.db.query<{ id: string }>(
+        SQL_FIND_VALID_INTERNAL_ASSIGNEES,
+        [dto.userIds],
+      );
+      if (rows.length !== dto.userIds.length) {
+        throw new AsignadoTicketInvalidoException();
+      }
+    }
+
+    const previous = await this.getAssignees(actorUserId, ticketId);
+    await this.db.query(SQL_REPLACE_TICKET_ASSIGNEES, [ticketId, dto.userIds]);
+    const updated = await this.getAssignees(actorUserId, ticketId);
+
+    await this.auditService.log({
+      userId: actorUserId,
+      action: AuditAction.ASSIGN,
+      tableName: AUDIT_TABLE.TICKET_ASSIGNEES,
+      recordId: ticketId,
+      oldValues: { assignees: previous },
+      newValues: { assignees: updated },
+    });
+
+    return updated;
+  }
+
   async moveToDraft(id: string, userId: string): Promise<Ticket> {
     const draftStatus = await this.getStatusByName(TicketStatusName.DRAFT);
     const previous = await this.findTicketRowById(id);
+    await this.assertCanChangeStatus(userId, id);
 
     if (previous.statusId === draftStatus.id) {
       return previous;
     }
 
-    const { rows } = await this.db.query<{ id: string }>(SQL_UPDATE_TICKET_STATUS, [
-      draftStatus.id,
-      id,
-    ]);
+    const { rows } = await this.db.query<{ id: string }>(
+      SQL_UPDATE_TICKET_STATUS,
+      [draftStatus.id, id],
+    );
 
     if (!rows[0]) {
       throw new TicketNoEncontradoException();
@@ -465,10 +610,15 @@ export class TicketsService {
       [ticketId],
     );
 
-    await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_STATUS_HISTORY, ticketId, {
-      scope: 'list_by_ticket',
-      resultCount: rows.length,
-    });
+    await this.auditRead(
+      actorUserId,
+      AUDIT_TABLE.TICKET_STATUS_HISTORY,
+      ticketId,
+      {
+        scope: 'list_by_ticket',
+        resultCount: rows.length,
+      },
+    );
 
     return rows;
   }
@@ -479,9 +629,10 @@ export class TicketsService {
   ): Promise<TicketComment[]> {
     await this.findTicketRowById(ticketId);
 
-    const { rows } = await this.db.query<TicketComment>(SQL_FIND_TICKET_COMMENTS, [
-      ticketId,
-    ]);
+    const { rows } = await this.db.query<TicketComment>(
+      SQL_FIND_TICKET_COMMENTS,
+      [ticketId],
+    );
 
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_COMMENTS, ticketId, {
       scope: 'list_by_ticket',
@@ -542,6 +693,13 @@ export class TicketsService {
 
     this.realtimeService.emitCommentCreated(comment);
 
+    const ticket = await this.findTicketRowById(dto.ticketId);
+    await this.notificationsService.notifyTicketComment(
+      actorUserId,
+      ticket,
+      comment,
+    );
+
     return comment;
   }
 
@@ -575,7 +733,9 @@ export class TicketsService {
   ): Promise<Asset[]> {
     await this.findTicketRowById(ticketId);
 
-    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [ticketId]);
+    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [
+      ticketId,
+    ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKET_ASSETS, ticketId, {
       scope: 'list_by_ticket',
@@ -591,7 +751,9 @@ export class TicketsService {
   ): Promise<Asset[]> {
     await this.assertPortalTicketAccess(userId, ticketId);
 
-    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [ticketId]);
+    const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [
+      ticketId,
+    ]);
 
     await this.auditRead(userId, AUDIT_TABLE.TICKET_ASSETS, ticketId, {
       scope: 'portal_list_by_ticket',
@@ -659,7 +821,10 @@ export class TicketsService {
     ticketId: string,
     assetId: string,
   ): Promise<void> {
-    const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [ticketId, assetId]);
+    const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [
+      ticketId,
+      assetId,
+    ]);
 
     if (!result.rowCount) {
       throw new VinculoTicketArchivoNoEncontradoException();
@@ -886,7 +1051,12 @@ export class TicketsService {
     const comment = await this.findCommentRowById(ticketCommentId);
     await this.assertPortalCommentAccess(userId, comment);
 
-    return this.uploadAssetToComment(userId, ticketCommentId, file, displayName);
+    return this.uploadAssetToComment(
+      userId,
+      ticketCommentId,
+      file,
+      displayName,
+    );
   }
 
   private async assertPortalCommentAccess(
@@ -991,6 +1161,44 @@ export class TicketsService {
     }
   }
 
+  private async assertSuperAdmin(userId: string): Promise<void> {
+    const authorization =
+      await this.permissionsService.resolveAuthorization(userId);
+    if (
+      !authorization ||
+      !this.permissionsService.isSuperAdmin(authorization.roles)
+    ) {
+      throw new PermisoDenegadoException();
+    }
+  }
+
+  private async assertCanChangeStatus(
+    userId: string,
+    ticketId: string,
+  ): Promise<void> {
+    const authorization =
+      await this.permissionsService.resolveAuthorization(userId);
+
+    if (
+      authorization &&
+      this.permissionsService.isSuperAdmin(authorization.roles)
+    ) {
+      return;
+    }
+
+    if (!authorization?.roles.includes('admin')) {
+      throw new PermisoDenegadoException();
+    }
+
+    const { rows } = await this.db.query<{ isAssigned: boolean }>(
+      SQL_IS_TICKET_ASSIGNEE,
+      [ticketId, userId],
+    );
+    if (!rows[0]?.isAssigned) {
+      throw new PermisoDenegadoException();
+    }
+  }
+
   private buildTicketUpdate(dto: UpdateTicketDto): {
     sets: string[];
     values: unknown[];
@@ -1008,7 +1216,6 @@ export class TicketsService {
       { field: 'priorityId', column: 'priority_id' },
       { field: 'categoryId', column: 'category_id' },
       { field: 'paymentStatusId', column: 'payment_status_id' },
-      { field: 'assignedToId', column: 'assigned_to_id' },
     ];
 
     for (const { field, column } of columns) {
@@ -1019,6 +1226,56 @@ export class TicketsService {
     }
 
     return { sets, values };
+  }
+
+  private resolveTimelineBounds(range: TicketTimelineRange): {
+    trunc: string;
+    interval: string;
+    start: Date;
+    end: Date;
+  } {
+    const now = new Date();
+
+    if (range === 'day') {
+      const end = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate(),
+          now.getUTCHours(),
+          0,
+          0,
+          0,
+        ),
+      );
+      const start = new Date(end);
+      start.setUTCHours(start.getUTCHours() - 23);
+      return { trunc: 'hour', interval: '1 hour', start, end };
+    }
+
+    if (range === 'month') {
+      const end = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+      const start = new Date(end);
+      start.setUTCDate(start.getUTCDate() - 29);
+      return { trunc: 'day', interval: '1 day', start, end };
+    }
+
+    const end = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+    const start = new Date(end);
+    start.setUTCMonth(start.getUTCMonth() - 11);
+    return { trunc: 'month', interval: '1 month', start, end };
   }
 
   private async auditRead(
@@ -1037,6 +1294,40 @@ export class TicketsService {
   }
 
   private asJson(value: object): Record<string, unknown> {
-    return { ...value } as Record<string, unknown>;
+    return { ...value };
+  }
+
+  private toKanbanItem(row: TicketKanbanItem): TicketKanbanItem {
+    return {
+      ...row,
+      isClosed: TICKET_CLOSED_STATUS_NAMES.has(row.statusName),
+      isWorking: TICKET_WORKING_STATUS_NAMES.has(row.statusName),
+    };
+  }
+
+  private async attachAssigneesToTickets(
+    tickets: TicketKanbanItem[],
+  ): Promise<TicketKanbanItem[]> {
+    if (tickets.length === 0) {
+      return tickets;
+    }
+
+    const ticketIds = tickets.map((ticket) => ticket.id);
+    const { rows } = await this.db.query<
+      TicketAssignee & { ticketId: string }
+    >(SQL_FIND_ASSIGNEES_BY_TICKET_IDS, [ticketIds]);
+
+    const assigneesByTicket = new Map<string, TicketAssignee[]>();
+    for (const row of rows) {
+      const { ticketId, ...assignee } = row;
+      const current = assigneesByTicket.get(ticketId) ?? [];
+      current.push(assignee);
+      assigneesByTicket.set(ticketId, current);
+    }
+
+    return tickets.map((ticket) => ({
+      ...ticket,
+      assignees: assigneesByTicket.get(ticket.id) ?? [],
+    }));
   }
 }

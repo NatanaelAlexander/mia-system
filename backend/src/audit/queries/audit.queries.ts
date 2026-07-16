@@ -32,3 +32,8 @@ export const SQL_FIND_ALL_AUDIT_LOGS_BASE = `
   SELECT ${AUDIT_LOG_COLUMNS}
   FROM audit_logs
 `;
+
+export const SQL_COUNT_AUDIT_LOGS_BASE = `
+  SELECT COUNT(*)::int AS "total"
+  FROM audit_logs
+`;

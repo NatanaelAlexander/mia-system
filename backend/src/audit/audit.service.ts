@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../common/database/database.service';
 import { AuditLogNoEncontradoException } from './exceptions/audit.exceptions';
 import {
+  SQL_COUNT_AUDIT_LOGS_BASE,
   SQL_FIND_ALL_AUDIT_LOGS_BASE,
   SQL_FIND_AUDIT_LOG_BY_ID,
   SQL_INSERT_AUDIT_LOG,
@@ -10,9 +11,11 @@ import {
   AuditLog,
   AuditLogFilters,
   CreateAuditLogInput,
+  PaginatedAuditLogs,
 } from './types/audit.types';
 
-const DEFAULT_LIST_LIMIT = 50;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 200;
 
 @Injectable()
 export class AuditService {
@@ -35,10 +38,35 @@ export class AuditService {
     return rows[0];
   }
 
-  async findAll(filters: AuditLogFilters = {}): Promise<AuditLog[]> {
-    const { sql, params } = this.buildListQuery(filters);
-    const { rows } = await this.db.query<AuditLog>(sql, params);
-    return rows;
+  async findAll(filters: AuditLogFilters = {}): Promise<PaginatedAuditLogs> {
+    const page = Math.max(1, filters.page ?? 1);
+    const pageSize = Math.min(
+      MAX_PAGE_SIZE,
+      Math.max(1, filters.pageSize ?? DEFAULT_PAGE_SIZE),
+    );
+    const offset = (page - 1) * pageSize;
+
+    const { where, params } = this.buildFilters(filters);
+
+    const countResult = await this.db.query<{ total: number }>(
+      `${SQL_COUNT_AUDIT_LOGS_BASE} ${where}`,
+      params,
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
+    const dataSql = `${SQL_FIND_ALL_AUDIT_LOGS_BASE}
+      ${where}
+      ORDER BY created_at DESC
+      LIMIT $${params.length + 1}
+      OFFSET $${params.length + 2}`;
+
+    const { rows } = await this.db.query<AuditLog>(dataSql, [
+      ...params,
+      pageSize,
+      offset,
+    ]);
+
+    return { items: rows, total, page, pageSize };
   }
 
   async findById(id: string): Promise<AuditLog> {
@@ -53,8 +81,8 @@ export class AuditService {
     return rows[0];
   }
 
-  private buildListQuery(filters: AuditLogFilters): {
-    sql: string;
+  private buildFilters(filters: AuditLogFilters): {
+    where: string;
     params: unknown[];
   } {
     const conditions: string[] = [];
@@ -81,17 +109,19 @@ export class AuditService {
       params.push(filters.action);
     }
 
+    if (filters.dateFrom) {
+      conditions.push(`created_at >= $${index++}`);
+      params.push(filters.dateFrom);
+    }
+
+    if (filters.dateTo) {
+      conditions.push(`created_at <= $${index++}`);
+      params.push(filters.dateTo);
+    }
+
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limit = filters.limit ?? DEFAULT_LIST_LIMIT;
-    params.push(limit);
-
-    const sql = `${SQL_FIND_ALL_AUDIT_LOGS_BASE}
-      ${where}
-      ORDER BY created_at DESC
-      LIMIT $${index}`;
-
-    return { sql, params };
+    return { where, params };
   }
 }

@@ -30,7 +30,9 @@ type PathRule = {
 const PATH_RULES: PathRule[] = [
   {
     test: (path, method) =>
-      path.includes('tickets') && path.includes('catalogos') && method === 'GET',
+      path.includes('tickets') &&
+      path.includes('catalogos') &&
+      method === 'GET',
     permission: 'tickets:read',
   },
   {
@@ -95,7 +97,9 @@ const PATH_RULES: PathRule[] = [
   },
   {
     test: (path, method, surface) =>
-      path.includes('comentarios') && method === 'GET' && surface === 'internal',
+      path.includes('comentarios') &&
+      method === 'GET' &&
+      surface === 'internal',
     permission: 'ticket_comments:read_internal',
   },
   {
@@ -112,6 +116,10 @@ const PATH_RULES: PathRule[] = [
       !path.includes('vincular-archivo') &&
       !path.includes('desvincular-archivo'),
     permission: 'ticket_comments:create',
+  },
+  {
+    test: (path, method) => path.includes('/asignados') && method === 'PATCH',
+    permission: 'tickets:assign',
   },
   {
     test: (path, method) => path.includes('/estado') && method === 'PATCH',

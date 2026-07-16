@@ -25,3 +25,17 @@ export class AuditLogResponseDto {
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }
+
+export class PaginatedAuditLogsResponseDto {
+  @ApiProperty({ type: AuditLogResponseDto, isArray: true })
+  items: AuditLogResponseDto[];
+
+  @ApiProperty({ example: 137, description: 'Total de registros que cumplen los filtros' })
+  total: number;
+
+  @ApiProperty({ example: 1 })
+  page: number;
+
+  @ApiProperty({ example: 20 })
+  pageSize: number;
+}

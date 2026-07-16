@@ -10,6 +10,11 @@ export interface User {
   updatedAt: Date;
 }
 
+export interface UserListItem extends User {
+  jobTitles: string[];
+  jobTitleIds: string[];
+}
+
 export interface UserCompanySummary {
   id: string;
   name: string;

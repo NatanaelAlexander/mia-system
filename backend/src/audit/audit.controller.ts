@@ -1,4 +1,4 @@
-import { Body, Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -7,13 +7,17 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  AuthorizeAction,
   AuthorizeResource,
   AuthorizeSurface,
 } from '../auth/decorators/authorize.decorator';
 import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import { AuditService } from './audit.service';
 import { FilterAuditLogsDto } from './dto/filter-audit-logs.dto';
-import { AuditLogResponseDto } from './dto/responses/audit-log-response.dto';
+import {
+  AuditLogResponseDto,
+  PaginatedAuditLogsResponseDto,
+} from './dto/responses/audit-log-response.dto';
 
 @ApiBearerAuth('access-token')
 @AuthorizeSurface('internal')
@@ -27,11 +31,25 @@ export class InternalAuditController {
   @ApiOperation({
     summary: 'Listar registros de auditoría',
     description:
-      'Filtros opcionales por body. Sin body lista los últimos 50.',
+      'Filtros opcionales por body (acción, fecha, usuario). Paginado; por defecto página 1 con 20 registros.',
   })
   @ApiBody({ type: FilterAuditLogsDto, required: false })
-  @ApiOkResponse({ type: AuditLogResponseDto, isArray: true })
+  @ApiOkResponse({ type: PaginatedAuditLogsResponseDto })
   findAll(@Body() filters: FilterAuditLogsDto = {}) {
+    return this.auditService.findAll(filters);
+  }
+
+  @Post('listar')
+  @HttpCode(HttpStatus.OK)
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Listar registros de auditoría (con filtros en body)',
+    description:
+      'Filtros opcionales por body (acción, fecha, usuario). Paginado; por defecto página 1 con 20 registros.',
+  })
+  @ApiBody({ type: FilterAuditLogsDto, required: false })
+  @ApiOkResponse({ type: PaginatedAuditLogsResponseDto })
+  list(@Body() filters: FilterAuditLogsDto = {}) {
     return this.auditService.findAll(filters);
   }
 

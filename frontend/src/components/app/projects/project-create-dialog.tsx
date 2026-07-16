@@ -80,6 +80,7 @@ export function ProjectCreateDialog({
       await createProject({
         companyId: values.companyId,
         name: values.name.trim(),
+        description: values.description?.trim() || null,
         type: values.type,
       });
       toast.success("Proyecto creado correctamente");

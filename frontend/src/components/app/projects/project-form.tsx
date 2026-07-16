@@ -21,11 +21,13 @@ import {
 const createProjectSchema = z.object({
   companyId: z.string().uuid("Selecciona una empresa"),
   name: z.string().min(1, "El nombre es obligatorio").max(255),
+  description: z.string().max(5000).optional().or(z.literal("")),
   type: z.enum(["internal", "external"]),
 });
 
 const editProjectSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").max(255),
+  description: z.string().max(5000).optional().or(z.literal("")),
   type: z.enum(["internal", "external"]),
   status: z.enum(["active", "inactive", "completed"]),
 });
@@ -47,8 +49,12 @@ const statusOptions: Array<{ label: string; value: ProjectStatus }> = [
 const emptyCreateValues: CreateProjectFormValues = {
   companyId: "",
   name: "",
+  description: "",
   type: "external",
 };
+
+const textareaClassName =
+  "flex min-h-[80px] w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30";
 
 interface ProjectCreateFormProps {
   companies: CompanyListItem[];
@@ -141,6 +147,18 @@ export function ProjectCreateForm({
             {form.formState.errors.name.message}
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="project-description">Descripción (opcional)</Label>
+        <textarea
+          id="project-description"
+          rows={3}
+          disabled={isSubmitting}
+          className={textareaClassName}
+          placeholder="Resumen del alcance o objetivo del proyecto"
+          {...form.register("description")}
+        />
       </div>
 
       <div className="space-y-2">
@@ -247,6 +265,18 @@ export function ProjectEditForm({
             {form.formState.errors.name.message}
           </p>
         ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="project-edit-description">Descripción (opcional)</Label>
+        <textarea
+          id="project-edit-description"
+          rows={3}
+          disabled={isSubmitting}
+          className={textareaClassName}
+          placeholder="Resumen del alcance o objetivo del proyecto"
+          {...form.register("description")}
+        />
       </div>
 
       <div className="space-y-2">

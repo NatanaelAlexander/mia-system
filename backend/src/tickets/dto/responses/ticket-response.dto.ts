@@ -58,6 +58,46 @@ export class TicketResponseDto {
   updatedAt: Date;
 }
 
+export class TicketAssigneeResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  firstName: string;
+
+  @ApiProperty()
+  lastName: string;
+
+  @ApiProperty({ type: String, isArray: true })
+  roles: string[];
+
+  @ApiProperty()
+  isSuperAdmin: boolean;
+}
+
+export class TicketKanbanItemResponseDto extends TicketResponseDto {
+  @ApiPropertyOptional({ nullable: true })
+  lastCommentAuthorFirstName: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastCommentAuthorLastName: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  lastCommentAt: Date | null;
+
+  @ApiProperty()
+  isClosed: boolean;
+
+  @ApiProperty()
+  isWorking: boolean;
+
+  @ApiPropertyOptional({ type: TicketAssigneeResponseDto, isArray: true })
+  assignees?: TicketAssigneeResponseDto[];
+}
+
 export class TicketCommentResponseDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
@@ -72,7 +112,8 @@ export class TicketCommentResponseDto {
   comment: string;
 
   @ApiProperty({
-    description: 'Si es true, el comentario solo es visible en el panel interno.',
+    description:
+      'Si es true, el comentario solo es visible en el panel interno.',
   })
   isInternal: boolean;
 
@@ -111,4 +152,18 @@ export class TicketStatusHistoryResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
+}
+
+export class TicketTimelinePointResponseDto {
+  @ApiProperty({ type: String, format: 'date-time' })
+  date: Date;
+
+  @ApiProperty({ example: 12 })
+  total: number;
+
+  @ApiProperty({ example: 8 })
+  open: number;
+
+  @ApiProperty({ example: 4 })
+  closed: number;
 }

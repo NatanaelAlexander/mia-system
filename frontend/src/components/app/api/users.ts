@@ -8,6 +8,8 @@ export interface UserListItem {
   isActive: boolean;
   permissionsVersion: number;
   createdAt: string;
+  jobTitles?: string[];
+  jobTitleIds?: string[];
 }
 
 export interface UserCompanySummary {

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProjectStatus, ProjectType } from '../../types/project.types';
 
 export class ProjectResponseDto {
@@ -10,6 +10,12 @@ export class ProjectResponseDto {
 
   @ApiProperty({ example: 'Portal cliente 2026' })
   name: string;
+
+  @ApiPropertyOptional({
+    example: 'Rediseño del portal de clientes y flujo de tickets.',
+    nullable: true,
+  })
+  description: string | null;
 
   @ApiProperty({ enum: ProjectType })
   type: ProjectType;

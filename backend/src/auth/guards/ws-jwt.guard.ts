@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { AuthService } from '../../auth/auth.service';
-import { JwtAccessPayload } from '../../auth/types/auth.types';
+import { AuthService } from '../auth.service';
+import { JwtAccessPayload } from '../types/auth.types';
 
 export type AuthenticatedSocket = Socket & {
   data: {
