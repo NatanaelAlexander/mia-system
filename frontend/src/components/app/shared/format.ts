@@ -7,10 +7,16 @@ export function formatDate(value: string) {
 }
 
 export function formatChatTime(value: string) {
-  return new Intl.DateTimeFormat("es-CL", {
+  const date = new Date(value);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  const time = new Intl.DateTimeFormat("es-CL", {
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(date);
+
+  return `${day}-${month}-${year} ${time}`;
 }
 
 export function formatFileSize(value: number | null) {

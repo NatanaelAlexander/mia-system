@@ -526,6 +526,22 @@ export class PortalTicketsController {
     return this.ticketsService.findAllForPortal(userId, dto);
   }
 
+  @Post('estadisticas/timeline')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'Serie temporal de tickets del cliente para dashboard',
+    description:
+      'Solo tickets de empresas vinculadas al usuario. Agrupa por hora, día o mes.',
+  })
+  @ApiBody({ type: FilterTicketTimelineDto })
+  @ApiOkResponse({ type: TicketTimelinePointResponseDto, isArray: true })
+  getTimeline(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FilterTicketTimelineDto,
+  ) {
+    return this.ticketsService.getTimelineForPortal(userId, dto.range);
+  }
+
   @Get('detalle')
   @ApiOperation({ summary: 'Obtener ticket por ID (portal)' })
   @ApiBody({ type: FindByIdDto })

@@ -6,6 +6,8 @@ import {
   getTicketTimeline,
   type TicketTimelineRange,
 } from "@/components/app/api/tickets";
+import { preferredSurface } from "@/components/app/shared/surface";
+import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,6 +71,7 @@ function formatTooltipLabel(value: string, range: TicketTimelineRange): string {
 }
 
 export function DashboardTicketsAreaChart() {
+  const { claims } = useAuth();
   const [range, setRange] = React.useState<TicketTimelineRange>("month");
   const [data, setData] = React.useState<
     Array<{ date: string; total: number; open: number; closed: number }>
@@ -77,11 +80,19 @@ export function DashboardTicketsAreaChart() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!claims) {
+      setIsLoading(false);
+      setError("No se pudo cargar el gráfico de tickets.");
+      return;
+    }
+
     let cancelled = false;
     setIsLoading(true);
     setError(null);
 
-    getTicketTimeline(range)
+    const surface = preferredSurface(claims);
+
+    getTicketTimeline(surface, range)
       .then((rows) => {
         if (cancelled) {
           return;
@@ -113,7 +124,7 @@ export function DashboardTicketsAreaChart() {
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [claims, range]);
 
   const rangeLabel =
     RANGES.find((option) => option.value === range)?.label ?? "Último mes";

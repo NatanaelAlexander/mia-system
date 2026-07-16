@@ -54,6 +54,12 @@ const KANBAN_FILTER_CLAUSE = `
   )
 `;
 
+/**
+ * Params:
+ * $1 includeDrafts, $2 draftStatusName, $3 projectId,
+ * $4 lifecycle, $5 workingOnly,
+ * $6 isSuperAdmin, $7 actorUserId
+ */
 export const SQL_FIND_ALL_TICKETS_KANBAN = `
   SELECT
     ${TICKET_COLUMNS},
@@ -63,6 +69,15 @@ export const SQL_FIND_ALL_TICKETS_KANBAN = `
   WHERE ($1::boolean OR ts.name <> $2)
     AND ($3::uuid IS NULL OR t.project_id = $3)
     ${KANBAN_FILTER_CLAUSE}
+    AND (
+      COALESCE($6::boolean, FALSE)
+      OR EXISTS (
+        SELECT 1
+        FROM ticket_assignees ta
+        WHERE ta.ticket_id = t.id
+          AND ta.user_id = $7::uuid
+      )
+    )
   ORDER BY t.updated_at DESC
 `;
 

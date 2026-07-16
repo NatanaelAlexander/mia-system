@@ -76,7 +76,7 @@ import {
   SQL_FIND_ALL_TICKETS_KANBAN,
   SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER_KANBAN,
 } from './queries/ticket-kanban.queries';
-import { SQL_TICKET_TIMELINE } from './queries/ticket-timeline.queries';
+import { SQL_TICKET_TIMELINE, SQL_TICKET_TIMELINE_FOR_PORTAL_USER } from './queries/ticket-timeline.queries';
 import {
   SQL_FIND_TICKET_BY_ID,
   SQL_INSERT_TICKET,
@@ -133,7 +133,7 @@ export class TicketsService {
     const isInternalViewer = user.surfaces.includes('internal');
 
     if (isInternalViewer) {
-      await this.findTicketRowById(ticketId);
+      await this.assertCanAccessTicket(user.sub, ticketId);
       return { isInternalViewer: true };
     }
 
@@ -211,6 +211,7 @@ export class TicketsService {
     filters: FilterTicketsDto = {},
   ): Promise<TicketKanbanItem[]> {
     const includeDrafts = filters.includeDrafts ?? false;
+    const isSuperAdmin = await this.isActorSuperAdmin(actorUserId);
     const { rows } = await this.db.query<TicketKanbanItem>(
       SQL_FIND_ALL_TICKETS_KANBAN,
       [
@@ -219,6 +220,8 @@ export class TicketsService {
         filters.projectId ?? null,
         filters.lifecycle ?? null,
         filters.workingOnly ?? false,
+        isSuperAdmin,
+        actorUserId,
       ],
     );
 
@@ -242,14 +245,35 @@ export class TicketsService {
     range: TicketTimelineRange,
   ): Promise<TicketTimelinePoint[]> {
     const { trunc, interval, start } = this.resolveTimelineBounds(range);
+    const isSuperAdmin = await this.isActorSuperAdmin(actorUserId);
 
     const { rows } = await this.db.query<TicketTimelinePoint>(
       SQL_TICKET_TIMELINE,
-      [trunc, start.toISOString(), interval],
+      [trunc, start.toISOString(), interval, isSuperAdmin, actorUserId],
     );
 
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, null, {
       scope: 'timeline',
+      range,
+      resultCount: rows.length,
+    });
+
+    return rows;
+  }
+
+  async getTimelineForPortal(
+    userId: string,
+    range: TicketTimelineRange,
+  ): Promise<TicketTimelinePoint[]> {
+    const { trunc, interval, start } = this.resolveTimelineBounds(range);
+
+    const { rows } = await this.db.query<TicketTimelinePoint>(
+      SQL_TICKET_TIMELINE_FOR_PORTAL_USER,
+      [trunc, start.toISOString(), interval, userId],
+    );
+
+    await this.auditRead(userId, AUDIT_TABLE.TICKETS, null, {
+      scope: 'portal_timeline',
       range,
       resultCount: rows.length,
     });
@@ -297,7 +321,7 @@ export class TicketsService {
   }
 
   async findById(actorUserId: string, id: string): Promise<Ticket> {
-    const ticket = await this.findTicketRowById(id);
+    const ticket = await this.assertCanAccessTicket(actorUserId, id);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.TICKETS, id, {
       scope: 'detail',
@@ -396,7 +420,7 @@ export class TicketsService {
     id: string,
     dto: UpdateTicketDto,
   ): Promise<Ticket> {
-    const previous = await this.findTicketRowById(id);
+    const previous = await this.assertCanAccessTicket(actorUserId, id);
 
     if (dto.priorityId) {
       await this.ensurePriorityExists(dto.priorityId);
@@ -448,7 +472,7 @@ export class TicketsService {
     id: string,
     dto: ChangeTicketStatusDto,
   ): Promise<Ticket> {
-    const previous = await this.findTicketRowById(id);
+    const previous = await this.assertCanAccessTicket(actorUserId, id);
     await this.assertCanChangeStatus(actorUserId, id);
     await this.ensureStatusExists(dto.statusId);
 
@@ -504,7 +528,7 @@ export class TicketsService {
     actorUserId: string,
     ticketId: string,
   ): Promise<TicketAssignee[]> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
     const { rows } = await this.db.query<TicketAssignee>(
       SQL_FIND_TICKET_ASSIGNEES,
       [ticketId],
@@ -554,7 +578,7 @@ export class TicketsService {
 
   async moveToDraft(id: string, userId: string): Promise<Ticket> {
     const draftStatus = await this.getStatusByName(TicketStatusName.DRAFT);
-    const previous = await this.findTicketRowById(id);
+    const previous = await this.assertCanAccessTicket(userId, id);
     await this.assertCanChangeStatus(userId, id);
 
     if (previous.statusId === draftStatus.id) {
@@ -603,7 +627,7 @@ export class TicketsService {
     actorUserId: string,
     ticketId: string,
   ): Promise<TicketStatusHistoryEntry[]> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
 
     const { rows } = await this.db.query<TicketStatusHistoryEntry>(
       SQL_FIND_TICKET_STATUS_HISTORY,
@@ -627,7 +651,7 @@ export class TicketsService {
     actorUserId: string,
     ticketId: string,
   ): Promise<TicketComment[]> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
 
     const { rows } = await this.db.query<TicketComment>(
       SQL_FIND_TICKET_COMMENTS,
@@ -674,8 +698,38 @@ export class TicketsService {
     actorUserId: string,
     dto: CreateTicketCommentDto,
   ): Promise<TicketComment> {
-    await this.findTicketRowById(dto.ticketId);
+    await this.assertCanAccessTicket(actorUserId, dto.ticketId);
+    return this.insertComment(actorUserId, dto);
+  }
 
+  async addCommentForPortal(
+    userId: string,
+    dto: PortalCreateTicketCommentDto,
+  ): Promise<TicketComment> {
+    const hasAccess = await this.portalAccess.userHasTicket(
+      userId,
+      dto.ticketId,
+    );
+    if (!hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    const ticket = await this.findTicketRowById(dto.ticketId);
+    if (ticket.statusName === TicketStatusName.DRAFT) {
+      throw new TicketNoEncontradoException();
+    }
+
+    return this.insertComment(userId, {
+      ticketId: dto.ticketId,
+      comment: dto.comment,
+      isInternal: false,
+    });
+  }
+
+  private async insertComment(
+    actorUserId: string,
+    dto: CreateTicketCommentDto,
+  ): Promise<TicketComment> {
     const { rows: inserted } = await this.db.query<{ id: string }>(
       SQL_INSERT_TICKET_COMMENT,
       [dto.ticketId, actorUserId, dto.comment, dto.isInternal ?? false],
@@ -703,35 +757,11 @@ export class TicketsService {
     return comment;
   }
 
-  async addCommentForPortal(
-    userId: string,
-    dto: PortalCreateTicketCommentDto,
-  ): Promise<TicketComment> {
-    const hasAccess = await this.portalAccess.userHasTicket(
-      userId,
-      dto.ticketId,
-    );
-    if (!hasAccess) {
-      throw new TicketNoEncontradoException();
-    }
-
-    const ticket = await this.findTicketRowById(dto.ticketId);
-    if (ticket.statusName === TicketStatusName.DRAFT) {
-      throw new TicketNoEncontradoException();
-    }
-
-    return this.addComment(userId, {
-      ticketId: dto.ticketId,
-      comment: dto.comment,
-      isInternal: false,
-    });
-  }
-
   async getTicketAssets(
     actorUserId: string,
     ticketId: string,
   ): Promise<Asset[]> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_TICKET_ASSETS, [
       ticketId,
@@ -770,7 +800,7 @@ export class TicketsService {
     displayName?: string,
   ): Promise<Asset> {
     await this.assertPortalTicketAccess(userId, ticketId);
-    return this.uploadAssetToTicket(userId, ticketId, file, displayName);
+    return this.insertTicketUpload(userId, ticketId, file, displayName);
   }
 
   private async assertPortalTicketAccess(
@@ -793,7 +823,7 @@ export class TicketsService {
     ticketId: string,
     assetId: string,
   ): Promise<void> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
     await this.assetsService.findById(assetId);
 
     const exists = await this.db.query(SQL_EXISTS_TICKET_ASSET_LINK, [
@@ -821,6 +851,8 @@ export class TicketsService {
     ticketId: string,
     assetId: string,
   ): Promise<void> {
+    await this.assertCanAccessTicket(actorUserId, ticketId);
+
     const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [
       ticketId,
       assetId,
@@ -845,8 +877,16 @@ export class TicketsService {
     file: Express.Multer.File,
     displayName?: string,
   ): Promise<Asset> {
-    await this.findTicketRowById(ticketId);
+    await this.assertCanAccessTicket(actorUserId, ticketId);
+    return this.insertTicketUpload(actorUserId, ticketId, file, displayName);
+  }
 
+  private async insertTicketUpload(
+    actorUserId: string,
+    ticketId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
     const asset = await this.assetsService.uploadFile({
       buffer: file.buffer,
       originalName: file.originalname,
@@ -879,7 +919,8 @@ export class TicketsService {
     actorUserId: string,
     ticketCommentId: string,
   ): Promise<Asset[]> {
-    await this.findCommentRowById(ticketCommentId);
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_COMMENT_ASSETS, [
       ticketCommentId,
@@ -903,7 +944,8 @@ export class TicketsService {
     ticketCommentId: string,
     assetId: string,
   ): Promise<void> {
-    await this.findCommentRowById(ticketCommentId);
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
     await this.assetsService.findById(assetId);
 
     const exists = await this.db.query(SQL_EXISTS_COMMENT_ASSET_LINK, [
@@ -931,6 +973,9 @@ export class TicketsService {
     ticketCommentId: string,
     assetId: string,
   ): Promise<void> {
+    const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
+
     const result = await this.db.query(SQL_DELETE_COMMENT_ASSET, [
       ticketCommentId,
       assetId,
@@ -956,7 +1001,23 @@ export class TicketsService {
     displayName?: string,
   ): Promise<Asset> {
     const comment = await this.findCommentRowById(ticketCommentId);
+    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
+    return this.insertCommentUpload(
+      actorUserId,
+      comment,
+      ticketCommentId,
+      file,
+      displayName,
+    );
+  }
 
+  private async insertCommentUpload(
+    actorUserId: string,
+    comment: TicketComment,
+    ticketCommentId: string,
+    file: Express.Multer.File,
+    displayName?: string,
+  ): Promise<Asset> {
     const asset = await this.assetsService.uploadFile({
       buffer: file.buffer,
       originalName: file.originalname,
@@ -1051,8 +1112,9 @@ export class TicketsService {
     const comment = await this.findCommentRowById(ticketCommentId);
     await this.assertPortalCommentAccess(userId, comment);
 
-    return this.uploadAssetToComment(
+    return this.insertCommentUpload(
       userId,
+      comment,
       ticketCommentId,
       file,
       displayName,
@@ -1161,13 +1223,42 @@ export class TicketsService {
     }
   }
 
-  private async assertSuperAdmin(userId: string): Promise<void> {
+  private async isActorSuperAdmin(userId: string): Promise<boolean> {
     const authorization =
       await this.permissionsService.resolveAuthorization(userId);
-    if (
-      !authorization ||
-      !this.permissionsService.isSuperAdmin(authorization.roles)
-    ) {
+    return Boolean(
+      authorization &&
+        this.permissionsService.isSuperAdmin(authorization.roles),
+    );
+  }
+
+  /**
+   * Internal ticket ACL: superadmin sees all; everyone else must be assigned.
+   * Returns the ticket row when access is allowed.
+   */
+  private async assertCanAccessTicket(
+    userId: string,
+    ticketId: string,
+  ): Promise<Ticket> {
+    const ticket = await this.findTicketRowById(ticketId);
+
+    if (await this.isActorSuperAdmin(userId)) {
+      return ticket;
+    }
+
+    const { rows } = await this.db.query<{ isAssigned: boolean }>(
+      SQL_IS_TICKET_ASSIGNEE,
+      [ticketId, userId],
+    );
+    if (!rows[0]?.isAssigned) {
+      throw new TicketNoEncontradoException();
+    }
+
+    return ticket;
+  }
+
+  private async assertSuperAdmin(userId: string): Promise<void> {
+    if (!(await this.isActorSuperAdmin(userId))) {
       throw new PermisoDenegadoException();
     }
   }
