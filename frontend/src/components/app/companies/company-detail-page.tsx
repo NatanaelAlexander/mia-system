@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -33,7 +33,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { companiesModule } from "./companies-module";
+import {
+  Tabs,
+  TabsIndicator,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+} from "@/components/ui/tabs";
+import {
+  companiesModule,
+  companyDetailHref,
+  type CompanyDetailTab,
+} from "./companies-module";
 import {
   CompanyForm,
   toCompanyFormValues,
@@ -49,6 +60,20 @@ interface CompanyDetailPageProps {
   companyId: string;
 }
 
+const COMPANY_TABS = [
+  "datos",
+  "representantes",
+  "usuarios",
+  "proyectos",
+] as const satisfies readonly CompanyDetailTab[];
+
+function isCompanyDetailTab(value: string | null): value is CompanyDetailTab {
+  return (
+    typeof value === "string" &&
+    (COMPANY_TABS as readonly string[]).includes(value)
+  );
+}
+
 function DetailSkeleton() {
   return (
     <div className="space-y-6">
@@ -61,6 +86,7 @@ function DetailSkeleton() {
 
 export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { claims, isLoading: isAuthLoading } = useAuth();
   const surface = claims ? preferredSurface(claims) : "portal";
   const canAccess = canAccessModule(claims, companiesModule);
@@ -69,12 +95,43 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const canDeactivate =
     isInternalUser(claims) && hasPermission(claims, "companies:delete");
   const canViewProjects = canAccessModule(claims, projectsModule);
+  const isInternal = isInternalUser(claims);
 
   const [company, setCompany] = React.useState<CompanyDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
+
+  const allowedTabs = React.useMemo(() => {
+    const tabs: CompanyDetailTab[] = ["datos"];
+    if (isInternal) {
+      tabs.push("representantes", "usuarios");
+    }
+    if (canViewProjects) {
+      tabs.push("proyectos");
+    }
+    return tabs;
+  }, [canViewProjects, isInternal]);
+
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab: CompanyDetailTab = isCompanyDetailTab(tabFromUrl)
+    ? allowedTabs.includes(tabFromUrl)
+      ? tabFromUrl
+      : "datos"
+    : "datos";
+
+  const handleTabChange = (value: string | number | null) => {
+    if (typeof value !== "string" || !isCompanyDetailTab(value)) {
+      return;
+    }
+
+    if (!allowedTabs.includes(value)) {
+      return;
+    }
+
+    router.replace(companyDetailHref(companyId, value), { scroll: false });
+  };
 
   const loadCompany = React.useCallback(async () => {
     if (!claims || !canAccess) {
@@ -227,42 +284,66 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Datos de la empresa</CardTitle>
-          <CardDescription>
-            {canEdit
-              ? "Edita la información general de la empresa."
-              : "Vista de solo lectura."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CompanyForm
-            mode="edit"
-            defaultValues={toCompanyFormValues(company)}
-            onSubmit={handleSubmit}
-            readOnly={!canEdit}
-            isSubmitting={isSubmitting}
-            submitLabel="Guardar cambios"
-          />
-        </CardContent>
-      </Card>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTab value="datos">Datos de la empresa</TabsTab>
+          {isInternal ? (
+            <>
+              <TabsTab value="representantes">Representantes legales</TabsTab>
+              <TabsTab value="usuarios">Usuarios vinculados</TabsTab>
+            </>
+          ) : null}
+          {canViewProjects ? (
+            <TabsTab value="proyectos">Proyectos activos</TabsTab>
+          ) : null}
+          <TabsIndicator />
+        </TabsList>
 
-      {isInternalUser(claims) ? (
-        <>
-          <CompanyRepresentativesSection
-            companyId={company.id}
-            representativeLinks={company.representativeLinks}
-            canManage={canEdit}
-            onChanged={loadCompany}
-          />
-          <CompanyUsersSection companyId={company.id} canManage={canEdit} />
-        </>
-      ) : null}
+        <TabsPanel value="datos">
+          <Card>
+            <CardHeader>
+              <CardTitle>Datos de la empresa</CardTitle>
+              <CardDescription>
+                {canEdit
+                  ? "Edita la información general de la empresa."
+                  : "Vista de solo lectura."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CompanyForm
+                mode="edit"
+                defaultValues={toCompanyFormValues(company)}
+                onSubmit={handleSubmit}
+                readOnly={!canEdit}
+                isSubmitting={isSubmitting}
+                submitLabel="Guardar cambios"
+              />
+            </CardContent>
+          </Card>
+        </TabsPanel>
 
-      {canViewProjects ? (
-        <CompanyProjectsSection companyId={company.id} surface={surface} />
-      ) : null}
+        {isInternal ? (
+          <>
+            <TabsPanel value="representantes">
+              <CompanyRepresentativesSection
+                companyId={company.id}
+                representativeLinks={company.representativeLinks}
+                canManage={canEdit}
+                onChanged={loadCompany}
+              />
+            </TabsPanel>
+            <TabsPanel value="usuarios">
+              <CompanyUsersSection companyId={company.id} canManage={canEdit} />
+            </TabsPanel>
+          </>
+        ) : null}
+
+        {canViewProjects ? (
+          <TabsPanel value="proyectos">
+            <CompanyProjectsSection companyId={company.id} surface={surface} />
+          </TabsPanel>
+        ) : null}
+      </Tabs>
 
       <ConfirmDialog
         open={deactivateConfirmOpen}

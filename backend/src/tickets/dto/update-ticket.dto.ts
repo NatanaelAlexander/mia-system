@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class UpdateTicketDto {
   @ApiPropertyOptional({ example: 'Error al iniciar sesión (actualizado)' })
@@ -28,9 +34,4 @@ export class UpdateTicketDto {
   @IsOptional()
   @IsUUID('4', { message: 'El ID de estado de pago no es válido' })
   paymentStatusId?: string;
-
-  @ApiPropertyOptional({ format: 'uuid', nullable: true })
-  @IsOptional()
-  @IsUUID('4', { message: 'El ID del asignado no es válido' })
-  assignedToId?: string | null;
 }

@@ -10,11 +10,22 @@ export interface TicketCatalogItem {
 export interface TicketListItem {
   id: string;
   title: string;
+  statusId: string;
   statusName: string;
   priorityName: string;
   categoryName: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TicketKanbanItem extends TicketListItem {
+  projectId: string;
+  lastCommentAuthorFirstName: string | null;
+  lastCommentAuthorLastName: string | null;
+  lastCommentAt: string | null;
+  isClosed: boolean;
+  isWorking: boolean;
+  assignees?: TicketAssignee[];
 }
 
 export interface TicketDetail extends TicketListItem {
@@ -27,6 +38,15 @@ export interface TicketDetail extends TicketListItem {
   paymentStatusId: string | null;
   paymentStatusName: string | null;
   assignedToId: string | null;
+}
+
+export interface TicketAssignee {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  roles: string[];
+  isSuperAdmin: boolean;
 }
 
 export interface TicketComment {
@@ -43,6 +63,17 @@ export interface TicketComment {
 
 export interface ListTicketsFilters {
   projectId?: string;
+  lifecycle?: "all" | "active" | "closed";
+  workingOnly?: boolean;
+}
+
+export type TicketTimelineRange = "day" | "month" | "year";
+
+export interface TicketTimelinePoint {
+  date: string;
+  total: number;
+  open: number;
+  closed: number;
 }
 
 export interface CreateTicketPayload {
@@ -52,7 +83,6 @@ export interface CreateTicketPayload {
   priorityId: string;
   categoryId?: string;
   paymentStatusId?: string;
-  assignedToId?: string;
 }
 
 export interface AddTicketCommentPayload {
@@ -69,9 +99,17 @@ export function listTickets(
   surface: ResourceSurface,
   filters: ListTicketsFilters = {},
 ) {
-  return apiFetchDetalle<TicketListItem[]>(
+  return apiFetchDetalle<TicketKanbanItem[]>(
     `${ticketsBase(surface)}/listar`,
-    { projectId: filters.projectId },
+    filters,
+    true,
+  );
+}
+
+export function getTicketTimeline(range: TicketTimelineRange) {
+  return apiFetchDetalle<TicketTimelinePoint[]>(
+    "/internal/tickets/estadisticas/timeline",
+    { range },
     true,
   );
 }
@@ -88,10 +126,44 @@ export function createTicket(
   surface: ResourceSurface,
   payload: CreateTicketPayload,
 ) {
-  return apiFetch<TicketDetail>(ticketsBase(surface), {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }, true);
+  return apiFetch<TicketDetail>(
+    ticketsBase(surface),
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export function listTicketAssignees(ticketId: string) {
+  return apiFetchDetalle<TicketAssignee[]>(
+    "/internal/tickets/asignados/listar",
+    { ticketId },
+    true,
+  );
+}
+
+export function replaceTicketAssignees(ticketId: string, userIds: string[]) {
+  return apiFetch<TicketAssignee[]>(
+    `/internal/tickets/${ticketId}/asignados`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ userIds }),
+    },
+    true,
+  );
+}
+
+export function changeTicketStatus(ticketId: string, statusId: string) {
+  return apiFetch<TicketDetail>(
+    `/internal/tickets/${ticketId}/estado`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ statusId }),
+    },
+    true,
+  );
 }
 
 export function listTicketComments(surface: ResourceSurface, ticketId: string) {
@@ -111,10 +183,14 @@ export function addTicketComment(
       ? payload
       : { ticketId: payload.ticketId, comment: payload.comment };
 
-  return apiFetch<TicketComment>(`${ticketsBase(surface)}/comentarios`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  }, true);
+  return apiFetch<TicketComment>(
+    `${ticketsBase(surface)}/comentarios`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    true,
+  );
 }
 
 export function listTicketCommentAssets(
@@ -183,6 +259,14 @@ export function uploadTicketAsset(
 export function listTicketPriorities(surface: ResourceSurface = "internal") {
   return apiFetch<TicketCatalogItem[]>(
     `${ticketsBase(surface)}/catalogos/prioridades`,
+    {},
+    true,
+  );
+}
+
+export function listTicketStatuses(surface: ResourceSurface = "internal") {
+  return apiFetch<TicketCatalogItem[]>(
+    `${ticketsBase(surface)}/catalogos/estados`,
     {},
     true,
   );

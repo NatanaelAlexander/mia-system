@@ -8,6 +8,7 @@ export const TicketsRealtimeEvent = {
   TICKET_STATUS_CHANGED: 'ticket.status_changed',
   COMMENT_TYPING: 'comment.typing',
   TICKET_PRESENCE: 'ticket.presence',
+  APP_PRESENCE: 'app.presence',
 } as const;
 
 export type TicketsRealtimeEventName =
@@ -17,6 +18,18 @@ export interface TicketPresenceUser {
   userId: string;
   firstName: string;
   lastName: string;
+}
+
+export interface AppPresenceUser {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  roles: string[];
+  surfaces: string[];
+}
+
+export interface AppPresencePayload {
+  users: AppPresenceUser[];
 }
 
 export interface TicketPresencePayload {

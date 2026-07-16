@@ -39,5 +39,15 @@ export interface AuditLogFilters {
   recordId?: string;
   userId?: string;
   action?: string;
-  limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedAuditLogs {
+  items: AuditLog[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

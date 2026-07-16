@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { listCompanies } from "@/components/app/api/companies";
 import { getProjectDetail } from "@/components/app/api/projects";
+import { companyDetailHref } from "@/components/app/companies/companies-module";
 import { ErrorState, ListSkeleton } from "@/components/app/shared/list-states";
 import { canAccessModule } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
@@ -15,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { projectsModule } from "./projects-module";
 import { ProjectHubPanel } from "./project-hub-panel";
+import { ProjectTicketsSection } from "./project-tickets-section";
 
 interface ProjectHubPageProps {
   projectId: string;
@@ -32,6 +34,10 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
   const [project, setProject] = React.useState<
     Awaited<ReturnType<typeof getProjectDetail>> | null
   >(null);
+
+  const backHref = project
+    ? companyDetailHref(project.companyId, "proyectos")
+    : "/app/companies";
 
   const loadProject = React.useCallback(async () => {
     if (!claims || !canAccess) {
@@ -80,11 +86,11 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
     return (
       <div className="space-y-4">
         <Link
-          href="/app/projects"
+          href="/app/companies"
           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
           <ArrowLeft />
-          Proyectos
+          Empresas
         </Link>
         <ErrorState
           message={errorMessage ?? "Proyecto no disponible."}
@@ -95,9 +101,9 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-[1400px] space-y-6">
       <Link
-        href="/app/projects"
+        href={backHref}
         className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
       >
         <ArrowLeft />
@@ -114,6 +120,8 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
           }
         }}
       />
+
+      <ProjectTicketsSection projectId={project.id} surface={surface} />
     </div>
   );
 }

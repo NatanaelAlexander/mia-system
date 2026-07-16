@@ -31,6 +31,15 @@ export class EstadoPagoNoEncontradoException extends AppException {
   }
 }
 
+export class AsignadoTicketInvalidoException extends AppException {
+  constructor() {
+    super(
+      'Solo se pueden asignar admins o superadmins activos',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+}
+
 export class ComentarioTicketNoEncontradoException extends AppException {
   constructor() {
     super('Comentario de ticket no encontrado', HttpStatus.NOT_FOUND);

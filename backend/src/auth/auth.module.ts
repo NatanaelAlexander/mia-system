@@ -12,6 +12,7 @@ import { InternalSurfaceGuard } from './guards/internal-surface.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { PortalSurfaceGuard } from './guards/portal-surface.guard';
+import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { PermissionsService } from './permissions/permissions.service';
 
 @Module({
@@ -33,6 +34,7 @@ import { PermissionsService } from './permissions/permissions.service';
     InternalSurfaceGuard,
     PortalSurfaceGuard,
     PermissionsGuard,
+    WsJwtGuard,
   ],
   exports: [
     AuthService,
@@ -44,6 +46,7 @@ import { PermissionsService } from './permissions/permissions.service';
     InternalSurfaceGuard,
     PortalSurfaceGuard,
     PermissionsGuard,
+    WsJwtGuard,
   ],
 })
 export class AuthModule {}

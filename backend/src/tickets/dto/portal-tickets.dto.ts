@@ -1,11 +1,38 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+
+export type TicketLifecycleFilter = 'all' | 'active' | 'closed';
 
 export class PortalFilterTicketsDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID('4', { message: 'El ID del proyecto no es válido' })
   projectId?: string;
+
+  @ApiPropertyOptional({
+    enum: ['all', 'active', 'closed'],
+    description: 'Filtrar tickets activos o cerrados para vista kanban',
+  })
+  @IsOptional()
+  @IsIn(['all', 'active', 'closed'], {
+    message: 'lifecycle debe ser all, active o closed',
+  })
+  lifecycle?: TicketLifecycleFilter;
+
+  @ApiPropertyOptional({
+    description: 'Solo tickets en trabajo (Tomado, En desarrollo, QA, Esperando cliente)',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'workingOnly debe ser booleano' })
+  workingOnly?: boolean;
 }
 
 export class PortalCreateTicketDto {

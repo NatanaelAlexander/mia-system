@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/themes/t3-chat.css";
+@import "../styles/themes/mono.css";
+@import "../styles/themes/clean-slate.css";
+@import "../styles/themes/cyberpunk.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -62,10 +66,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Geist Mono, ui-monospace, monospace;
-  --font-mono: JetBrains Mono, monospace;
-  --font-serif: serif;
-  --radius: 0.75rem;
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
   --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
   --tracking-tight: calc(var(--tracking-normal) - 0.025em);
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
@@ -188,9 +191,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
     letter-spacing: var(--tracking-normal);
-    font-family: var(--font-sans);
   }
 
   [data-sonner-toaster] {

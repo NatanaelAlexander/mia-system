@@ -11,7 +11,9 @@ const MIGRATIONS = [
   'assets',
   'projects',
   'tickets',
+  'ticket_assignees',
   'ticket_comments_internal',
+  'ticket_notifications',
   'audit_logs',
 ] as const;
 

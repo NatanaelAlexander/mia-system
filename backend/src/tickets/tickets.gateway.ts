@@ -13,11 +13,11 @@ import {
 import { Server, Socket } from 'socket.io';
 import { loadSecurityConfig } from '../common/security/security.config';
 import type { JwtAccessPayload } from '../auth/types/auth.types';
-import { WsJwtGuard } from './guards/ws-jwt.guard';
-import type { AuthenticatedSocket } from './guards/ws-jwt.guard';
+import { WsJwtGuard } from '../auth/guards/ws-jwt.guard';
+import type { AuthenticatedSocket } from '../auth/guards/ws-jwt.guard';
 import { TicketsService } from './tickets.service';
 import { TicketNoEncontradoException } from './exceptions/tickets.exceptions';
-import { ticketInternalRoom, ticketPublicRoom } from './realtime/ticket-rooms.util';
+import { ticketInternalRoom, ticketPublicRoom, appOnlineRoom, appPresenceWatchersRoom } from './realtime/ticket-rooms.util';
 import { TicketsRealtimeService } from './realtime/tickets-realtime.service';
 import { TicketsRealtimeEvent } from './realtime/tickets-realtime.types';
 import type {
@@ -27,6 +27,8 @@ import type {
   TicketLeavePayload,
   TicketPresencePayload,
   TicketPresenceUser,
+  AppPresencePayload,
+  AppPresenceUser,
 } from './realtime/tickets-realtime.types';
 
 function socketCorsOrigins(): string[] | boolean {
@@ -66,6 +68,14 @@ export class TicketsGateway
   async handleConnection(client: Socket): Promise<void> {
     try {
       await this.wsJwtGuard.authenticateClient(client);
+      const user = client.data.user as JwtAccessPayload | undefined;
+      if (user) {
+        await client.join(appOnlineRoom());
+        if (this.canWatchAppPresence(user)) {
+          await client.join(appPresenceWatchersRoom());
+        }
+        await this.broadcastAppPresence();
+      }
     } catch (error) {
       const message =
         error instanceof WsException
@@ -81,6 +91,7 @@ export class TicketsGateway
     for (const ticketId of ticketIds) {
       await this.broadcastPresence(ticketId);
     }
+    await this.broadcastAppPresence();
   }
 
   @UseGuards(WsJwtGuard)
@@ -241,6 +252,46 @@ export class TicketsGateway
     this.server
       .to(room)
       .emit(TicketsRealtimeEvent.TICKET_PRESENCE, presence);
+  }
+
+  private async broadcastAppPresence(): Promise<void> {
+    const sockets = await this.server.in(appOnlineRoom()).fetchSockets();
+    const usersById = new Map<string, AppPresenceUser>();
+
+    for (const remoteSocket of sockets) {
+      const user = remoteSocket.data?.user as JwtAccessPayload | undefined;
+      if (!user?.sub) {
+        continue;
+      }
+
+      usersById.set(user.sub, {
+        userId: user.sub,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roles: user.roles,
+        surfaces: user.surfaces,
+      });
+    }
+
+    const presence: AppPresencePayload = {
+      users: [...usersById.values()].sort((left, right) =>
+        `${left.firstName} ${left.lastName}`.localeCompare(
+          `${right.firstName} ${right.lastName}`,
+          'es',
+        ),
+      ),
+    };
+
+    this.server
+      .to(appPresenceWatchersRoom())
+      .emit(TicketsRealtimeEvent.APP_PRESENCE, presence);
+  }
+
+  private canWatchAppPresence(user: JwtAccessPayload): boolean {
+    return (
+      user.surfaces.includes('internal') &&
+      (user.roles.includes('admin') || user.roles.includes('super_admin'))
+    );
   }
 
   private trackJoinedTicket(client: Socket, ticketId: string): void {

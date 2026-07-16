@@ -90,6 +90,17 @@ export const SQL_FIND_USER_JOB_TITLES = `
   ORDER BY jt.name ASC
 `;
 
+export const SQL_FIND_JOB_TITLES_BY_USER_IDS = `
+  SELECT
+    ujt.user_id AS "userId",
+    jt.id,
+    jt.name
+  FROM users_job_titles ujt
+  INNER JOIN job_titles jt ON jt.id = ujt.job_title_id
+  WHERE ujt.user_id = ANY($1::uuid[])
+  ORDER BY ujt.user_id, jt.name ASC
+`;
+
 export const SQL_DELETE_USER_JOB_TITLES = `
   DELETE FROM users_job_titles
   WHERE user_id = $1
