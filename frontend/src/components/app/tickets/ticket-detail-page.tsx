@@ -33,6 +33,7 @@ import { ErrorState } from "@/components/app/shared/list-states";
 import {
   hasPermission,
   isInternalUser,
+  canAccessModule,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
@@ -42,8 +43,10 @@ import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectContextHeader } from "../projects/project-context-header";
+import { EntityQuotesList } from "@/components/app/quotes/company-quotes-section";
+import { quotesModule } from "@/components/app/quotes/quotes-module";
 import {
   TicketChatMessage,
   TicketChatTypingIndicator,
@@ -195,6 +198,7 @@ export function TicketDetailPage({
   const canDownload = hasPermission(claims, "assets:read");
   const canPostInternal =
     isInternal && hasPermission(claims, "ticket_comments:create");
+  const canViewQuotes = canAccessModule(claims, quotesModule);
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -209,6 +213,7 @@ export function TicketDetailPage({
   const [ticket, setTicket] = React.useState<TicketDetail | null>(null);
   const [projectName, setProjectName] = React.useState("");
   const [companyName, setCompanyName] = React.useState("");
+  const [companyId, setCompanyId] = React.useState("");
   const [comments, setComments] = React.useState<CommentWithAssets[]>([]);
   const [ticketAssets, setTicketAssets] = React.useState<AssetListItem[]>([]);
   const [message, setMessage] = React.useState("");
@@ -394,6 +399,7 @@ export function TicketDetailPage({
       );
 
       setProjectName(project.name);
+      setCompanyId(project.companyId);
       setCompanyName(
         companies.find((company) => company.id === project.companyId)?.name ??
           "",
@@ -720,6 +726,21 @@ export function TicketDetailPage({
         sectionTitle={ticket?.title ?? "Ticket"}
         sectionDescription="Conversación y archivos del ticket."
       />
+
+      {canViewQuotes && companyId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cotizaciones del ticket</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EntityQuotesList
+              companyId={companyId}
+              projectId={projectId}
+              ticketId={ticketId}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader className="border-b">

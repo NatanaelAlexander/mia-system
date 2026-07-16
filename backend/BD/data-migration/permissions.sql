@@ -40,5 +40,10 @@ INSERT INTO permissions (name, module) VALUES
   ('ticket_comments:create', 'ticket_comments'),
   ('ticket_comments:read_internal', 'ticket_comments'),
   ('audit_logs:read', 'audit_logs'),
-  ('system:manage', 'system')
+  ('system:manage', 'system'),
+  ('quotes:read', 'quotes'),
+  ('quotes:create', 'quotes'),
+  ('quotes:update', 'quotes'),
+  ('quotes:delete', 'quotes'),
+  ('quotes:send', 'quotes')
 ON CONFLICT (name) DO NOTHING;

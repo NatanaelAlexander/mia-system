@@ -8,15 +8,19 @@ export type TicketNotificationTypeName =
 
 export interface TicketNotification {
   id: string;
+  kind: 'ticket' | 'quote';
   userId: string;
-  ticketId: string;
-  projectId: string;
-  type: TicketNotificationTypeName;
+  ticketId: string | null;
+  projectId: string | null;
+  quoteId: string | null;
+  companyId: string | null;
+  shareToken: string | null;
+  type: string;
   commentId: string | null;
   actorUserId: string;
   actorFirstName: string;
   actorLastName: string;
-  ticketTitle: string;
+  ticketTitle: string | null;
   message: string;
   readAt: Date | null;
   createdAt: Date;

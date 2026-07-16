@@ -15,7 +15,7 @@ WHERE r.name = 'super_admin'
   AND p.name NOT LIKE 'audit_logs:%'
 ON CONFLICT DO NOTHING;
 
--- admin → operación general sin system, roles, permissions ni CRUD de usuarios (solo read)
+-- admin → operación general sin system, roles, permissions, cotizaciones ni CRUD de usuarios (solo read)
 INSERT INTO roles_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
@@ -25,6 +25,7 @@ WHERE r.name = 'admin'
   AND p.name != 'system:manage'
   AND p.name NOT LIKE 'roles:%'
   AND p.name NOT LIKE 'permissions:%'
+  AND p.name NOT LIKE 'quotes:%'
   AND (
     p.name NOT LIKE 'users:%'
     OR p.name = 'users:read'

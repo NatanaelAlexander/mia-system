@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, MessageSquare, Ticket } from "lucide-react";
+import { Bell, FileText, MessageSquare, Ticket } from "lucide-react";
 import { useNotifications } from "@/providers/notifications-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { TicketNotification } from "@/components/app/api/notifications";
+import type { AppNotification } from "@/components/app/api/notifications";
+import { publicQuoteHref } from "@/components/app/quotes/quotes-module";
 
 function formatRelativeTime(value: string) {
   const date = new Date(value);
@@ -35,12 +36,40 @@ function formatRelativeTime(value: string) {
   return `Hace ${diffDays} d`;
 }
 
-function NotificationIcon({ type }: { type: TicketNotification["type"] }) {
-  if (type === "ticket_created") {
+function NotificationIcon({ notification }: { notification: AppNotification }) {
+  if (notification.kind === "quote" || notification.type === "quote_sent") {
+    return <FileText className="size-4 shrink-0 text-primary" />;
+  }
+
+  if (notification.type === "ticket_created") {
     return <Ticket className="size-4 shrink-0 text-primary" />;
   }
 
   return <MessageSquare className="size-4 shrink-0 text-primary" />;
+}
+
+function notificationHref(notification: AppNotification): string {
+  if (notification.kind === "quote" && notification.shareToken) {
+    return publicQuoteHref(notification.shareToken);
+  }
+
+  if (
+    notification.kind === "quote" &&
+    notification.companyId &&
+    notification.quoteId
+  ) {
+    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+  }
+
+  if (notification.projectId && notification.ticketId) {
+    return `/app/projects/${notification.projectId}/tickets/${notification.ticketId}`;
+  }
+
+  if (notification.companyId) {
+    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+  }
+
+  return "/app";
 }
 
 interface NotificationsMenuProps {
@@ -130,9 +159,7 @@ export function NotificationsMenu({
                   !notification.readAt && "bg-primary/5",
                 )}
                 render={
-                  <Link
-                    href={`/app/projects/${notification.projectId}/tickets/${notification.ticketId}`}
-                  />
+                  <Link href={notificationHref(notification)} />
                 }
                 onClick={() => {
                   if (!notification.readAt) {
@@ -140,7 +167,7 @@ export function NotificationsMenu({
                   }
                 }}
               >
-                <NotificationIcon type={notification.type} />
+                <NotificationIcon notification={notification} />
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <p className="line-clamp-2 text-sm leading-snug">
                     {notification.message}

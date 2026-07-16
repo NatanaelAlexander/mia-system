@@ -10,10 +10,16 @@ VALUES (
 )
 ON CONFLICT (tax_id) DO NOTHING;
 
--- Corrige RUT demo inválido (cualquier variante sin puntos)
-UPDATE companies
+-- Solo corrige RUT demo legacy 76.123.456-7 si aún no existe el canónico
+UPDATE companies c
 SET tax_id = '12.345.678-5'
-WHERE regexp_replace(tax_id, '[.\-]', '', 'g') = '761234567';
+WHERE regexp_replace(c.tax_id, '[.\-]', '', 'g') = '761234567'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM companies other
+    WHERE other.tax_id = '12.345.678-5'
+      AND other.id <> c.id
+  );
 
 INSERT INTO users_companies (user_id, company_id)
 SELECT u.id, c.id

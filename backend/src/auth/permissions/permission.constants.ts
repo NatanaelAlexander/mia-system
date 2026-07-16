@@ -40,6 +40,11 @@ export const Permission = {
   TicketCommentsReadInternal: 'ticket_comments:read_internal',
   AuditLogsRead: 'audit_logs:read',
   SystemManage: 'system:manage',
+  QuotesRead: 'quotes:read',
+  QuotesCreate: 'quotes:create',
+  QuotesUpdate: 'quotes:update',
+  QuotesDelete: 'quotes:delete',
+  QuotesSend: 'quotes:send',
 } as const;
 
 export type PermissionName = (typeof Permission)[keyof typeof Permission];

@@ -10,4 +10,5 @@ export type PermissionModule =
   | 'ticket_comments'
   | 'job_titles'
   | 'audit_logs'
-  | 'system';
+  | 'system'
+  | 'quotes';

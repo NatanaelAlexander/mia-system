@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import {
   listAuditLogs,
   type AuditLogItem,
@@ -14,6 +14,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -65,6 +71,34 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function formatJson(value: Record<string, unknown> | null): string {
+  if (!value || Object.keys(value).length === 0) {
+    return "—";
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <div className="text-sm">{children}</div>
+    </div>
+  );
+}
+
 type LoadState =
   | { status: "loading" }
   | { status: "success"; items: AuditLogItem[]; total: number }
@@ -83,6 +117,9 @@ export function DashboardActivity() {
 
   const [state, setState] = React.useState<LoadState>({ status: "loading" });
   const [users, setUsers] = React.useState<UserListItem[]>([]);
+  const [selectedLog, setSelectedLog] = React.useState<AuditLogItem | null>(
+    null,
+  );
 
   const userNameById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -145,6 +182,14 @@ export function DashboardActivity() {
     };
   };
 
+  const resolveUserLabel = React.useCallback(
+    (item: AuditLogItem) =>
+      item.userId
+        ? (userNameById.get(item.userId) ?? item.userId)
+        : "Sistema",
+    [userNameById],
+  );
+
   const columns = React.useMemo<DataColumn<AuditLogItem>[]>(
     () => [
       {
@@ -175,13 +220,32 @@ export function DashboardActivity() {
         key: "user",
         label: "Usuario",
         width: "wide",
-        render: (item) =>
-          item.userId
-            ? (userNameById.get(item.userId) ?? item.userId)
-            : "Sistema",
+        render: (item) => resolveUserLabel(item),
+      },
+      {
+        key: "actions",
+        label: "",
+        width: "auto",
+        headerClassName: "sr-only",
+        render: (item) => (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground"
+            aria-label="Ver detalle del registro"
+            title="Ver más"
+            onClick={(event) => {
+              event.stopPropagation();
+              setSelectedLog(item);
+            }}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        ),
       },
     ],
-    [userNameById],
+    [resolveUserLabel],
   );
 
   const total = state.status === "success" ? state.total : 0;
@@ -282,7 +346,11 @@ export function DashboardActivity() {
         />
       ) : (
         <>
-          <DataTable columns={columns} data={state.items} />
+          <DataTable
+            columns={columns}
+            data={state.items}
+            getRowKey={(item) => item.id}
+          />
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -346,6 +414,60 @@ export function DashboardActivity() {
           </div>
         </>
       )}
+
+      <Dialog
+        open={selectedLog !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedLog(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalle del registro</DialogTitle>
+          </DialogHeader>
+
+          {selectedLog ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DetailField label="Fecha">
+                  {formatDateTime(selectedLog.createdAt)}
+                </DetailField>
+                <DetailField label="Acción">
+                  <Badge variant="secondary">
+                    {ACTION_LABELS.get(selectedLog.action) ?? selectedLog.action}
+                  </Badge>
+                </DetailField>
+                <DetailField label="Tabla">{selectedLog.tableName}</DetailField>
+                <DetailField label="Usuario">
+                  {resolveUserLabel(selectedLog)}
+                </DetailField>
+                <DetailField label="ID del registro">
+                  <span className="break-all font-mono text-xs">
+                    {selectedLog.id}
+                  </span>
+                </DetailField>
+                <DetailField label="ID del recurso">
+                  <span className="break-all font-mono text-xs">
+                    {selectedLog.recordId ?? "—"}
+                  </span>
+                </DetailField>
+              </div>
+
+              <DetailField label="Valores anteriores">
+                <pre className="max-h-56 overflow-auto rounded-lg border border-border/60 bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap break-all">
+                  {formatJson(selectedLog.oldValues)}
+                </pre>
+              </DetailField>
+
+              <DetailField label="Valores nuevos">
+                <pre className="max-h-56 overflow-auto rounded-lg border border-border/60 bg-muted/30 p-3 font-mono text-xs whitespace-pre-wrap break-all">
+                  {formatJson(selectedLog.newValues)}
+                </pre>
+              </DetailField>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

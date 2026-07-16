@@ -12,6 +12,7 @@ const DATA_MIGRATIONS = [
   'tickets',
   'users',
   'companies',
+  'quotes',
 ] as const;
 
 const SEPARATOR = '----------------------------------------';

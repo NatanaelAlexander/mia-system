@@ -10,6 +10,7 @@ import {
   SQL_INSERT_TICKET_NOTIFICATION,
   SQL_MARK_ALL_NOTIFICATIONS_READ,
   SQL_MARK_NOTIFICATION_READ,
+  SQL_MARK_QUOTE_NOTIFICATION_READ,
   SQL_MARK_TICKET_NOTIFICATIONS_READ,
 } from './queries/notifications.queries';
 import { NotificationsRealtimeService } from './realtime/notifications-realtime.service';
@@ -54,7 +55,16 @@ export class NotificationsService {
   }
 
   async markAsRead(userId: string, notificationId: string): Promise<void> {
-    await this.db.query(SQL_MARK_NOTIFICATION_READ, [notificationId, userId]);
+    const ticketResult = await this.db.query(SQL_MARK_NOTIFICATION_READ, [
+      notificationId,
+      userId,
+    ]);
+    if (!ticketResult.rowCount) {
+      await this.db.query(SQL_MARK_QUOTE_NOTIFICATION_READ, [
+        notificationId,
+        userId,
+      ]);
+    }
     await this.emitUnreadCount(userId);
   }
 
@@ -159,8 +169,12 @@ export class NotificationsService {
 
       this.realtimeService.emitNotificationCreated(userId, {
         id: created.id,
+        kind: created.kind,
         ticketId: created.ticketId,
         projectId: created.projectId,
+        quoteId: created.quoteId,
+        companyId: created.companyId,
+        shareToken: created.shareToken,
         type: created.type,
         commentId: created.commentId,
         actorUserId: created.actorUserId,
