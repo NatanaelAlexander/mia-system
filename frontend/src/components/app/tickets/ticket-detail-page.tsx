@@ -616,7 +616,7 @@ export function TicketDetailPage({
     }
 
     try {
-      const { url } = await getAssetDownloadUrl(asset.id);
+      const { url } = await getAssetDownloadUrl(surface, asset.id);
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = asset.fileName;

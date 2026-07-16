@@ -52,6 +52,7 @@ export const SQL_FIND_PROJECTS_FOR_PORTAL_USER = `
   INNER JOIN users_companies uc ON uc.company_id = p.company_id
   INNER JOIN companies c ON c.id = p.company_id
   WHERE uc.user_id = $1
+    AND c.status = 'active'
     AND p.status = $2
     AND ($3::uuid IS NULL OR p.company_id = $3)
     AND (

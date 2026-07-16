@@ -80,8 +80,10 @@ export const SQL_TICKET_TIMELINE_FOR_PORTAL_USER = `
     FROM tickets t
     INNER JOIN ticket_statuses ts ON ts.id = t.status_id
     INNER JOIN projects p ON p.id = t.project_id
-    INNER JOIN users_companies uc ON uc.company_id = p.company_id
+    INNER JOIN companies c ON c.id = p.company_id
+    INNER JOIN users_companies uc ON uc.company_id = c.id
     WHERE uc.user_id = $4::uuid
+      AND c.status = 'active'
       AND t.created_at >= $2::timestamptz
       AND t.created_at <= NOW()
       AND ts.name <> 'Borrador'

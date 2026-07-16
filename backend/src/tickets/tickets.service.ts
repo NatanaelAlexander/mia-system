@@ -138,13 +138,9 @@ export class TicketsService {
     }
 
     if (user.surfaces.includes('portal')) {
-      const hasAccess = await this.portalAccess.userHasTicket(
-        user.sub,
-        ticketId,
-      );
-      if (!hasAccess) {
+      await this.portalAccess.assertTicket(user.sub, ticketId, () => {
         throw new TicketNoEncontradoException();
-      }
+      });
 
       const ticket = await this.findTicketRowById(ticketId);
       if (ticket.statusName === TicketStatusName.DRAFT) {
@@ -287,13 +283,9 @@ export class TicketsService {
   ): Promise<TicketKanbanItem[]> {
     const projectId = filters.projectId;
     if (projectId) {
-      const hasAccess = await this.portalAccess.userHasProject(
-        userId,
-        projectId,
-      );
-      if (!hasAccess) {
+      await this.portalAccess.assertProject(userId, projectId, () => {
         throw new TicketNoEncontradoException();
-      }
+      });
     }
 
     const { rows } = await this.db.query<TicketKanbanItem>(
@@ -331,10 +323,9 @@ export class TicketsService {
   }
 
   async findByIdForPortal(userId: string, id: string): Promise<Ticket> {
-    const hasAccess = await this.portalAccess.userHasTicket(userId, id);
-    if (!hasAccess) {
+    await this.portalAccess.assertTicket(userId, id, () => {
       throw new TicketNoEncontradoException();
-    }
+    });
 
     const ticket = await this.findTicketRowById(id);
 
@@ -353,13 +344,9 @@ export class TicketsService {
     userId: string,
     dto: PortalCreateTicketDto,
   ): Promise<Ticket> {
-    const hasAccess = await this.portalAccess.userHasProject(
-      userId,
-      dto.projectId,
-    );
-    if (!hasAccess) {
+    await this.portalAccess.assertProject(userId, dto.projectId, () => {
       throw new ProyectoNoEncontradoException();
-    }
+    });
 
     return this.create(userId, dto);
   }
@@ -670,10 +657,9 @@ export class TicketsService {
     userId: string,
     ticketId: string,
   ): Promise<TicketComment[]> {
-    const hasAccess = await this.portalAccess.userHasTicket(userId, ticketId);
-    if (!hasAccess) {
+    await this.portalAccess.assertTicket(userId, ticketId, () => {
       throw new TicketNoEncontradoException();
-    }
+    });
 
     const ticket = await this.findTicketRowById(ticketId);
 
@@ -706,13 +692,9 @@ export class TicketsService {
     userId: string,
     dto: PortalCreateTicketCommentDto,
   ): Promise<TicketComment> {
-    const hasAccess = await this.portalAccess.userHasTicket(
-      userId,
-      dto.ticketId,
-    );
-    if (!hasAccess) {
+    await this.portalAccess.assertTicket(userId, dto.ticketId, () => {
       throw new TicketNoEncontradoException();
-    }
+    });
 
     const ticket = await this.findTicketRowById(dto.ticketId);
     if (ticket.statusName === TicketStatusName.DRAFT) {
@@ -807,10 +789,9 @@ export class TicketsService {
     userId: string,
     ticketId: string,
   ): Promise<void> {
-    const hasAccess = await this.portalAccess.userHasTicket(userId, ticketId);
-    if (!hasAccess) {
+    await this.portalAccess.assertTicket(userId, ticketId, () => {
       throw new TicketNoEncontradoException();
-    }
+    });
 
     const ticket = await this.findTicketRowById(ticketId);
     if (ticket.statusName === TicketStatusName.DRAFT) {
@@ -1129,13 +1110,9 @@ export class TicketsService {
       throw new ComentarioTicketNoEncontradoException();
     }
 
-    const hasAccess = await this.portalAccess.userHasTicket(
-      userId,
-      comment.ticketId,
-    );
-    if (!hasAccess) {
+    await this.portalAccess.assertTicket(userId, comment.ticketId, () => {
       throw new TicketNoEncontradoException();
-    }
+    });
 
     const ticket = await this.findTicketRowById(comment.ticketId);
     if (ticket.statusName === TicketStatusName.DRAFT) {

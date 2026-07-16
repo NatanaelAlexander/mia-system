@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../common/database/database.service';
+import { PortalAccessService } from '../common/portal/portal-access.service';
 import { R2StorageService } from '../common/storage/r2-storage.service';
 import {
   ArchivoDemasiadoGrandeException,
@@ -35,6 +36,7 @@ export class AssetsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly r2Storage: R2StorageService,
+    private readonly portalAccess: PortalAccessService,
   ) {}
 
   async findAll(): Promise<Asset[]> {
@@ -125,6 +127,17 @@ export class AssetsService {
     );
 
     return { url, expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
+  }
+
+  async getDownloadUrlForPortal(
+    userId: string,
+    assetId: string,
+  ): Promise<AssetDownloadUrl> {
+    await this.portalAccess.assertAsset(userId, assetId, () => {
+      throw new AssetNoEncontradoException();
+    });
+
+    return this.getDownloadUrl(assetId);
   }
 
   async delete(id: string): Promise<void> {

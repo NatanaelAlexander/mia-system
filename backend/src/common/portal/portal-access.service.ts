@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import {
+  SQL_USER_HAS_ASSET,
   SQL_USER_HAS_COMPANY,
   SQL_USER_HAS_PROJECT,
   SQL_USER_HAS_TICKET,
@@ -32,5 +33,53 @@ export class PortalAccessService {
       ticketId,
     ]);
     return Boolean(rowCount && rowCount > 0);
+  }
+
+  async userHasAsset(userId: string, assetId: string): Promise<boolean> {
+    const { rowCount } = await this.db.query(SQL_USER_HAS_ASSET, [
+      userId,
+      assetId,
+    ]);
+    return Boolean(rowCount && rowCount > 0);
+  }
+
+  async assertCompany(
+    userId: string,
+    companyId: string,
+    onDenied: () => never,
+  ): Promise<void> {
+    if (!(await this.userHasCompany(userId, companyId))) {
+      onDenied();
+    }
+  }
+
+  async assertProject(
+    userId: string,
+    projectId: string,
+    onDenied: () => never,
+  ): Promise<void> {
+    if (!(await this.userHasProject(userId, projectId))) {
+      onDenied();
+    }
+  }
+
+  async assertTicket(
+    userId: string,
+    ticketId: string,
+    onDenied: () => never,
+  ): Promise<void> {
+    if (!(await this.userHasTicket(userId, ticketId))) {
+      onDenied();
+    }
+  }
+
+  async assertAsset(
+    userId: string,
+    assetId: string,
+    onDenied: () => never,
+  ): Promise<void> {
+    if (!(await this.userHasAsset(userId, assetId))) {
+      onDenied();
+    }
   }
 }

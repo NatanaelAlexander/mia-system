@@ -87,9 +87,11 @@ export const SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER_KANBAN = `
     ${KANBAN_EXTRA_COLUMNS}
   ${TICKET_FROM_JOIN}
   INNER JOIN projects p ON p.id = t.project_id
-  INNER JOIN users_companies uc ON uc.company_id = p.company_id
+  INNER JOIN companies c ON c.id = p.company_id
+  INNER JOIN users_companies uc ON uc.company_id = c.id
   ${KANBAN_LAST_COMMENT_JOIN_PORTAL}
   WHERE uc.user_id = $1
+    AND c.status = 'active'
     AND ts.name <> $2
     AND ($3::uuid IS NULL OR t.project_id = $3)
     ${KANBAN_FILTER_CLAUSE}
