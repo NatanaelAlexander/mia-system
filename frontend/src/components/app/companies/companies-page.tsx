@@ -371,56 +371,114 @@ export function CompaniesPage() {
               }
             />
           ) : (
-            <div
-              className="overflow-hidden rounded-xl border border-border/70"
-              onClick={(event) => {
-                const row = (event.target as HTMLElement).closest("[data-company-id]");
-                const companyId = row?.getAttribute("data-company-id");
-                if (companyId && event.target instanceof HTMLElement && !event.target.closest("a")) {
-                  router.push(`/app/companies/${companyId}`);
-                }
-              }}
-            >
-              <div
-                className="grid gap-3 border-b bg-muted/40 p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
-              >
-                {columns.map((column) => (
-                  <div key={column.key} className="inline-flex items-center gap-1.5">
-                    {column.key === "name" ? (
-                      <Building2 className="size-3.5" />
-                    ) : null}
-                    {column.key === "taxId" ? (
-                      <IdCard className="size-3.5" />
-                    ) : null}
-                    {column.key === "status" ? (
-                      <Filter className="size-3.5" />
-                    ) : null}
-                    {column.key === "email" ? <Mail className="size-3.5" /> : null}
-                    {column.key === "phone" ? (
-                      <Phone className="size-3.5" />
-                    ) : null}
-                    {column.label}
-                  </div>
+            <>
+              <div className="space-y-3 md:hidden">
+                {visibleData.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="w-full rounded-xl border border-border/70 p-3 text-left transition-colors hover:bg-muted/30"
+                    onClick={() => router.push(`/app/companies/${item.id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate font-medium">{item.name}</p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {item.taxId}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          item.status === "active" ? "secondary" : "outline"
+                        }
+                      >
+                        {formatCompanyStatus(item.status)}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+                      <p className="flex items-center gap-2 truncate">
+                        <Mail className="size-3.5 shrink-0" />
+                        <span className="truncate">{item.email ?? "—"}</span>
+                      </p>
+                      <p className="flex items-center gap-2 truncate">
+                        <Phone className="size-3.5 shrink-0" />
+                        <span className="truncate">
+                          {item.phoneNumber ?? "—"}
+                        </span>
+                      </p>
+                    </div>
+                  </button>
                 ))}
               </div>
-              <div className="divide-y divide-border/70">
-                {visibleData.map((item) => (
+
+              <div
+                className="hidden overflow-x-auto rounded-xl border border-border/70 md:block"
+                onClick={(event) => {
+                  const row = (event.target as HTMLElement).closest(
+                    "[data-company-id]",
+                  );
+                  const companyId = row?.getAttribute("data-company-id");
+                  if (
+                    companyId &&
+                    event.target instanceof HTMLElement &&
+                    !event.target.closest("a")
+                  ) {
+                    router.push(`/app/companies/${companyId}`);
+                  }
+                }}
+              >
+                <div style={{ minWidth: 720 }}>
                   <div
-                    key={item.id}
-                    data-company-id={item.id}
-                    className="grid cursor-pointer gap-3 p-3 text-sm hover:bg-muted/30"
-                    style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+                    className="grid gap-3 border-b bg-muted/40 p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                    style={{
+                      gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))`,
+                    }}
                   >
                     {columns.map((column) => (
-                      <div key={column.key} className="min-w-0 truncate">
-                        {column.render(item)}
+                      <div
+                        key={column.key}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        {column.key === "name" ? (
+                          <Building2 className="size-3.5" />
+                        ) : null}
+                        {column.key === "taxId" ? (
+                          <IdCard className="size-3.5" />
+                        ) : null}
+                        {column.key === "status" ? (
+                          <Filter className="size-3.5" />
+                        ) : null}
+                        {column.key === "email" ? (
+                          <Mail className="size-3.5" />
+                        ) : null}
+                        {column.key === "phone" ? (
+                          <Phone className="size-3.5" />
+                        ) : null}
+                        {column.label}
                       </div>
                     ))}
                   </div>
-                ))}
+                  <div className="divide-y divide-border/70">
+                    {visibleData.map((item) => (
+                      <div
+                        key={item.id}
+                        data-company-id={item.id}
+                        className="grid cursor-pointer gap-3 p-3 text-sm hover:bg-muted/30"
+                        style={{
+                          gridTemplateColumns: `repeat(${columns.length}, minmax(120px, 1fr))`,
+                        }}
+                      >
+                        {columns.map((column) => (
+                          <div key={column.key} className="min-w-0 truncate">
+                            {column.render(item)}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>

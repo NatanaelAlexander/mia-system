@@ -225,7 +225,7 @@ export function ProjectsPage() {
                   : "Proyectos activos de tus empresas."}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {claims?.surfaces.map((item) => (
                 <Badge key={item} variant="secondary">
                   {item}

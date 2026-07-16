@@ -88,10 +88,9 @@ export class ProjectsService {
     const companySearch = filters.companySearch?.trim() || null;
 
     if (companyId) {
-      const hasAccess = await this.portalAccess.userHasCompany(userId, companyId);
-      if (!hasAccess) {
+      await this.portalAccess.assertCompany(userId, companyId, () => {
         throw new ProyectoNoEncontradoException();
-      }
+      });
     }
 
     const { rows } = await this.db.query<Project>(
@@ -110,10 +109,9 @@ export class ProjectsService {
   }
 
   async findByIdForPortal(userId: string, id: string): Promise<Project> {
-    const hasAccess = await this.portalAccess.userHasProject(userId, id);
-    if (!hasAccess) {
+    await this.portalAccess.assertProject(userId, id, () => {
       throw new ProyectoNoEncontradoException();
-    }
+    });
 
     const project = await this.findProjectRowById(id);
 

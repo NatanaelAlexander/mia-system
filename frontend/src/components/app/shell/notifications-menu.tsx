@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, MessageSquare, Ticket } from "lucide-react";
+import { Bell, FileText, MessageSquare, Ticket } from "lucide-react";
 import { useNotifications } from "@/providers/notifications-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { TicketNotification } from "@/components/app/api/notifications";
+import type { AppNotification } from "@/components/app/api/notifications";
+import { publicQuoteHref } from "@/components/app/quotes/quotes-module";
 
 function formatRelativeTime(value: string) {
   const date = new Date(value);
@@ -35,15 +36,50 @@ function formatRelativeTime(value: string) {
   return `Hace ${diffDays} d`;
 }
 
-function NotificationIcon({ type }: { type: TicketNotification["type"] }) {
-  if (type === "ticket_created") {
+function NotificationIcon({ notification }: { notification: AppNotification }) {
+  if (notification.kind === "quote" || notification.type === "quote_sent") {
+    return <FileText className="size-4 shrink-0 text-primary" />;
+  }
+
+  if (notification.type === "ticket_created") {
     return <Ticket className="size-4 shrink-0 text-primary" />;
   }
 
   return <MessageSquare className="size-4 shrink-0 text-primary" />;
 }
 
-export function NotificationsMenu() {
+function notificationHref(notification: AppNotification): string {
+  if (notification.kind === "quote" && notification.shareToken) {
+    return publicQuoteHref(notification.shareToken);
+  }
+
+  if (
+    notification.kind === "quote" &&
+    notification.companyId &&
+    notification.quoteId
+  ) {
+    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+  }
+
+  if (notification.projectId && notification.ticketId) {
+    return `/app/projects/${notification.projectId}/tickets/${notification.ticketId}`;
+  }
+
+  if (notification.companyId) {
+    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+  }
+
+  return "/app";
+}
+
+interface NotificationsMenuProps {
+  /** Compact icon button for the top header (mobile). */
+  variant?: "sidebar" | "header";
+}
+
+export function NotificationsMenu({
+  variant = "sidebar",
+}: NotificationsMenuProps) {
   const {
     notifications,
     unreadCount,
@@ -52,30 +88,43 @@ export function NotificationsMenu() {
     markAllAsRead,
   } = useNotifications();
 
+  const isHeader = variant === "header";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "relative flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
+          isHeader
+            ? "relative inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-hidden transition-colors hover:bg-muted hover:text-foreground"
+            : "relative flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
         )}
-        render={<button type="button" />}
+        render={<button type="button" aria-label="Notificaciones" />}
       >
-        <Bell className="size-4 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">
-          Notificaciones
-        </span>
+        <Bell className="size-4 shrink-0" />
+        {!isHeader ? (
+          <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">
+            Notificaciones
+          </span>
+        ) : null}
         {unreadCount > 0 ? (
-          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-top-1 group-data-[collapsible=icon]:-right-1">
+          <span
+            className={cn(
+              "inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground",
+              isHeader
+                ? "absolute -top-1 -right-1"
+                : "group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-top-1 group-data-[collapsible=icon]:-right-1",
+            )}
+          >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        align="start"
-        side="top"
+        align={isHeader ? "end" : "start"}
+        side={isHeader ? "bottom" : "top"}
         sideOffset={8}
-        className="w-80 p-0"
+        className="w-[min(20rem,calc(100vw-1.5rem))] p-0"
       >
         <div className="flex items-center justify-between border-b px-3 py-2.5">
           <p className="text-sm font-medium">Notificaciones</p>
@@ -110,9 +159,7 @@ export function NotificationsMenu() {
                   !notification.readAt && "bg-primary/5",
                 )}
                 render={
-                  <Link
-                    href={`/app/projects/${notification.projectId}/tickets/${notification.ticketId}`}
-                  />
+                  <Link href={notificationHref(notification)} />
                 }
                 onClick={() => {
                   if (!notification.readAt) {
@@ -120,7 +167,7 @@ export function NotificationsMenu() {
                   }
                 }}
               >
-                <NotificationIcon type={notification.type} />
+                <NotificationIcon notification={notification} />
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <p className="line-clamp-2 text-sm leading-snug">
                     {notification.message}

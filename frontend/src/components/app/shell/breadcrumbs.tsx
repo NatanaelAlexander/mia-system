@@ -33,7 +33,6 @@ function labelForSegment(segment: string): string {
     return SEGMENT_LABELS[segment];
   }
 
-  // Segmentos dinámicos (ids/uuids) → etiqueta genérica
   if (/^[0-9a-f]{8}-[0-9a-f]{4}/i.test(segment) || /^\d+$/.test(segment)) {
     return "Detalle";
   }
@@ -65,9 +64,39 @@ export function Breadcrumbs() {
     return items;
   }, [pathname]);
 
+  const mobileCrumbs = React.useMemo(() => {
+    if (crumbs.length <= 2) {
+      return crumbs;
+    }
+
+    return [crumbs[0], crumbs[crumbs.length - 1]];
+  }, [crumbs]);
+
   return (
-    <nav aria-label="Ruta de navegación" className="min-w-0">
-      <ol className="flex items-center gap-1 text-sm">
+    <nav aria-label="Ruta de navegación" className="min-w-0 flex-1 overflow-hidden">
+      <ol className="flex items-center gap-1 text-sm md:hidden">
+        {mobileCrumbs.map((crumb, index) => (
+          <li key={`m-${crumb.href}`} className="flex min-w-0 items-center gap-1">
+            {index > 0 ? (
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" />
+            ) : null}
+            {crumb.isLast || index === mobileCrumbs.length - 1 ? (
+              <span className="truncate font-medium text-foreground">
+                {crumb.label}
+              </span>
+            ) : (
+              <Link
+                href={crumb.href}
+                className="truncate text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {crumb.label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      <ol className="hidden items-center gap-1 text-sm md:flex">
         {crumbs.map((crumb) => (
           <li key={crumb.href} className="flex min-w-0 items-center gap-1">
             {crumb.isLast ? (

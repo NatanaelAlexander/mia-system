@@ -106,9 +106,12 @@ export function listTickets(
   );
 }
 
-export function getTicketTimeline(range: TicketTimelineRange) {
+export function getTicketTimeline(
+  surface: ResourceSurface,
+  range: TicketTimelineRange,
+) {
   return apiFetchDetalle<TicketTimelinePoint[]>(
-    "/internal/tickets/estadisticas/timeline",
+    `${ticketsBase(surface)}/estadisticas/timeline`,
     { range },
     true,
   );

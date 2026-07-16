@@ -51,18 +51,29 @@ function AuthorNameWithCargos({
   }
 
   return (
-    <span className="group/author relative inline-flex">
-      <span className="text-sm font-bold text-primary transition-opacity group-hover/author:opacity-90">
+    <span className="group/author relative inline-flex flex-col gap-1">
+      <span className="text-sm font-bold text-primary transition-opacity group-hover/author:opacity-90 group-focus-within/author:opacity-90">
         {label}
+      </span>
+      <span className="flex max-w-[15rem] flex-wrap gap-1 sm:hidden">
+        {jobTitles.map((title) => (
+          <span
+            key={title}
+            className="inline-flex rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary"
+          >
+            {title}
+          </span>
+        ))}
       </span>
       <span
         role="tooltip"
         className={cn(
-          "pointer-events-none absolute bottom-[calc(100%+6px)] z-50",
-          "flex max-w-[15rem] flex-wrap gap-1 rounded-lg p-1",
+          "pointer-events-none absolute bottom-[calc(100%+6px)] z-50 hidden",
+          "max-w-[15rem] flex-wrap gap-1 rounded-lg p-1 sm:flex",
           "border border-primary/15 bg-popover/90 shadow-md backdrop-blur-md",
           "opacity-0 translate-y-0.5 transition-all duration-150",
           "group-hover/author:opacity-100 group-hover/author:translate-y-0",
+          "group-focus-within/author:opacity-100 group-focus-within/author:translate-y-0",
           alignEnd ? "right-0" : "left-0",
         )}
       >
@@ -228,20 +239,22 @@ export function TicketChatTypingIndicator({ names }: { names: string[] }) {
   const label = names.join(", ");
 
   return (
-    <div className="flex w-full items-end gap-2">
+    <div className="flex w-full min-w-0 items-end gap-2">
       <Avatar size="sm" className="shrink-0">
         <AvatarFallback className="bg-muted-foreground/15 text-[10px] font-semibold text-muted-foreground">
           {getInitials(label)}
         </AvatarFallback>
       </Avatar>
-      <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3">
+      <div className="shrink-0 rounded-2xl rounded-bl-md bg-muted px-4 py-3">
         <div className="flex items-center gap-1">
           <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:0ms]" />
           <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:150ms]" />
           <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 [animation-delay:300ms]" />
         </div>
       </div>
-      <span className="pb-1 text-xs text-muted-foreground">{label} está escribiendo...</span>
+      <span className="min-w-0 flex-1 truncate pb-1 text-xs text-muted-foreground">
+        {label} está escribiendo...
+      </span>
     </div>
   );
 }

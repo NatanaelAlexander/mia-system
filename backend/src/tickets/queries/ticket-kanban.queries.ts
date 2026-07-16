@@ -54,6 +54,12 @@ const KANBAN_FILTER_CLAUSE = `
   )
 `;
 
+/**
+ * Params:
+ * $1 includeDrafts, $2 draftStatusName, $3 projectId,
+ * $4 lifecycle, $5 workingOnly,
+ * $6 isSuperAdmin, $7 actorUserId
+ */
 export const SQL_FIND_ALL_TICKETS_KANBAN = `
   SELECT
     ${TICKET_COLUMNS},
@@ -63,6 +69,15 @@ export const SQL_FIND_ALL_TICKETS_KANBAN = `
   WHERE ($1::boolean OR ts.name <> $2)
     AND ($3::uuid IS NULL OR t.project_id = $3)
     ${KANBAN_FILTER_CLAUSE}
+    AND (
+      COALESCE($6::boolean, FALSE)
+      OR EXISTS (
+        SELECT 1
+        FROM ticket_assignees ta
+        WHERE ta.ticket_id = t.id
+          AND ta.user_id = $7::uuid
+      )
+    )
   ORDER BY t.updated_at DESC
 `;
 
@@ -72,9 +87,11 @@ export const SQL_FIND_ALL_TICKETS_FOR_PORTAL_USER_KANBAN = `
     ${KANBAN_EXTRA_COLUMNS}
   ${TICKET_FROM_JOIN}
   INNER JOIN projects p ON p.id = t.project_id
-  INNER JOIN users_companies uc ON uc.company_id = p.company_id
+  INNER JOIN companies c ON c.id = p.company_id
+  INNER JOIN users_companies uc ON uc.company_id = c.id
   ${KANBAN_LAST_COMMENT_JOIN_PORTAL}
   WHERE uc.user_id = $1
+    AND c.status = 'active'
     AND ts.name <> $2
     AND ($3::uuid IS NULL OR t.project_id = $3)
     ${KANBAN_FILTER_CLAUSE}

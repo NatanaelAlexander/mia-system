@@ -1,10 +1,13 @@
 export {
   HELP_ARTICLES,
   HELP_CATEGORIES,
+  articleMatchesAudience,
   getHelpArticle,
   getHelpArticlesByCategory,
+  getHelpCategoriesForAudience,
   getHelpCategory,
   type HelpArticle,
+  type HelpAudience,
   type HelpCategory,
   type HelpCategoryId,
   type HelpCommandBlock,

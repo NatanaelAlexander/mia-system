@@ -178,71 +178,66 @@ export function DashboardHome({
         <DashboardConnectedUsers className="xl:col-span-1" />
       </section>
 
-      <section
-        className="animate-in fade-in slide-in-from-bottom-4 duration-500"
-        style={{ animationDelay: "200ms" }}
-      >
-        <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
-          <div className="p-5 md:p-6">
-            <Tabs defaultValue="activity">
-              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1 text-center sm:text-left">
-                  <p className="text-base font-medium">Última actividad</p>
-                  <p className="text-sm text-muted-foreground">
-                    Registros de auditoría con filtros y paginación.
-                  </p>
+      {canViewActivity ? (
+        <section
+          className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "200ms" }}
+        >
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
+            <div className="p-5 md:p-6">
+              <Tabs defaultValue="activity">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <p className="text-base font-medium">Última actividad</p>
+                    <p className="text-sm text-muted-foreground">
+                      Registros de auditoría con filtros y paginación.
+                    </p>
+                  </div>
+                  <TabsList className="mx-auto sm:mx-0">
+                    <TabsTab value="activity">Actividad</TabsTab>
+                    <TabsTab value="summary">Resumen</TabsTab>
+                    <TabsIndicator />
+                  </TabsList>
                 </div>
-                <TabsList className="mx-auto sm:mx-0">
-                  <TabsTab value="activity">Actividad</TabsTab>
-                  <TabsTab value="summary">Resumen</TabsTab>
-                  <TabsIndicator />
-                </TabsList>
-              </div>
 
-              <TabsPanel value="activity">
-                {canViewActivity ? (
+                <TabsPanel value="activity">
                   <DashboardActivity />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-border/70 p-8 text-center text-sm text-muted-foreground">
-                    Tu usuario no tiene permiso para ver los registros de
-                    auditoría.
-                  </div>
-                )}
-              </TabsPanel>
+                </TabsPanel>
 
-              <TabsPanel value="summary">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
-                    <Users className="mx-auto mb-2 size-5 text-primary" />
-                    <p className="text-2xl font-semibold tabular-nums">
-                      {companies?.total ?? "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Empresas</p>
+                <TabsPanel value="summary">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
+                      <Users className="mx-auto mb-2 size-5 text-primary" />
+                      <p className="text-2xl font-semibold tabular-nums">
+                        {companies?.total ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Empresas</p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
+                      <Ticket className="mx-auto mb-2 size-5 text-primary" />
+                      <p className="text-2xl font-semibold tabular-nums">
+                        {tickets?.active ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Tickets activos
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
+                      <Building2 className="mx-auto mb-2 size-5 text-primary" />
+                      <p className="text-2xl font-semibold tabular-nums">
+                        {companies?.active ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Empresas activas
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
-                    <Ticket className="mx-auto mb-2 size-5 text-primary" />
-                    <p className="text-2xl font-semibold tabular-nums">
-                      {tickets?.active ?? "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Tickets activos
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
-                    <Building2 className="mx-auto mb-2 size-5 text-primary" />
-                    <p className="text-2xl font-semibold tabular-nums">
-                      {companies?.active ?? "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Empresas activas
-                    </p>
-                  </div>
-                </div>
-              </TabsPanel>
-            </Tabs>
+                </TabsPanel>
+              </Tabs>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

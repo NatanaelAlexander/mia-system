@@ -120,3 +120,28 @@ export class InternalAssetsController {
     return this.assetsService.delete(id);
   }
 }
+
+@ApiBearerAuth('access-token')
+@AuthorizeSurface('portal')
+@AuthorizeResource('assets')
+@ApiTags('Assets — Portal')
+@Controller('portal/assets')
+export class PortalAssetsController {
+  constructor(private readonly assetsService: AssetsService) {}
+
+  @Post('descarga')
+  @AuthorizeAction('read')
+  @ApiOperation({
+    summary: 'URL firmada para descargar archivo del cliente',
+    description:
+      'Solo archivos vinculados a tickets/proyectos de empresas del usuario.',
+  })
+  @ApiBody({ type: FindByIdDto })
+  @ApiOkResponse({ type: AssetDownloadUrlResponseDto })
+  getDownloadUrl(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: FindByIdDto,
+  ) {
+    return this.assetsService.getDownloadUrlForPortal(userId, dto.id);
+  }
+}

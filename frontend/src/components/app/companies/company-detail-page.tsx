@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
+  FileText,
   FolderKanban,
   IdCard,
   Scale,
@@ -29,6 +30,7 @@ import {
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { projectsModule } from "@/components/app/projects/projects-module";
+import { quotesModule } from "@/components/app/quotes/quotes-module";
 import { ErrorState } from "@/components/app/shared/list-states";
 import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,6 +67,7 @@ import {
 import { CompanyRepresentativesSection } from "./company-representatives-section";
 import { CompanyUsersSection } from "./company-users-section";
 import { CompanyProjectsSection } from "./company-projects-section";
+import { CompanyQuotesSection } from "@/components/app/quotes/company-quotes-section";
 
 interface CompanyDetailPageProps {
   companyId: string;
@@ -75,6 +78,7 @@ const COMPANY_TABS = [
   "representantes",
   "usuarios",
   "proyectos",
+  "cotizaciones",
 ] as const satisfies readonly CompanyDetailTab[];
 
 const STATUS_HELP: Record<CompanyStatus, string> = {
@@ -93,6 +97,8 @@ const TAB_HELP: Record<CompanyDetailTab, string> = {
     "Cuentas del sistema vinculadas a esta empresa. Pueden acceder al portal o a la operación según su rol.",
   proyectos:
     "Proyectos asociados a esta empresa. Puedes filtrar por activos, inactivos o completados.",
+  cotizaciones:
+    "Cotizaciones (boleta o factura) asociadas a esta empresa, un proyecto o un ticket. Solo superAdmin.",
 };
 
 function isCompanyDetailTab(value: string | null): value is CompanyDetailTab {
@@ -115,14 +121,17 @@ function DetailSkeleton() {
 function TabLabel({
   icon: Icon,
   label,
+  shortLabel,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  shortLabel: string;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Icon className="size-3.5 shrink-0" />
-      <span>{label}</span>
+      <span className="sm:hidden">{shortLabel}</span>
+      <span className="hidden sm:inline">{label}</span>
     </span>
   );
 }
@@ -138,6 +147,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const canDeactivate =
     isInternalUser(claims) && hasPermission(claims, "companies:delete");
   const canViewProjects = canAccessModule(claims, projectsModule);
+  const canViewQuotes = canAccessModule(claims, quotesModule);
   const isInternal = isInternalUser(claims);
 
   const [company, setCompany] = React.useState<CompanyDetail | null>(null);
@@ -154,8 +164,11 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     if (canViewProjects) {
       tabs.push("proyectos");
     }
+    if (canViewQuotes) {
+      tabs.push("cotizaciones");
+    }
     return tabs;
-  }, [canViewProjects, isInternal]);
+  }, [canViewProjects, canViewQuotes, isInternal]);
 
   const tabFromUrl = searchParams.get("tab");
   const activeTab: CompanyDetailTab = isCompanyDetailTab(tabFromUrl)
@@ -292,7 +305,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <Link
@@ -348,21 +361,46 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTab value="datos">
-            <TabLabel icon={Building2} label="Datos de la empresa" />
+            <TabLabel
+              icon={Building2}
+              label="Datos de la empresa"
+              shortLabel="Datos"
+            />
           </TabsTab>
           {isInternal ? (
             <>
               <TabsTab value="representantes">
-                <TabLabel icon={Scale} label="Representantes legales" />
+                <TabLabel
+                  icon={Scale}
+                  label="Representantes legales"
+                  shortLabel="Representantes"
+                />
               </TabsTab>
               <TabsTab value="usuarios">
-                <TabLabel icon={Users} label="Usuarios vinculados" />
+                <TabLabel
+                  icon={Users}
+                  label="Usuarios vinculados"
+                  shortLabel="Usuarios"
+                />
               </TabsTab>
             </>
           ) : null}
           {canViewProjects ? (
             <TabsTab value="proyectos">
-              <TabLabel icon={FolderKanban} label="Proyectos" />
+              <TabLabel
+                icon={FolderKanban}
+                label="Proyectos"
+                shortLabel="Proyectos"
+              />
+            </TabsTab>
+          ) : null}
+          {canViewQuotes ? (
+            <TabsTab value="cotizaciones">
+              <TabLabel
+                icon={FileText}
+                label="Cotizaciones"
+                shortLabel="Cotizaciones"
+              />
             </TabsTab>
           ) : null}
           <TabsIndicator />
@@ -417,6 +455,12 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
         {canViewProjects ? (
           <TabsPanel value="proyectos">
             <CompanyProjectsSection companyId={company.id} surface={surface} />
+          </TabsPanel>
+        ) : null}
+
+        {canViewQuotes ? (
+          <TabsPanel value="cotizaciones">
+            <CompanyQuotesSection companyId={company.id} />
           </TabsPanel>
         ) : null}
       </Tabs>

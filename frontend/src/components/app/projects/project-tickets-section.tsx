@@ -91,14 +91,14 @@ export function ProjectTicketsSection({
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b">
+        <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle>Tickets</CardTitle>
             <CardDescription>
               Solicitudes y seguimiento de trabajo del proyecto.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canCreate ? (
               <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus />

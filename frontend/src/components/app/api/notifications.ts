@@ -1,25 +1,36 @@
 import { apiFetch, apiFetchDetalle } from "@/lib/api/client";
 import type { ResourceSurface } from "./types";
 
-export type TicketNotificationType = "ticket_created" | "ticket_comment";
+export type AppNotificationType =
+  | "ticket_created"
+  | "ticket_comment"
+  | "quote_sent";
 
-export interface TicketNotification {
+export interface AppNotification {
   id: string;
-  ticketId: string;
-  projectId: string;
-  type: TicketNotificationType;
+  kind: "ticket" | "quote";
+  ticketId: string | null;
+  projectId: string | null;
+  quoteId: string | null;
+  companyId: string | null;
+  shareToken: string | null;
+  type: AppNotificationType | string;
   commentId: string | null;
   actorUserId: string;
   actorFirstName: string;
   actorLastName: string;
-  ticketTitle: string;
+  ticketTitle: string | null;
   message: string;
   readAt: string | null;
   createdAt: string;
 }
 
+/** @deprecated use AppNotification */
+export type TicketNotification = AppNotification;
+export type TicketNotificationType = AppNotificationType;
+
 export interface TicketNotificationListResult {
-  items: TicketNotification[];
+  items: AppNotification[];
   unreadCount: number;
 }
 
