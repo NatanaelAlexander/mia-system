@@ -33,13 +33,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   appStandaloneNav,
   administrationNav,
   type NavModule,
 } from "./navigation";
-import { NotificationsMenu } from "./notifications-menu";
 
 const mainNav = [
   { title: "Dashboard", href: "/app", icon: LayoutDashboard },
@@ -65,6 +65,7 @@ function isActivePath(pathname: string, href: string) {
 export function AppSidebar() {
   const pathname = usePathname();
   const { claims, logout } = useAuth();
+  const { isMobile } = useSidebar();
   const roleLabel = formatRoles(claims?.roles ?? []);
 
   const standaloneNav = appStandaloneNav.filter((item) =>
@@ -152,9 +153,6 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu className="gap-2">
           <SidebarMenuItem>
-            <NotificationsMenu />
-          </SidebarMenuItem>
-          <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
@@ -232,7 +230,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
 
-      <SidebarRail />
+      {!isMobile ? <SidebarRail /> : null}
     </Sidebar>
   );
 }

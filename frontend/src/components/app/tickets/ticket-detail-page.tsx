@@ -821,8 +821,8 @@ export function TicketDetailPage({
             </div>
           ) : null}
 
-          <div className="flex max-h-[32rem] min-h-[18rem] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40">
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="flex min-h-[min(70dvh,32rem)] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40 md:max-h-[32rem] md:min-h-[18rem]">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">
                   Cargando conversación...
@@ -852,7 +852,7 @@ export function TicketDetailPage({
             {canComment ? (
               <div
                 className={cn(
-                  "relative border-t border-border/70 bg-card/60 p-3 transition-colors",
+                  "sticky bottom-0 relative border-t border-border/70 bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-colors supports-backdrop-filter:bg-card/80",
                   isComposerDragging && "ring-2 ring-inset ring-primary/20",
                 )}
                 onDragOver={(event) => {

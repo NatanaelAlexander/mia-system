@@ -2,10 +2,20 @@
 
 import Link from "next/link";
 import { Pencil } from "lucide-react";
-import type { TicketKanbanItem } from "@/components/app/api/tickets";
+import type {
+  TicketCatalogItem,
+  TicketKanbanItem,
+} from "@/components/app/api/tickets";
 import { formatDate } from "@/components/app/shared/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface TicketKanbanCardProps {
@@ -13,6 +23,10 @@ interface TicketKanbanCardProps {
   projectId: string;
   draggable: boolean;
   canManageAssignees: boolean;
+  statuses?: TicketCatalogItem[];
+  canChangeStatus?: boolean;
+  showStatusSelect?: boolean;
+  onStatusChange?: (statusId: string) => void;
   onEditAssignees: (ticket: TicketKanbanItem) => void;
   onDragStart: (ticketId: string) => void;
   onDragEnd: () => void;
@@ -35,10 +49,19 @@ export function TicketKanbanCard({
   projectId,
   draggable,
   canManageAssignees,
+  statuses = [],
+  canChangeStatus = false,
+  showStatusSelect = false,
+  onStatusChange,
   onEditAssignees,
   onDragStart,
   onDragEnd,
 }: TicketKanbanCardProps) {
+  const statusItems = statuses.map((status) => ({
+    value: status.id,
+    label: status.name,
+  }));
+
   return (
     <article
       draggable={draggable}
@@ -46,7 +69,9 @@ export function TicketKanbanCard({
       onDragEnd={onDragEnd}
       className={cn(
         "rounded-lg border border-border/70 bg-card p-3 shadow-xs transition-shadow",
-        draggable ? "cursor-grab active:cursor-grabbing hover:shadow-sm" : "cursor-default",
+        draggable
+          ? "cursor-grab active:cursor-grabbing hover:shadow-sm"
+          : "cursor-default",
         ticket.isClosed && "opacity-80",
       )}
     >
@@ -100,10 +125,42 @@ export function TicketKanbanCard({
         )}
       </div>
 
+      {showStatusSelect && canChangeStatus && statusItems.length > 0 ? (
+        <div
+          className="mb-2"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Select
+            items={statusItems}
+            value={ticket.statusId}
+            onValueChange={(value) => {
+              if (typeof value === "string" && value !== ticket.statusId) {
+                onStatusChange?.(value);
+              }
+            }}
+          >
+            <SelectTrigger className="h-8 w-full text-xs">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <p className="text-xs text-muted-foreground">
-        Último mensaje: <span className="text-foreground">{lastAuthorLabel(ticket)}</span>
+        Último mensaje:{" "}
+        <span className="text-foreground">{lastAuthorLabel(ticket)}</span>
         {ticket.lastCommentAt ? (
-          <span className="block text-[11px]">{formatDate(ticket.lastCommentAt)}</span>
+          <span className="block text-[11px]">
+            {formatDate(ticket.lastCommentAt)}
+          </span>
         ) : null}
       </p>
 

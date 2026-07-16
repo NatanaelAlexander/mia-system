@@ -43,7 +43,14 @@ function NotificationIcon({ type }: { type: TicketNotification["type"] }) {
   return <MessageSquare className="size-4 shrink-0 text-primary" />;
 }
 
-export function NotificationsMenu() {
+interface NotificationsMenuProps {
+  /** Compact icon button for the top header (mobile). */
+  variant?: "sidebar" | "header";
+}
+
+export function NotificationsMenu({
+  variant = "sidebar",
+}: NotificationsMenuProps) {
   const {
     notifications,
     unreadCount,
@@ -52,30 +59,43 @@ export function NotificationsMenu() {
     markAllAsRead,
   } = useNotifications();
 
+  const isHeader = variant === "header";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "relative flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
+          isHeader
+            ? "relative inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-hidden transition-colors hover:bg-muted hover:text-foreground"
+            : "relative flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
         )}
-        render={<button type="button" />}
+        render={<button type="button" aria-label="Notificaciones" />}
       >
-        <Bell className="size-4 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">
-          Notificaciones
-        </span>
+        <Bell className="size-4 shrink-0" />
+        {!isHeader ? (
+          <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">
+            Notificaciones
+          </span>
+        ) : null}
         {unreadCount > 0 ? (
-          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-top-1 group-data-[collapsible=icon]:-right-1">
+          <span
+            className={cn(
+              "inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground",
+              isHeader
+                ? "absolute -top-1 -right-1"
+                : "group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-top-1 group-data-[collapsible=icon]:-right-1",
+            )}
+          >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        align="start"
-        side="top"
+        align={isHeader ? "end" : "start"}
+        side={isHeader ? "bottom" : "top"}
         sideOffset={8}
-        className="w-80 p-0"
+        className="w-[min(20rem,calc(100vw-1.5rem))] p-0"
       >
         <div className="flex items-center justify-between border-b px-3 py-2.5">
           <p className="text-sm font-medium">Notificaciones</p>

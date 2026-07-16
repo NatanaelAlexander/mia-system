@@ -49,6 +49,12 @@ export const APP_STYLES = [
     description: "Neón magenta sobre fondo oscuro",
     swatch: "#f472b6",
   },
+  {
+    id: "nature",
+    label: "Nature",
+    description: "Verdes naturales y tonos tierra",
+    swatch: "#3f7a45",
+  },
 ] as const satisfies readonly AppStyleDefinition[];
 
 const styleIds = new Set<string>(APP_STYLES.map((style) => style.id));

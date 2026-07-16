@@ -145,7 +145,7 @@ export function DashboardTicketsAreaChart() {
 
       <div className="p-5 pt-4">
         {isLoading ? (
-          <Skeleton className="h-[300px] w-full rounded-xl" />
+          <Skeleton className="h-[220px] w-full rounded-xl sm:h-[300px]" />
         ) : error ? (
           <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
             {error}
@@ -153,7 +153,7 @@ export function DashboardTicketsAreaChart() {
         ) : (
           <ChartContainer
             config={chartConfig}
-            className="aspect-auto h-[300px] w-full"
+            className="aspect-auto h-[220px] w-full sm:h-[300px]"
           >
             <AreaChart
               accessibilityLayer

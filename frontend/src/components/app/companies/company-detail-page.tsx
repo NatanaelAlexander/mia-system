@@ -115,14 +115,17 @@ function DetailSkeleton() {
 function TabLabel({
   icon: Icon,
   label,
+  shortLabel,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  shortLabel: string;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <Icon className="size-3.5 shrink-0" />
-      <span>{label}</span>
+      <span className="sm:hidden">{shortLabel}</span>
+      <span className="hidden sm:inline">{label}</span>
     </span>
   );
 }
@@ -348,21 +351,37 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTab value="datos">
-            <TabLabel icon={Building2} label="Datos de la empresa" />
+            <TabLabel
+              icon={Building2}
+              label="Datos de la empresa"
+              shortLabel="Datos"
+            />
           </TabsTab>
           {isInternal ? (
             <>
               <TabsTab value="representantes">
-                <TabLabel icon={Scale} label="Representantes legales" />
+                <TabLabel
+                  icon={Scale}
+                  label="Representantes legales"
+                  shortLabel="Representantes"
+                />
               </TabsTab>
               <TabsTab value="usuarios">
-                <TabLabel icon={Users} label="Usuarios vinculados" />
+                <TabLabel
+                  icon={Users}
+                  label="Usuarios vinculados"
+                  shortLabel="Usuarios"
+                />
               </TabsTab>
             </>
           ) : null}
           {canViewProjects ? (
             <TabsTab value="proyectos">
-              <TabLabel icon={FolderKanban} label="Proyectos" />
+              <TabLabel
+                icon={FolderKanban}
+                label="Proyectos"
+                shortLabel="Proyectos"
+              />
             </TabsTab>
           ) : null}
           <TabsIndicator />

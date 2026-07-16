@@ -142,13 +142,16 @@ export function ProjectHubPanel({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {canAccessAssets ? (
             <Link
               href={`/app/projects/${currentProject.id}/assets`}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              className={cn(
+                buttonVariants({ variant: "default", size: "default" }),
+                "gap-2 font-semibold shadow-sm",
+              )}
             >
-              <Files />
+              <Files className="size-4" />
               Archivos
             </Link>
           ) : null}
