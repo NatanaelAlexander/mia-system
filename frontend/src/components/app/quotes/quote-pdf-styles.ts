@@ -22,6 +22,9 @@ export interface QuotePdfTheme {
 
 export const QUOTE_PDF_BACKGROUND = "#FFFFFF" as const;
 
+/** Logo de marca usado en footer de preview y PDF. */
+export const QUOTE_BRAND_LOGO_SRC = "/login/team_prime_dg.PNG";
+
 export const DEFAULT_QUOTE_PDF_LAYOUT_ID: QuotePdfLayoutId = "clasico";
 export const DEFAULT_QUOTE_PDF_PRIMARY = "#2563EB";
 export const DEFAULT_QUOTE_PDF_SECONDARY = "#6B7280";

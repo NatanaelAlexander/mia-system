@@ -7,6 +7,7 @@ import {
   formatClp,
 } from "@/components/app/quotes/quotes-tax";
 import {
+  QUOTE_BRAND_LOGO_SRC,
   resolveQuotePdfTheme,
   type QuotePdfLayoutId,
   type QuotePdfTheme,
@@ -233,6 +234,7 @@ function LayoutInforme({
       <p className="mt-4 text-center text-xs" style={{ color: theme.secondary }}>
         Cotización válida hasta {formatDay(model.expiresAt)}.
       </p>
+      <FooterNote secondary={theme.secondary} compact />
     </div>
   );
 }
@@ -301,6 +303,7 @@ function LayoutBanner({
         <p className="text-xs" style={{ color: theme.secondary }}>
           Cotización válida hasta {formatDay(model.expiresAt)}.
         </p>
+        <FooterNote secondary={theme.secondary} compact />
       </div>
     </div>
   );
@@ -442,9 +445,11 @@ function LayoutDual({
           Notas
         </p>
         <p style={{ color: theme.secondary }}>
-          Cotización válida hasta {formatDay(model.expiresAt)}. Gracias por su
-          preferencia.
+          Cotización válida hasta {formatDay(model.expiresAt)}.
         </p>
+      </div>
+      <div className="px-5 pb-5 sm:px-6">
+        <FooterNote secondary={theme.secondary} compact />
       </div>
     </div>
   );
@@ -963,15 +968,28 @@ function FooterNote({
   compact?: boolean;
 }) {
   return (
-    <p
+    <div
       className={cn(
-        "border-t border-gray-200 text-center italic",
-        compact ? "mt-4 pt-2 text-xs" : "mt-10 pt-4 text-sm",
+        "flex flex-col items-center gap-2 border-t border-gray-200 text-center",
+        compact ? "mt-4 pt-3" : "mt-10 pt-4",
       )}
-      style={{ color: secondary }}
     >
-      Gracias por su preferencia.
-    </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={QUOTE_BRAND_LOGO_SRC}
+        alt="Team Prime"
+        className={cn(
+          "w-auto object-contain opacity-90",
+          compact ? "h-5" : "h-7",
+        )}
+      />
+      <p
+        className={cn("italic", compact ? "text-xs" : "text-sm")}
+        style={{ color: secondary }}
+      >
+        Gracias por su preferencia.
+      </p>
+    </div>
   );
 }
 

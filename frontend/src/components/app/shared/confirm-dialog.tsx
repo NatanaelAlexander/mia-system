@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description: string;
+  description: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void | Promise<void>;
@@ -33,12 +34,23 @@ export function ConfirmDialog({
   isConfirming = false,
   confirmVariant = "destructive",
 }: ConfirmDialogProps) {
+  const isPlainText = typeof description === "string";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {isPlainText ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : (
+            <>
+              <DialogDescription className="sr-only">
+                {title}
+              </DialogDescription>
+              <div className="text-sm text-muted-foreground">{description}</div>
+            </>
+          )}
         </DialogHeader>
         <DialogFooter>
           <Button

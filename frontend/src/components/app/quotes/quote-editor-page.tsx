@@ -122,7 +122,7 @@ import {
   QuotePreviewDocument,
   type QuotePreviewModel,
 } from "./quote-preview";
-import { companyQuoteHref, publicQuoteHref, quotesModule } from "./quotes-module";
+import { publicQuoteHref, quotesModule } from "./quotes-module";
 import {
   calculateSectionTotals,
   formatClp,
@@ -135,6 +135,45 @@ interface QuoteEditorPageProps {
 }
 
 type QuoteEditorTab = "datos" | "pagos" | "gestion";
+type GestionStep = "enlace" | "estados" | "firmado";
+
+const GESTION_STEPS: Array<{
+  id: GestionStep;
+  label: string;
+  description: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  card: string;
+  iconWrap: string;
+  accentText: string;
+}> = [
+  {
+    id: "enlace",
+    label: "Enlace",
+    description: "Revisión pública",
+    Icon: Link2,
+    card: "border-secondary/40 bg-secondary/10 ring-secondary/25",
+    iconWrap: "bg-secondary text-secondary-foreground",
+    accentText: "text-secondary",
+  },
+  {
+    id: "estados",
+    label: "Estados",
+    description: "Flujo y pago",
+    Icon: ListOrdered,
+    card: "border-primary/35 bg-primary/5 ring-primary/20",
+    iconWrap: "bg-primary text-primary-foreground",
+    accentText: "text-primary",
+  },
+  {
+    id: "firmado",
+    label: "Firmado",
+    description: "Documento",
+    Icon: FileSignature,
+    card: "border-chart-3/50 bg-chart-3/10 ring-chart-3/30",
+    iconWrap: "bg-chart-3 text-zinc-950",
+    accentText: "text-chart-3",
+  },
+];
 
 function TabLabel({
   icon: Icon,
@@ -228,6 +267,26 @@ const FREQUENCY_TITLE: Record<QuoteFrequency, string> = {
   mensual: "Pagos mensuales",
   anual: "Pagos anuales",
 };
+
+const FREQUENCY_SHORT: Record<QuoteFrequency, string> = {
+  unico: "Único",
+  mensual: "Mensual",
+  anual: "Anual",
+};
+
+const FREQUENCY_ORDER: QuoteFrequency[] = ["unico", "mensual", "anual"];
+
+function initialActiveFrequency(sections: DraftSection[]): QuoteFrequency {
+  return (
+    FREQUENCY_ORDER.find((frequency) => {
+      const section = sections.find((row) => row.frequency === frequency);
+      if (!section) return false;
+      return (
+        section.items.length > 0 || section.esCanje || section.applyTax
+      );
+    }) ?? "unico"
+  );
+}
 
 const FREQUENCY_THEME: Record<
   QuoteFrequency,
@@ -368,9 +427,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [presets, setPresets] = React.useState<QuotePreset[]>([]);
   const [selectedPresetId, setSelectedPresetId] = React.useState<string>("");
   const [editorTab, setEditorTab] = React.useState<QuoteEditorTab>("datos");
+  const [activeFrequency, setActiveFrequency] =
+    React.useState<QuoteFrequency>("unico");
+  const [activeGestionStep, setActiveGestionStep] =
+    React.useState<GestionStep>("enlace");
   const [savePresetOpen, setSavePresetOpen] = React.useState(false);
   const [loadPresetOpen, setLoadPresetOpen] = React.useState(false);
   const [presetName, setPresetName] = React.useState("");
+  const [generateConfirmOpen, setGenerateConfirmOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState<
     "quote" | "preset" | "signed" | null
   >(null);
@@ -450,12 +514,15 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         setClientVisible(detail.clientVisible);
         setIssueDate(detail.issueDate);
         setExpiresAt(detail.expiresAt);
-        setSections(sectionsFromQuote(detail));
+        const loadedSections = sectionsFromQuote(detail);
+        setSections(loadedSections);
+        setActiveFrequency(initialActiveFrequency(loadedSections));
         setSelectedStatusCodes(detail.statusFlags?.map((f) => f.code) ?? []);
       } else {
         if (issuerList[0]) setIssuerId(issuerList[0].id);
         const firstRep = company.representativeLinks?.[0]?.legalRepresentativeId;
         if (firstRep) setLegalRepresentativeId(firstRep);
+        setActiveFrequency("unico");
       }
     } catch (error) {
       const message =
@@ -640,6 +707,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     };
   };
 
+  const requestGenerate = () => {
+    if (isNew && !canCreate) return;
+    if (!isNew && !canUpdate) return;
+    const payload = buildPayload();
+    if (!payload) return;
+    setGenerateConfirmOpen(true);
+  };
+
   const handleSave = async () => {
     if (isNew && !canCreate) return;
     if (!isNew && !canUpdate) return;
@@ -650,15 +725,16 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     setIsSaving(true);
     try {
       if (isNew) {
-        const created = await createQuote(payload);
-        toast.success("Cotización creada");
-        router.replace(companyQuoteHref(companyId, created.id));
+        await createQuote(payload);
+        setGenerateConfirmOpen(false);
+        toast.success("Cotización creada como borrador");
+        router.push(backHref);
       } else if (quoteId) {
         const { companyId: _companyId, ...updatePayload } = payload;
-        const updated = await updateQuote(quoteId, updatePayload);
-        setQuote(updated);
-        setSections(sectionsFromQuote(updated));
+        await updateQuote(quoteId, updatePayload);
+        setGenerateConfirmOpen(false);
         toast.success("Cotización actualizada");
+        router.push(backHref);
       }
     } catch (error) {
       toast.error(
@@ -741,6 +817,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         }));
       }
       setSections(next);
+      setActiveFrequency(initialActiveFrequency(next));
     }
     // Fechas no se tocan a propósito
     setLoadPresetOpen(false);
@@ -944,7 +1021,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       toast.error("Guarda la cotización antes de descargar el PDF.");
       return;
     }
-    generateQuotePdf({
+    void generateQuotePdf({
       ...quote,
       pdfLayoutId,
       pdfPrimaryColor,
@@ -1032,9 +1109,9 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     new Date(quote.shareLink.expiresAt).getTime() > Date.now();
 
   return (
-    <div className="mx-auto max-w-[90rem]">
-      <div className="grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-1">
+    <div className="mx-auto max-w-[90rem] pr-1 sm:pr-2 md:pr-3">
+      <div className="grid items-start gap-8 lg:gap-10 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:grid-cols-2 2xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
+        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-4 lg:pr-3 xl:pr-4">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -1108,7 +1185,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
             }}
             className="gap-3"
           >
-            <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 pb-3 backdrop-blur supports-backdrop-filter:bg-background/80">
+            <div className="-mx-1 px-1 pb-3">
               <TabsList className="w-full max-w-none">
                 <TabsTab value="datos" className="flex-1">
                   <TabLabel
@@ -1341,7 +1418,66 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         </TabsPanel>
 
         <TabsPanel value="pagos" className="space-y-4">
-          {sections.map((section) => {
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Elige un tipo de pago para editarlo. Los otros se mantienen
+              guardados; cambia de pestaña cuando quieras.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {FREQUENCY_ORDER.map((frequency) => {
+                const theme = FREQUENCY_THEME[frequency];
+                const SectionIcon = theme.Icon;
+                const selected = activeFrequency === frequency;
+                const itemCount =
+                  sections.find((section) => section.frequency === frequency)
+                    ?.items.length ?? 0;
+
+                return (
+                  <button
+                    key={frequency}
+                    type="button"
+                    onClick={() => setActiveFrequency(frequency)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-colors",
+                      selected
+                        ? cn("ring-1", theme.card)
+                        : "border-border/70 bg-muted/20 hover:border-primary/40 hover:bg-muted/40",
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                          selected ? theme.iconWrap : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        <SectionIcon className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            selected ? theme.accentText : "text-foreground",
+                          )}
+                        >
+                          {FREQUENCY_SHORT[frequency]}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {itemCount > 0
+                            ? `${itemCount} ítem${itemCount === 1 ? "" : "s"}`
+                            : "Sin ítems"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {sections
+            .filter((section) => section.frequency === activeFrequency)
+            .map((section) => {
             const totals = calculateSectionTotals({
               itemPrices: section.items.map((item) => Number(item.price) || 0),
               documentType,
@@ -1557,6 +1693,59 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
         {!isNew && quote ? (
           <TabsPanel value="gestion" className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Elige una sección para gestionarla. Cambia de paso cuando
+                quieras; no se pierde lo que ya configuraste.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {GESTION_STEPS.map((step) => {
+                  const selected = activeGestionStep === step.id;
+                  const StepIcon = step.Icon;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => setActiveGestionStep(step.id)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        selected
+                          ? cn("ring-1", step.card)
+                          : "border-border/70 bg-muted/20 hover:border-primary/40 hover:bg-muted/40",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={cn(
+                            "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                            selected
+                              ? step.iconWrap
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          <StepIcon className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-semibold",
+                              selected ? step.accentText : "text-foreground",
+                            )}
+                          >
+                            {step.label}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {step.description}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {activeGestionStep === "enlace" ? (
             <Card className="border-secondary/35 bg-secondary/10 ring-1 ring-secondary/20">
               <CardHeader className="border-b border-secondary/20 pb-4">
                 <div className="flex items-start gap-3">
@@ -1635,7 +1824,9 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 )}
               </CardContent>
             </Card>
+            ) : null}
 
+            {activeGestionStep === "estados" ? (
             <Card className="border-primary/30 bg-primary/5 ring-1 ring-primary/15">
               <CardHeader className="gap-3 border-b border-primary/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -1706,7 +1897,9 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 })}
               </CardContent>
             </Card>
+            ) : null}
 
+            {activeGestionStep === "firmado" ? (
             <Card className="border-chart-3/40 bg-chart-3/10 ring-1 ring-chart-3/25">
               <CardHeader className="border-b border-chart-3/25 pb-4">
                 <div className="flex items-start gap-3">
@@ -1774,13 +1967,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 )}
               </CardContent>
             </Card>
+            ) : null}
           </TabsPanel>
         ) : null}
           </Tabs>
         </aside>
 
-        <aside className="min-w-0 space-y-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-          <div className="sticky top-0 z-10 space-y-3 bg-background/95 pb-3 backdrop-blur supports-backdrop-filter:bg-background/80">
+        <aside className="min-w-0 space-y-3 lg:pl-1 xl:pl-2">
+          <div className="space-y-3 pb-3">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold tracking-tight">Documento</h2>
               <Badge variant="secondary" className="font-normal">
@@ -1789,7 +1983,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
               <HelpHint
                 label="Qué es un preset"
                 side="bottom"
-                text="Un preset guarda la configuración actual (representante, emisor, alcance, tipo, visibilidad e ítems) para reutilizarla. Al cargar no se tocan las fechas. Generar documento crea o actualiza la cotización con lo que ves en la vista previa."
+                text="Un preset guarda la configuración actual (representante, emisor, alcance, tipo, visibilidad e ítems) para reutilizarla. Al cargar no se tocan las fechas. Generar documento guarda la cotización; si no la envías al cliente, queda como Borrador en el listado."
               />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1818,7 +2012,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 type="button"
                 size="sm"
                 disabled={isSaving || (isNew ? !canCreate : !canUpdate)}
-                onClick={() => void handleSave()}
+                onClick={requestGenerate}
               >
                 <FileText />
                 {isSaving ? "Generando…" : "Generar documento"}
@@ -2054,6 +2248,58 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={generateConfirmOpen}
+        onOpenChange={setGenerateConfirmOpen}
+        title="Generar documento"
+        description={
+          quote?.status === "sent" ? (
+            <div className="space-y-3 text-left leading-relaxed">
+              <p>
+                Se guardarán los cambios de la cotización con lo que ves en la
+                vista previa.
+              </p>
+              <p>
+                Como ya fue enviada, en el listado seguirá con la etiqueta{" "}
+                <span className="font-semibold text-foreground">Enviada</span>.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 text-left leading-relaxed">
+              <p>
+                Se guardará la cotización con lo que ves en la{" "}
+                <span className="font-semibold text-foreground">
+                  vista previa
+                </span>
+                .
+              </p>
+              <p>
+                Si todavía{" "}
+                <span className="font-semibold text-foreground">
+                  no la envías al cliente
+                </span>{" "}
+                (botón <span className="font-semibold text-foreground">Enviar</span>
+                ), en el listado aparecerá como{" "}
+                <span className="rounded-md bg-muted px-1.5 py-0.5 font-semibold text-foreground">
+                  Borrador
+                </span>
+                .
+              </p>
+              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-foreground/90">
+                <span className="font-semibold">Borrador</span> no significa que
+                falte guardar: significa que{" "}
+                <span className="font-semibold">aún no fue enviada</span>.
+              </p>
+            </div>
+          )
+        }
+        confirmLabel={isNew ? "Generar" : "Guardar cambios"}
+        cancelLabel="Cancelar"
+        confirmVariant="default"
+        onConfirm={() => handleSave()}
+        isConfirming={isSaving}
+      />
 
       <ConfirmDialog
         open={confirmDelete !== null}

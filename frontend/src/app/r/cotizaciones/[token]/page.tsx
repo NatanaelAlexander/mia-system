@@ -110,7 +110,7 @@ export default function PublicQuotePage() {
               Puedes descargar el PDF para revisarlo. No se requiere firma.
             </CardDescription>
           </div>
-          <Button type="button" onClick={() => generateQuotePdf(quote)}>
+          <Button type="button" onClick={() => void generateQuotePdf(quote)}>
             <Download />
             Descargar PDF
           </Button>

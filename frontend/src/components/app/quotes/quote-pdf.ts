@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import type { QuoteDetail, QuoteSection } from "@/components/app/api/quotes";
 import {
   hexToRgb,
+  QUOTE_BRAND_LOGO_SRC,
   resolveQuotePdfTheme,
 } from "@/components/app/quotes/quote-pdf-styles";
 
@@ -25,7 +26,23 @@ function money(value: number): string {
   return `$${Number(value).toLocaleString("es-CL")}`;
 }
 
-export function generateQuotePdf(quote: QuoteDetail): void {
+async function loadBrandLogoDataUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(QUOTE_BRAND_LOGO_SRC);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -720,16 +737,31 @@ export function generateQuotePdf(quote: QuoteDetail): void {
     yPosition = drawTable(section, yPosition);
   }
 
-  const footerY = pageHeight - 20;
+  const logoDataUrl = await loadBrandLogoDataUrl();
+  const footerY = pageHeight - 14;
+  const logoHeight = 8;
+  const logoWidth = 18;
+  const lineY = footerY - (logoDataUrl ? 16 : 6);
+
   doc.setDrawColor(...grayBorder);
   doc.setLineWidth(0.3);
-  doc.line(marginX, footerY - 5, pageWidth - marginX, footerY - 5);
+  doc.line(marginX, lineY, pageWidth - marginX, lineY);
+
+  if (logoDataUrl) {
+    const logoX = (pageWidth - logoWidth) / 2;
+    const logoY = lineY + 2;
+    doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoWidth, logoHeight);
+  }
+
   doc.setTextColor(...secondary);
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
-  doc.text("Gracias por su preferencia.", pageWidth / 2, footerY, {
-    align: "center",
-  });
+  doc.text(
+    "Gracias por su preferencia.",
+    pageWidth / 2,
+    logoDataUrl ? footerY : lineY + 6,
+    { align: "center" },
+  );
 
   const safeName = (quote.companyName || "cotizacion").replace(/\s+/g, "_");
   doc.save(`Cotizacion_${safeName}_${Date.now()}.pdf`);

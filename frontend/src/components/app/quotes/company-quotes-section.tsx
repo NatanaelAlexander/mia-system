@@ -113,20 +113,28 @@ function lifecycleBadgeClass(status: QuoteStatus): string {
   if (status === "ready") {
     return "border-transparent bg-secondary text-secondary-foreground";
   }
-  return "border-border/80 bg-muted/60 text-muted-foreground";
+  return "border-border/80 bg-muted text-foreground";
 }
 
 function flagBadgeClass(category: string): string {
   if (category === "payment") {
-    return "border-primary/30 bg-primary/10 text-primary";
+    return "border-primary/45 bg-primary/15 text-primary";
   }
   if (category === "workflow") {
-    return "border-secondary/40 bg-secondary/15 text-secondary-foreground";
+    return "border-secondary/50 bg-secondary/20 text-secondary";
   }
   if (category === "exchange") {
-    return "border-border bg-muted text-foreground";
+    return "border-chart-3/45 bg-chart-3/15 text-chart-3";
   }
-  return "border-border/70 text-muted-foreground";
+  return "border-border/80 bg-muted/80 text-foreground";
+}
+
+/** Flags already covered by the lifecycle badge (Borrador / Lista / Enviada). */
+function visibleStatusFlags(quote: QuoteListItem) {
+  return (quote.statusFlags ?? []).filter((flag) => {
+    if (flag.code === "enviado") return false;
+    return true;
+  });
 }
 
 function QuoteRow({
@@ -205,8 +213,8 @@ function QuoteRow({
               className={cn(
                 "gap-1",
                 quote.clientVisible
-                  ? "border-secondary/40 bg-secondary/15 text-secondary-foreground"
-                  : "border-border/70 text-muted-foreground",
+                  ? "border-secondary/50 bg-secondary/20 text-secondary"
+                  : "border-border/80 bg-muted/80 text-foreground",
               )}
             >
               {quote.clientVisible ? (
@@ -219,12 +227,12 @@ function QuoteRow({
             {quote.signedAssetId ? (
               <Badge
                 variant="outline"
-                className="border-primary/30 bg-primary/10 text-primary"
+                className="border-primary/45 bg-primary/15 text-primary"
               >
                 Firmado
               </Badge>
             ) : null}
-            {(quote.statusFlags ?? []).map((flag) => (
+            {visibleStatusFlags(quote).map((flag) => (
               <Badge
                 key={flag.code}
                 variant="outline"

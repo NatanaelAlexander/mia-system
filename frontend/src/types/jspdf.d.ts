@@ -38,6 +38,14 @@ declare module "jspdf" {
     ): void;
     splitTextToSize(text: string, size: number): string[];
     addPage(): void;
+    addImage(
+      imageData: string,
+      format: string,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+    ): void;
     save(filename: string): void;
   }
 }
