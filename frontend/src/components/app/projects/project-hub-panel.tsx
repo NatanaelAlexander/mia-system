@@ -2,13 +2,23 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Building2, FolderKanban, Files, Layers, SquarePen, Tag } from "lucide-react";
+import {
+  AlignLeft,
+  Building2,
+  CalendarDays,
+  FolderKanban,
+  Files,
+  Layers,
+  SquarePen,
+  Tag,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   updateProject,
   type ProjectListItem,
 } from "@/components/app/api/projects";
 import {
+  formatDate,
   formatProjectStatus,
   formatProjectType,
 } from "@/components/app/shared/format";
@@ -48,19 +58,26 @@ function InfoField({
   icon: Icon,
   label,
   value,
+  className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5",
+        className,
+      )}
+    >
       <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
         <Icon className="size-4" />
       </div>
       <div className="min-w-0 space-y-0.5">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <div className="truncate text-sm font-medium">{value}</div>
+        <div className="text-sm font-medium wrap-break-word">{value}</div>
       </div>
     </div>
   );
@@ -90,6 +107,7 @@ export function ProjectHubPanel({
     try {
       const updated = await updateProject(currentProject.id, {
         name: values.name.trim(),
+        description: values.description?.trim() || null,
         type: values.type,
         status: values.status,
       });
@@ -152,6 +170,7 @@ export function ProjectHubPanel({
                   companyName={companyName}
                   defaultValues={{
                     name: currentProject.name,
+                    description: currentProject.description ?? "",
                     type: currentProject.type,
                     status: currentProject.status,
                   }}
@@ -164,7 +183,7 @@ export function ProjectHubPanel({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
+      <CardContent className="space-y-3 pt-6">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <InfoField icon={Building2} label="Empresa" value={companyName} />
           <InfoField
@@ -181,6 +200,23 @@ export function ProjectHubPanel({
             icon={Layers}
             label="Estado"
             value={formatProjectStatus(currentProject.status)}
+          />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <InfoField
+            icon={AlignLeft}
+            label="Descripción"
+            value={
+              currentProject.description?.trim()
+                ? currentProject.description
+                : "Sin descripción"
+            }
+          />
+          <InfoField
+            icon={CalendarDays}
+            label="Creado"
+            value={formatDate(currentProject.createdAt)}
           />
         </div>
       </CardContent>

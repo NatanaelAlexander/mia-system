@@ -10,6 +10,17 @@ export class UpdateProjectDto {
   @MaxLength(255)
   name?: string;
 
+  @ApiPropertyOptional({
+    example: 'Rediseño del portal de clientes y flujo de tickets.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString({ message: 'La descripción debe ser texto' })
+  @MaxLength(5000, {
+    message: 'La descripción no puede superar 5000 caracteres',
+  })
+  description?: string | null;
+
   @ApiPropertyOptional({ enum: ProjectType })
   @IsOptional()
   @IsEnum(ProjectType, { message: 'El tipo de proyecto no es válido' })

@@ -13,6 +13,7 @@ export interface Project {
   id: string;
   companyId: string;
   name: string;
+  description: string | null;
   type: ProjectType;
   status: ProjectStatus;
   createdAt: Date;

@@ -3,15 +3,25 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  FolderKanban,
+  IdCard,
+  Scale,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   deactivateCompany,
   getCompanyDetail,
   updateCompany,
   type CompanyDetail,
+  type CompanyStatus,
 } from "@/components/app/api/companies";
 import { formatCompanyStatus } from "@/components/app/shared/format";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import {
   canAccessModule,
   hasPermission,
@@ -67,6 +77,24 @@ const COMPANY_TABS = [
   "proyectos",
 ] as const satisfies readonly CompanyDetailTab[];
 
+const STATUS_HELP: Record<CompanyStatus, string> = {
+  active:
+    "Empresa operativa. Puede tener proyectos activos, usuarios vinculados y tickets en curso.",
+  inactive:
+    "Empresa deshabilitada. No se usa en la operación diaria; se mantiene el historial.",
+};
+
+const TAB_HELP: Record<CompanyDetailTab, string> = {
+  datos:
+    "Información general de la empresa: RUT, contacto, dirección y estado.",
+  representantes:
+    "Personas naturales con facultades legales para representar a la empresa ante terceros.",
+  usuarios:
+    "Cuentas del sistema vinculadas a esta empresa. Pueden acceder al portal o a la operación según su rol.",
+  proyectos:
+    "Proyectos asociados a esta empresa. Puedes filtrar por activos, inactivos o completados.",
+};
+
 function isCompanyDetailTab(value: string | null): value is CompanyDetailTab {
   return (
     typeof value === "string" &&
@@ -81,6 +109,21 @@ function DetailSkeleton() {
       <Skeleton className="h-64 w-full rounded-xl" />
       <Skeleton className="h-48 w-full rounded-xl" />
     </div>
+  );
+}
+
+function TabLabel({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className="size-3.5 shrink-0" />
+      <span>{label}</span>
+    </span>
   );
 }
 
@@ -259,16 +302,34 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
             <ArrowLeft />
             Empresas
           </Link>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{company.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              RUT {company.taxId} · {formatCompanyStatus(company.status)}
+          <div className="space-y-1">
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+              <Building2 className="size-6 shrink-0 text-primary" />
+              {company.name}
+            </h1>
+            <p className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <IdCard className="size-3.5" />
+                RUT {company.taxId}
+              </span>
+              <span aria-hidden>·</span>
+              <span>{formatCompanyStatus(company.status)}</span>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">{company.status}</Badge>
+          <span className="inline-flex items-center gap-1.5">
+            <Badge
+              variant={company.status === "active" ? "secondary" : "outline"}
+            >
+              {formatCompanyStatus(company.status)}
+            </Badge>
+            <HelpHint
+              label={`Qué significa ${formatCompanyStatus(company.status)}`}
+              text={STATUS_HELP[company.status]}
+            />
+          </span>
           {canDeactivate && company.status === "active" ? (
             <Button
               type="button"
@@ -286,15 +347,23 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTab value="datos">Datos de la empresa</TabsTab>
+          <TabsTab value="datos">
+            <TabLabel icon={Building2} label="Datos de la empresa" />
+          </TabsTab>
           {isInternal ? (
             <>
-              <TabsTab value="representantes">Representantes legales</TabsTab>
-              <TabsTab value="usuarios">Usuarios vinculados</TabsTab>
+              <TabsTab value="representantes">
+                <TabLabel icon={Scale} label="Representantes legales" />
+              </TabsTab>
+              <TabsTab value="usuarios">
+                <TabLabel icon={Users} label="Usuarios vinculados" />
+              </TabsTab>
             </>
           ) : null}
           {canViewProjects ? (
-            <TabsTab value="proyectos">Proyectos activos</TabsTab>
+            <TabsTab value="proyectos">
+              <TabLabel icon={FolderKanban} label="Proyectos" />
+            </TabsTab>
           ) : null}
           <TabsIndicator />
         </TabsList>
@@ -302,7 +371,14 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
         <TabsPanel value="datos">
           <Card>
             <CardHeader>
-              <CardTitle>Datos de la empresa</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="size-4 text-primary" />
+                Datos de la empresa
+                <HelpHint
+                  label="Qué son los datos de la empresa"
+                  text={TAB_HELP.datos}
+                />
+              </CardTitle>
               <CardDescription>
                 {canEdit
                   ? "Edita la información general de la empresa."

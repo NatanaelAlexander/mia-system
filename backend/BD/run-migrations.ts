@@ -10,6 +10,7 @@ const MIGRATIONS = [
   'companies',
   'assets',
   'projects',
+  'project_description',
   'tickets',
   'ticket_assignees',
   'ticket_comments_internal',
