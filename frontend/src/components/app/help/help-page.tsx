@@ -4,10 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, CircleHelp } from "lucide-react";
 import {
-  HELP_CATEGORIES,
   getHelpArticlesByCategory,
+  getHelpCategoriesForAudience,
+  type HelpAudience,
   type HelpCategoryId,
 } from "@/lib/help";
+import { isInternalUser } from "@/components/app/shared/permissions";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -23,16 +25,36 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 import { HelpSectionView } from "./help-content";
 
-const visibleCategories = HELP_CATEGORIES.filter(
-  (category) => getHelpArticlesByCategory(category.id).length > 0,
-);
+function resolveHelpAudience(
+  claims: Parameters<typeof isInternalUser>[0],
+): Exclude<HelpAudience, "both"> {
+  return isInternalUser(claims) ? "internal" : "portal";
+}
 
 export function HelpPage() {
+  const { claims } = useAuth();
+  const audience = resolveHelpAudience(claims);
+
+  const visibleCategories = React.useMemo(
+    () => getHelpCategoriesForAudience(audience),
+    [audience],
+  );
+
   const [activeCategory, setActiveCategory] = React.useState<HelpCategoryId>(
     visibleCategories[0]?.id ?? "general",
   );
+
+  React.useEffect(() => {
+    if (
+      visibleCategories.length > 0 &&
+      !visibleCategories.some((category) => category.id === activeCategory)
+    ) {
+      setActiveCategory(visibleCategories[0].id);
+    }
+  }, [activeCategory, visibleCategories]);
 
   const sectionRefs = React.useRef<Record<string, HTMLElement | null>>({});
 
@@ -43,6 +65,11 @@ export function HelpPage() {
       block: "start",
     });
   };
+
+  const subtitle =
+    audience === "portal"
+      ? "Guías para usar el portal: empresas, proyectos y tickets."
+      : "Guías, especificaciones y comandos del sistema.";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -60,9 +87,7 @@ export function HelpPage() {
           </div>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Ayuda</h1>
-            <p className="text-sm text-muted-foreground">
-              Guías, especificaciones y comandos del sistema.
-            </p>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
       </div>
@@ -96,7 +121,7 @@ export function HelpPage() {
 
         <div className="space-y-8">
           {visibleCategories.map((category) => {
-            const articles = getHelpArticlesByCategory(category.id);
+            const articles = getHelpArticlesByCategory(category.id, audience);
 
             return (
               <section
@@ -116,7 +141,9 @@ export function HelpPage() {
                   </CardHeader>
                   <CardContent>
                     <Accordion
-                      defaultValue={articles.length === 1 ? [articles[0].id] : []}
+                      defaultValue={
+                        articles.length === 1 ? [articles[0].id] : []
+                      }
                     >
                       {articles.map((article) => (
                         <AccordionItem key={article.id} value={article.id}>
