@@ -55,6 +55,12 @@ export const APP_STYLES = [
     description: "Verdes naturales y tonos tierra",
     swatch: "#3f7a45",
   },
+  {
+    id: "fl-theme",
+    label: "FL Theme",
+    description: "Cian y navy corporativo (Inter)",
+    swatch: "#3eb8e8",
+  },
 ] as const satisfies readonly AppStyleDefinition[];
 
 const styleIds = new Set<string>(APP_STYLES.map((style) => style.id));
