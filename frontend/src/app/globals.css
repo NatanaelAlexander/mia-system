@@ -5,6 +5,7 @@
 @import "../styles/themes/clean-slate.css";
 @import "../styles/themes/cyberpunk.css";
 @import "../styles/themes/nature.css";
+@import "../styles/themes/fl-theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
