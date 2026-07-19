@@ -131,10 +131,13 @@ function flagBadgeClass(category: string): string {
 
 /** Flags already covered by the lifecycle badge (Borrador / Lista / Enviada). */
 function visibleStatusFlags(quote: QuoteListItem) {
-  return (quote.statusFlags ?? []).filter((flag) => {
+  const flags = (quote.statusFlags ?? []).filter((flag) => {
     if (flag.code === "enviado") return false;
+    if (flag.category === "exchange") return false;
     return true;
   });
+  // Un solo estado comercial visible
+  return flags.slice(0, 1);
 }
 
 function QuoteRow({

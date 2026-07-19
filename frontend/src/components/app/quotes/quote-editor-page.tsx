@@ -40,7 +40,7 @@ import {
   listQuoteStatusCatalog,
   removeQuoteSignedDocument,
   sendQuote,
-  setQuoteStatuses,
+  setQuoteStatus,
   toggleQuoteShare,
   updateQuote,
   updateQuotePreset,
@@ -159,8 +159,8 @@ const GESTION_STEPS: Array<{
   },
   {
     id: "estados",
-    label: "Estados",
-    description: "Flujo y pago",
+    label: "Estado",
+    description: "Estado único",
     Icon: ListOrdered,
     card: "border-primary/35 bg-primary/5 ring-primary/20",
     iconWrap: "bg-primary text-primary-foreground",
@@ -395,9 +395,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [statusCatalog, setStatusCatalog] = React.useState<QuoteStatusFlag[]>(
     [],
   );
-  const [selectedStatusCodes, setSelectedStatusCodes] = React.useState<
-    string[]
-  >([]);
+  const [selectedStatusCode, setSelectedStatusCode] = React.useState("");
   const [projects, setProjects] = React.useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -438,6 +436,8 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     string | null
   >(null);
   const [generateConfirmOpen, setGenerateConfirmOpen] = React.useState(false);
+  const [defaultStatusConfirmOpen, setDefaultStatusConfirmOpen] =
+    React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState<
     "quote" | "preset" | "signed" | null
   >(null);
@@ -520,7 +520,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         const loadedSections = sectionsFromQuote(detail);
         setSections(loadedSections);
         setActiveFrequency(initialActiveFrequency(loadedSections));
-        setSelectedStatusCodes(detail.statusFlags?.map((f) => f.code) ?? []);
+        setSelectedStatusCode(detail.statusFlags?.[0]?.code ?? "creado");
       } else {
         if (issuerList[0]) setIssuerId(issuerList[0].id);
         const firstRep = company.representativeLinks?.[0]?.legalRepresentativeId;
@@ -701,6 +701,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       clientVisible,
       issueDate,
       expiresAt,
+      statusCode: selectedStatusCode || undefined,
       sections: sectionPayloads,
     };
   };
@@ -710,6 +711,10 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     if (!isNew && !canUpdate) return;
     const payload = buildPayload();
     if (!payload) return;
+    if (!selectedStatusCode) {
+      setDefaultStatusConfirmOpen(true);
+      return;
+    }
     setGenerateConfirmOpen(true);
   };
 
@@ -719,18 +724,25 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
     const payload = buildPayload();
     if (!payload) return;
+    const statusCode = selectedStatusCode || "creado";
 
     setIsSaving(true);
     try {
       if (isNew) {
-        await createQuote(payload);
+        await createQuote({ ...payload, statusCode });
         setGenerateConfirmOpen(false);
-        toast.success("Cotización creada como borrador");
+        setDefaultStatusConfirmOpen(false);
+        toast.success(
+          statusCode === "creado"
+            ? "Cotización creada con estado Creado"
+            : "Cotización creada",
+        );
         router.push(backHref);
       } else if (quoteId) {
         const { companyId: _companyId, ...updatePayload } = payload;
-        await updateQuote(quoteId, updatePayload);
+        await updateQuote(quoteId, { ...updatePayload, statusCode });
         setGenerateConfirmOpen(false);
+        setDefaultStatusConfirmOpen(false);
         toast.success("Cotización actualizada");
         router.push(backHref);
       }
@@ -938,7 +950,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     try {
       const updated = await sendQuote(quoteId);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? "creado");
       toast.success("Cotización enviada; enlace activo por 24 horas");
     } catch (error) {
       toast.error(
@@ -955,7 +967,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     try {
       const updated = await toggleQuoteShare(quoteId, enabled);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? "creado");
       toast.success(
         enabled
           ? "Enlace habilitado (24 horas desde ahora)"
@@ -972,37 +984,24 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const handleSaveStatuses = async () => {
     if (!quoteId || !canUpdate) return;
+    const statusCode = selectedStatusCode || "creado";
     setIsSaving(true);
     try {
-      const updated = await setQuoteStatuses(quoteId, selectedStatusCodes);
+      const updated = await setQuoteStatus(quoteId, statusCode);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
-      toast.success("Estados actualizados");
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? statusCode);
+      toast.success("Estado actualizado");
     } catch (error) {
       toast.error(
-        error instanceof ApiError ? error.message : "No se pudieron guardar los estados.",
+        error instanceof ApiError ? error.message : "No se pudo guardar el estado.",
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const toggleStatusCode = (code: string, category: QuoteStatusFlag["category"]) => {
-    setSelectedStatusCodes((current) => {
-      const isSelected = current.includes(code);
-      if (isSelected) {
-        return current.filter((item) => item !== code);
-      }
-      if (category === "payment" || category === "exchange") {
-        const exclusiveCodes = new Set(
-          statusCatalog
-            .filter((item) => item.category === category)
-            .map((item) => item.code),
-        );
-        return [...current.filter((item) => !exclusiveCodes.has(item)), code];
-      }
-      return [...current, code];
-    });
+  const selectStatusCode = (code: string) => {
+    setSelectedStatusCode(code);
   };
 
   const handleUploadSigned = async (file: File | null) => {
@@ -1447,6 +1446,30 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   tone="secondary"
                 />
               </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Estado de la cotización</Label>
+                <p className="text-xs text-muted-foreground">
+                  Solo un estado a la vez. Si no eliges ninguno, al guardar se
+                  usará «Creado».
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {statusCatalog.map((item) => (
+                    <OptionChip
+                      key={item.code}
+                      id={`status-datos-${item.code}`}
+                      checked={selectedStatusCode === item.code}
+                      onCheckedChange={(checked) =>
+                        selectStatusCode(checked ? item.code : "")
+                      }
+                      label={item.name}
+                      tone={
+                        item.category === "payment" ? "primary" : "secondary"
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsPanel>
@@ -1869,11 +1892,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   </div>
                   <div>
                     <CardTitle className="text-primary">
-                      Estados del documento
+                      Estado del documento
                     </CardTitle>
                     <CardDescription>
-                      Puedes marcar varios a la vez. En pago y canje solo uno de
-                      cada grupo.
+                      Solo un estado a la vez. El canje se marca por tipo de pago
+                      (único / mensual / anual), no aquí.
                     </CardDescription>
                   </div>
                 </div>
@@ -1883,52 +1906,26 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   disabled={isSaving || !canUpdate}
                   onClick={() => void handleSaveStatuses()}
                 >
-                  Guardar estados
+                  Guardar estado
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                {(
-                  [
-                    ["workflow", "Flujo", "secondary"],
-                    ["payment", "Pago", "primary"],
-                    ["exchange", "Canje", "secondary"],
-                    ["general", "Otros", "primary"],
-                  ] as const
-                ).map(([category, label, tone]) => {
-                  const items = statusCatalog.filter(
-                    (item) => item.category === category,
-                  );
-                  if (items.length === 0) return null;
-                  return (
-                    <div
-                      key={category}
-                      className="space-y-2 rounded-lg border border-border/50 bg-background/50 p-3"
-                    >
-                      <p
-                        className={cn(
-                          "text-sm font-medium",
-                          tone === "primary" ? "text-primary" : "text-secondary",
-                        )}
-                      >
-                        {label}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {items.map((item) => (
-                          <OptionChip
-                            key={item.code}
-                            id={`status-${item.code}`}
-                            checked={selectedStatusCodes.includes(item.code)}
-                            onCheckedChange={() =>
-                              toggleStatusCode(item.code, item.category)
-                            }
-                            label={item.name}
-                            tone={tone}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex flex-wrap gap-2">
+                  {statusCatalog.map((item) => (
+                    <OptionChip
+                      key={item.code}
+                      id={`status-${item.code}`}
+                      checked={selectedStatusCode === item.code}
+                      onCheckedChange={(checked) =>
+                        selectStatusCode(checked ? item.code : "")
+                      }
+                      label={item.name}
+                      tone={
+                        item.category === "payment" ? "primary" : "secondary"
+                      }
+                    />
+                  ))}
+                </div>
               </CardContent>
             </Card>
             ) : null}
@@ -2289,6 +2286,33 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={defaultStatusConfirmOpen}
+        onOpenChange={setDefaultStatusConfirmOpen}
+        title="Sin estado seleccionado"
+        description={
+          <div className="space-y-3 text-left leading-relaxed">
+            <p>
+              No elegiste un estado comercial para esta cotización.
+            </p>
+            <p>
+              Al continuar se guardará con el estado{" "}
+              <span className="font-semibold text-foreground">Creado</span>.
+              Esto es solo un aviso: puedes cambiarlo después en el editor.
+            </p>
+          </div>
+        }
+        confirmLabel="Continuar con Creado"
+        cancelLabel="Volver"
+        confirmVariant="default"
+        onConfirm={() => {
+          setSelectedStatusCode("creado");
+          setDefaultStatusConfirmOpen(false);
+          setGenerateConfirmOpen(true);
+        }}
+        isConfirming={false}
+      />
 
       <ConfirmDialog
         open={generateConfirmOpen}

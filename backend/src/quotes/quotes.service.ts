@@ -27,6 +27,7 @@ import {
 } from './exceptions/quotes.exceptions';
 import {
   SQL_ASSIGN_STATUS,
+  SQL_CLEAR_QUOTE_STATUSES,
   SQL_CLEAR_SIGNED_ASSET,
   SQL_DELETE_PRESET,
   SQL_DELETE_QUOTE,
@@ -55,8 +56,6 @@ import {
   SQL_INSERT_QUOTE_NOTIFICATION,
   SQL_INSERT_SECTION,
   SQL_QUOTE_DETAIL_EXTRAS,
-  SQL_REMOVE_STATUS,
-  SQL_REMOVE_STATUSES_IN_CATEGORY,
   SQL_SET_SIGNED_ASSET,
   SQL_UPDATE_PRESET,
   SQL_UPSERT_SHARE_LINK,
@@ -83,7 +82,7 @@ import {
 } from './dto/quote-preset.dto';
 const AUDIT_TABLE = 'quotes';
 const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
-const EXCLUSIVE_CATEGORIES = new Set(['payment', 'exchange']);
+const DEFAULT_COMMERCIAL_STATUS = 'creado';
 
 type DbQuery = <R extends QueryResultRow = QueryResultRow>(
   text: string,
@@ -212,17 +211,23 @@ export class QuotesService {
       return id;
     });
 
-    const detail = await this.loadDetail(quoteId);
+    await this.assignStatusCode(
+      quoteId,
+      dto.statusCode?.trim() || DEFAULT_COMMERCIAL_STATUS,
+      actorUserId,
+    );
+
+    const withStatus = await this.loadDetail(quoteId);
 
     await this.auditService.log({
       userId: actorUserId,
       action: AuditAction.CREATE,
       tableName: AUDIT_TABLE,
       recordId: quoteId,
-      newValues: this.asJson(detail),
+      newValues: this.asJson(withStatus),
     });
 
-    return detail;
+    return withStatus;
   }
 
   async update(
@@ -321,6 +326,16 @@ export class QuotesService {
         );
       }
     });
+
+    if (dto.statusCode?.trim()) {
+      await this.assignStatusCode(id, dto.statusCode.trim(), actorUserId);
+    } else if ((previous.statusFlags?.length ?? 0) === 0) {
+      await this.assignStatusCode(
+        id,
+        DEFAULT_COMMERCIAL_STATUS,
+        actorUserId,
+      );
+    }
 
     const detail = await this.loadDetail(id);
 
@@ -429,54 +444,13 @@ export class QuotesService {
   async setStatuses(
     actorUserId: string,
     id: string,
-    statusCodes: string[],
+    statusCode: string,
   ): Promise<QuoteDetail> {
     await this.loadDetail(id);
-    const catalog = await this.db.query<QuoteStatusFlag>(SQL_FIND_STATUS_CATALOG);
-    const byCode = new Map(catalog.rows.map((row) => [row.code, row]));
+    const code = statusCode.trim() || DEFAULT_COMMERCIAL_STATUS;
+    await this.assignStatusCode(id, code, actorUserId);
 
-    const uniqueCodes = [...new Set(statusCodes.map((c) => c.trim()).filter(Boolean))];
-    for (const code of uniqueCodes) {
-      if (!byCode.has(code)) {
-        throw new EstadoCotizacionInvalidoException(code);
-      }
-    }
-
-    // Exclusive categories: keep at most one code per payment/exchange
-    const selected = new Map<string, QuoteStatusFlag>();
-    for (const code of uniqueCodes) {
-      const flag = byCode.get(code)!;
-      if (EXCLUSIVE_CATEGORIES.has(flag.category)) {
-        for (const [existingCode, existing] of selected) {
-          if (existing.category === flag.category) {
-            selected.delete(existingCode);
-          }
-        }
-      }
-      selected.set(code, flag);
-    }
-
-    const { rows: current } = await this.db.query<QuoteStatusFlag & { quoteId: string }>(
-      SQL_FIND_STATUSES_BY_QUOTE_IDS,
-      [[id]],
-    );
-
-    const desiredIds = new Set([...selected.values()].map((s) => s.id));
-    const currentIds = new Set(current.map((s) => s.id));
-
-    for (const flag of current) {
-      if (!desiredIds.has(flag.id)) {
-        await this.db.query(SQL_REMOVE_STATUS, [id, flag.id]);
-      }
-    }
-
-    for (const flag of selected.values()) {
-      if (!currentIds.has(flag.id)) {
-        await this.db.query(SQL_ASSIGN_STATUS, [id, flag.id, actorUserId]);
-      }
-    }
-
-    if (selected.has('enviado')) {
+    if (code === 'enviado') {
       await this.db.query(
         `UPDATE quotes SET status = $1, updated_at = NOW() WHERE id = $2`,
         [QuoteStatus.SENT, id],
@@ -489,7 +463,7 @@ export class QuotesService {
       action: AuditAction.UPDATE,
       tableName: AUDIT_TABLE,
       recordId: id,
-      newValues: { scope: 'set_statuses', statusCodes: [...selected.keys()] },
+      newValues: { scope: 'set_status', statusCode: code },
     });
     return detail;
   }
@@ -651,17 +625,10 @@ export class QuotesService {
     ]);
     const flag = rows[0];
     if (!flag) {
-      return;
+      throw new EstadoCotizacionInvalidoException(code);
     }
 
-    if (EXCLUSIVE_CATEGORIES.has(flag.category)) {
-      await this.db.query(SQL_REMOVE_STATUSES_IN_CATEGORY, [
-        quoteId,
-        flag.category,
-        [code],
-      ]);
-    }
-
+    await this.db.query(SQL_CLEAR_QUOTE_STATUSES, [quoteId]);
     await this.db.query(SQL_ASSIGN_STATUS, [quoteId, flag.id, actorUserId]);
   }
 

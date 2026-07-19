@@ -204,7 +204,7 @@ export class InternalQuotesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetQuoteStatusesDto,
   ) {
-    return this.quotesService.setStatuses(actorUserId, id, dto.statusCodes);
+    return this.quotesService.setStatuses(actorUserId, id, dto.statusCode);
   }
 
   @Post(':id/documento-firmado')

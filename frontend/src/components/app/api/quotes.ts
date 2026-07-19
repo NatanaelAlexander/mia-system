@@ -136,6 +136,8 @@ export interface CreateQuotePayload {
   issueDate: string;
   expiresAt?: string;
   status?: QuoteStatus;
+  /** Estado comercial único. Si se omite, el API usa «creado». */
+  statusCode?: string;
   sections: QuoteSectionPayload[];
 }
 
@@ -212,11 +214,16 @@ export function listQuoteStatusCatalog() {
   return apiFetch<QuoteStatusFlag[]>("/internal/quotes/estados", {}, true);
 }
 
-export function setQuoteStatuses(id: string, statusCodes: string[]) {
+export function setQuoteStatus(id: string, statusCode: string) {
   return apiFetch<QuoteDetail>(`/internal/quotes/${id}/estados`, {
     method: "POST",
-    body: JSON.stringify({ statusCodes }),
+    body: JSON.stringify({ statusCode }),
   }, true);
+}
+
+/** @deprecated use setQuoteStatus */
+export function setQuoteStatuses(id: string, statusCodes: string[]) {
+  return setQuoteStatus(id, statusCodes[0] ?? "creado");
 }
 
 export function uploadQuoteSignedDocument(
