@@ -36,6 +36,7 @@ export const SQL_FIND_NOTIFICATIONS_BY_USER = `
     INNER JOIN tickets t ON t.id = n.ticket_id
     INNER JOIN users actor ON actor.id = n.actor_user_id
     WHERE n.user_id = $1
+      AND n.dismissed_at IS NULL
 
     UNION ALL
 
@@ -60,6 +61,7 @@ export const SQL_FIND_NOTIFICATIONS_BY_USER = `
     FROM quote_notifications qn
     INNER JOIN users actor ON actor.id = qn.actor_user_id
     WHERE qn.user_id = $1
+      AND qn.dismissed_at IS NULL
   ) notifications
   ORDER BY "createdAt" DESC
   LIMIT $2
@@ -68,10 +70,10 @@ export const SQL_FIND_NOTIFICATIONS_BY_USER = `
 export const SQL_COUNT_UNREAD_NOTIFICATIONS = `
   SELECT (
     (SELECT COUNT(*)::int FROM ticket_notifications
-     WHERE user_id = $1 AND read_at IS NULL)
+     WHERE user_id = $1 AND read_at IS NULL AND dismissed_at IS NULL)
     +
     (SELECT COUNT(*)::int FROM quote_notifications
-     WHERE user_id = $1 AND read_at IS NULL)
+     WHERE user_id = $1 AND read_at IS NULL AND dismissed_at IS NULL)
   ) AS count
 `;
 
@@ -81,6 +83,7 @@ export const SQL_MARK_NOTIFICATION_READ = `
   WHERE id = $1
     AND user_id = $2
     AND read_at IS NULL
+    AND dismissed_at IS NULL
   RETURNING id
 `;
 
@@ -90,6 +93,7 @@ export const SQL_MARK_QUOTE_NOTIFICATION_READ = `
   WHERE id = $1
     AND user_id = $2
     AND read_at IS NULL
+    AND dismissed_at IS NULL
   RETURNING id
 `;
 
@@ -99,6 +103,7 @@ export const SQL_MARK_ALL_NOTIFICATIONS_READ = `
     SET read_at = NOW()
     WHERE user_id = $1
       AND read_at IS NULL
+      AND dismissed_at IS NULL
     RETURNING id
   ),
   quote_upd AS (
@@ -106,6 +111,7 @@ export const SQL_MARK_ALL_NOTIFICATIONS_READ = `
     SET read_at = NOW()
     WHERE user_id = $1
       AND read_at IS NULL
+      AND dismissed_at IS NULL
     RETURNING id
   )
   SELECT
@@ -119,6 +125,43 @@ export const SQL_MARK_TICKET_NOTIFICATIONS_READ = `
   WHERE user_id = $1
     AND ticket_id = $2
     AND read_at IS NULL
+    AND dismissed_at IS NULL
+`;
+
+export const SQL_DISMISS_TICKET_NOTIFICATION = `
+  UPDATE ticket_notifications
+  SET dismissed_at = NOW(),
+      read_at = COALESCE(read_at, NOW())
+  WHERE id = $1
+    AND user_id = $2
+    AND dismissed_at IS NULL
+  RETURNING id
+`;
+
+export const SQL_DISMISS_QUOTE_NOTIFICATION = `
+  UPDATE quote_notifications
+  SET dismissed_at = NOW(),
+      read_at = COALESCE(read_at, NOW())
+  WHERE id = $1
+    AND user_id = $2
+    AND dismissed_at IS NULL
+  RETURNING id
+`;
+
+export const SQL_PURGE_OLD_NOTIFICATIONS = `
+  WITH ticket_del AS (
+    DELETE FROM ticket_notifications
+    WHERE created_at < NOW() - INTERVAL '7 days'
+    RETURNING id
+  ),
+  quote_del AS (
+    DELETE FROM quote_notifications
+    WHERE created_at < NOW() - INTERVAL '7 days'
+    RETURNING id
+  )
+  SELECT
+    (SELECT COUNT(*)::int FROM ticket_del)
+    + (SELECT COUNT(*)::int FROM quote_del) AS count
 `;
 
 export const SQL_FIND_TICKET_ASSIGNEE_USER_IDS = `

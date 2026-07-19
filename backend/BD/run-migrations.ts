@@ -22,6 +22,7 @@ const MIGRATIONS = [
   'quote_pdf_style',
   'quote_pdf_theme',
   'quote_pdf_layouts_v2',
+  'notification_dismiss_cleanup',
 ] as const;
 
 const SEPARATOR = '----------------------------------------';
