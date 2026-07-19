@@ -140,7 +140,7 @@ export class CreateQuoteDto {
   @IsDateString()
   expiresAt?: string;
 
-  @ApiPropertyOptional({ enum: QuoteStatus, default: QuoteStatus.DRAFT })
+  @ApiPropertyOptional({ enum: QuoteStatus, default: QuoteStatus.READY })
   @IsOptional()
   @IsEnum(QuoteStatus)
   status?: QuoteStatus;

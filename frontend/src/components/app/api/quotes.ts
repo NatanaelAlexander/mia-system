@@ -2,7 +2,7 @@ import { apiFetch, apiFetchDetalle, apiUpload } from "@/lib/api/client";
 
 export type QuoteScope = "company" | "project" | "ticket";
 export type QuoteDocumentType = "boleta" | "factura";
-export type QuoteStatus = "draft" | "ready" | "sent";
+export type QuoteStatus = "ready" | "sent";
 export type QuoteFrequency = "unico" | "mensual" | "anual";
 export type PriceInputMode = "gross" | "liquid";
 export type QuoteStatusCategory =

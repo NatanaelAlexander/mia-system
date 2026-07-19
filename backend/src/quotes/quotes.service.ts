@@ -185,7 +185,7 @@ export class QuotesService {
     );
 
     const expiresAt = dto.expiresAt ?? this.addDays(dto.issueDate, 30);
-    const status = dto.status ?? QuoteStatus.DRAFT;
+    const status = dto.status ?? QuoteStatus.READY;
 
     const quoteId = await this.db.transaction(async (query) => {
       const { rows } = await query<{ id: string }>(SQL_INSERT_QUOTE, [

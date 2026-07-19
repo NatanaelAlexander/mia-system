@@ -2342,17 +2342,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 <span className="font-semibold text-foreground">
                   no la envías al cliente
                 </span>{" "}
-                (botón <span className="font-semibold text-foreground">Enviar</span>
-                ), en el listado aparecerá como{" "}
-                <span className="rounded-md bg-muted px-1.5 py-0.5 font-semibold text-foreground">
-                  Borrador
-                </span>
-                .
-              </p>
-              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-foreground/90">
-                <span className="font-semibold">Borrador</span> no significa que
-                falte guardar: significa que{" "}
-                <span className="font-semibold">aún no fue enviada</span>.
+                (botón{" "}
+                <span className="font-semibold text-foreground">Enviar</span>),
+                quedará guardada con su estado comercial (por ejemplo{" "}
+                <span className="font-semibold text-foreground">Creado</span>)
+                sin aparecer como enviada.
               </p>
             </div>
           )

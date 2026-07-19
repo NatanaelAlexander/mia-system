@@ -10,7 +10,6 @@ export enum QuoteDocumentType {
 }
 
 export enum QuoteStatus {
-  DRAFT = 'draft',
   READY = 'ready',
   SENT = 'sent',
 }
