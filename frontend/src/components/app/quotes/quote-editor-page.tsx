@@ -43,6 +43,7 @@ import {
   setQuoteStatuses,
   toggleQuoteShare,
   updateQuote,
+  updateQuotePreset,
   uploadQuoteSignedDocument,
   type CreateQuotePayload,
   type PriceInputMode,
@@ -116,6 +117,7 @@ import {
   QUOTE_PDF_LAYOUTS,
   QUOTE_PDF_PRIMARY_COLORS,
   QUOTE_PDF_SECONDARY_COLORS,
+  resolveQuotePdfTheme,
   type QuotePdfLayoutId,
 } from "./quote-pdf-styles";
 import {
@@ -425,15 +427,16 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [expiresAt, setExpiresAt] = React.useState(addDaysIso(todayIso(), 30));
   const [sections, setSections] = React.useState<DraftSection[]>(emptySections());
   const [presets, setPresets] = React.useState<QuotePreset[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = React.useState<string>("");
   const [editorTab, setEditorTab] = React.useState<QuoteEditorTab>("datos");
   const [activeFrequency, setActiveFrequency] =
     React.useState<QuoteFrequency>("unico");
   const [activeGestionStep, setActiveGestionStep] =
     React.useState<GestionStep>("enlace");
-  const [savePresetOpen, setSavePresetOpen] = React.useState(false);
-  const [loadPresetOpen, setLoadPresetOpen] = React.useState(false);
+  const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [presetName, setPresetName] = React.useState("");
+  const [presetPendingDeleteId, setPresetPendingDeleteId] = React.useState<
+    string | null
+  >(null);
   const [generateConfirmOpen, setGenerateConfirmOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState<
     "quote" | "preset" | "signed" | null
@@ -594,11 +597,6 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     { value: "liquid", label: "Montos líquidos" },
   ] as const;
 
-  const presetItems = React.useMemo(
-    () => presets.map((preset) => ({ value: preset.id, label: preset.name })),
-    [presets],
-  );
-
   const previewModel = React.useMemo((): QuotePreviewModel => {
     const issuer = issuers.find((item) => item.id === issuerId);
     const rep = representatives.find((item) => item.id === legalRepresentativeId);
@@ -745,32 +743,54 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     }
   };
 
-  const buildPresetPayload = (): QuotePresetPayload => ({
-    legalRepresentativeId: legalRepresentativeId || undefined,
-    issuerId: issuerId || undefined,
-    scope,
-    projectId: scope === "company" ? null : projectId || null,
-    ticketId: scope === "ticket" ? ticketId || null : null,
-    documentType,
-    pdfLayoutId,
-    pdfPrimaryColor,
-    pdfSecondaryColor,
-    clientVisible,
-    sections: sections.map((section) => ({
-      frequency: section.frequency,
-      esCanje: section.esCanje,
-      applyTax: section.applyTax,
-      priceInputMode: section.priceInputMode,
-      items: section.items.map((item) => ({
-        title: item.title,
-        description: item.description,
-        price: item.price,
+  const buildPresetPayload = (): QuotePresetPayload => {
+    const theme = resolveQuotePdfTheme({
+      layoutId: pdfLayoutId,
+      primary: pdfPrimaryColor,
+      secondary: pdfSecondaryColor,
+    });
+
+    return {
+      legalRepresentativeId: legalRepresentativeId || undefined,
+      issuerId: issuerId || undefined,
+      scope,
+      projectId: scope === "company" ? null : projectId || null,
+      ticketId: scope === "ticket" ? ticketId || null : null,
+      documentType,
+      pdfLayoutId: theme.layoutId,
+      pdfPrimaryColor: theme.primary,
+      pdfSecondaryColor: theme.secondary,
+      clientVisible,
+      sections: sections.map((section) => ({
+        frequency: section.frequency,
+        esCanje: section.esCanje,
+        applyTax: section.applyTax,
+        priceInputMode: section.priceInputMode,
+        items: section.items.map((item) => ({
+          title: item.title,
+          description: item.description,
+          price: item.price,
+        })),
       })),
-    })),
-  });
+    };
+  };
+
+  const normalizePresetPayload = (
+    raw: QuotePreset["payload"] | string | null | undefined,
+  ): QuotePresetPayload => {
+    if (!raw) return {};
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw) as QuotePresetPayload;
+      } catch {
+        return {};
+      }
+    }
+    return raw;
+  };
 
   const applyPreset = (preset: QuotePreset) => {
-    const data = preset.payload ?? {};
+    const data = normalizePresetPayload(preset.payload);
     if (data.legalRepresentativeId) {
       setLegalRepresentativeId(data.legalRepresentativeId);
     }
@@ -789,15 +809,17 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     if (data.documentType) {
       setDocumentType(data.documentType);
     }
-    if (isQuotePdfLayoutId(data.pdfLayoutId)) {
-      setPdfLayoutId(data.pdfLayoutId);
-    }
-    if (isHexColor(data.pdfPrimaryColor)) {
-      setPdfPrimaryColor(data.pdfPrimaryColor);
-    }
-    if (isHexColor(data.pdfSecondaryColor)) {
-      setPdfSecondaryColor(data.pdfSecondaryColor);
-    }
+
+    // Siempre aplicar estilos del PDF del preset (layout + colores).
+    const theme = resolveQuotePdfTheme({
+      layoutId: data.pdfLayoutId,
+      primary: data.pdfPrimaryColor,
+      secondary: data.pdfSecondaryColor,
+    });
+    setPdfLayoutId(theme.layoutId);
+    setPdfPrimaryColor(theme.primary);
+    setPdfSecondaryColor(theme.secondary);
+
     if (typeof data.clientVisible === "boolean") {
       setClientVisible(data.clientVisible);
     }
@@ -820,20 +842,13 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       setActiveFrequency(initialActiveFrequency(next));
     }
     // Fechas no se tocan a propósito
-    setLoadPresetOpen(false);
-    toast.success(`Preset «${preset.name}» cargado (sin fechas)`);
+    setPresetsOpen(false);
+    toast.success(
+      `Preset «${preset.name}» cargado (incluidos estilos del PDF, sin fechas)`,
+    );
   };
 
-  const handleLoadPreset = () => {
-    const preset = presets.find((item) => item.id === selectedPresetId);
-    if (!preset) {
-      toast.error("Selecciona un preset para cargar.");
-      return;
-    }
-    applyPreset(preset);
-  };
-
-  const handleSavePreset = async () => {
+  const handleCreatePreset = async () => {
     if (!presetName.trim()) {
       toast.error("Escribe un nombre para el preset.");
       return;
@@ -848,13 +863,32 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       setPresets((current) =>
         [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      setSelectedPresetId(created.id);
-      setSavePresetOpen(false);
       setPresetName("");
-      toast.success("Preset guardado");
+      toast.success("Preset creado (incluye estilos del PDF)");
     } catch (error) {
       toast.error(
-        error instanceof ApiError ? error.message : "No se pudo guardar el preset.",
+        error instanceof ApiError ? error.message : "No se pudo crear el preset.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePreset = async (preset: QuotePreset) => {
+    setIsSaving(true);
+    try {
+      const updated = await updateQuotePreset(preset.id, {
+        payload: buildPresetPayload(),
+      });
+      setPresets((current) =>
+        current.map((item) => (item.id === preset.id ? updated : item)),
+      );
+      toast.success(`Preset «${preset.name}» actualizado (con estilos del PDF)`);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo actualizar el preset.",
       );
     } finally {
       setIsSaving(false);
@@ -862,14 +896,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   };
 
   const handleDeletePreset = async () => {
-    if (!selectedPresetId) return;
+    if (!presetPendingDeleteId) return;
     setIsSaving(true);
     try {
-      await deleteQuotePreset(selectedPresetId);
+      await deleteQuotePreset(presetPendingDeleteId);
       setPresets((current) =>
-        current.filter((item) => item.id !== selectedPresetId),
+        current.filter((item) => item.id !== presetPendingDeleteId),
       );
-      setSelectedPresetId("");
+      setPresetPendingDeleteId(null);
       setConfirmDelete(null);
       toast.success("Preset eliminado");
     } catch (error) {
@@ -1980,34 +2014,23 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
               <Badge variant="secondary" className="font-normal">
                 {getQuotePdfLayout(pdfLayoutId).name}
               </Badge>
-              <HelpHint
-                label="Qué es un preset"
-                side="bottom"
-                text="Un preset guarda la configuración actual (representante, emisor, alcance, tipo, visibilidad e ítems) para reutilizarla. Al cargar no se tocan las fechas. Generar documento guarda la cotización; si no la envías al cliente, queda como Borrador en el listado."
-              />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 disabled={isSaving}
-                onClick={() => setLoadPresetOpen(true)}
-              >
-                <FolderOpen />
-                Cargar preset
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-primary/40 bg-primary/15 text-primary hover:bg-primary hover:text-primary-foreground"
-                disabled={isSaving}
-                onClick={() => setSavePresetOpen(true)}
+                onClick={() => setPresetsOpen(true)}
               >
                 <BookmarkPlus />
-                Guardar preset
+                Preset
               </Button>
+              <HelpHint
+                label="Qué es un preset"
+                side="bottom"
+                text="Un preset guarda la configuración actual: representante, emisor, alcance, tipo, visibilidad, ítems y también los estilos del PDF (layout y colores). Al cargar no se tocan las fechas."
+              />
               <Button
                 type="button"
                 size="sm"
@@ -2147,103 +2170,121 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={loadPresetOpen} onOpenChange={setLoadPresetOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={presetsOpen}
+        onOpenChange={(open) => {
+          setPresetsOpen(open);
+          if (!open) setPresetName("");
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Cargar preset</DialogTitle>
+            <DialogTitle>Presets</DialogTitle>
             <DialogDescription>
-              Se rellenarán los datos del formulario excepto las fechas. Podrás
-              editarlo después.
+              Guarda la configuración actual del documento, incluidos los
+              estilos del PDF (layout y colores). Las fechas no forman parte del
+              preset. Puedes crear, cargar, actualizar o eliminar.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label>Preset</Label>
-            <Select
-              items={presetItems}
-              value={selectedPresetId || null}
-              onValueChange={(v: string | null) => setSelectedPresetId(v ?? "")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar preset" />
-              </SelectTrigger>
-              <SelectContent>
-                {presetItems.map((preset) => (
-                  <SelectItem key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter className="sm:justify-between">
-            {selectedPresetId ? (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={isSaving}
-                onClick={() => setConfirmDelete("preset")}
-              >
-                <Trash2 />
-                Eliminar
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setLoadPresetOpen(false)}
-                disabled={isSaving}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                disabled={isSaving || !selectedPresetId}
-                onClick={handleLoadPreset}
-              >
-                Cargar
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Guardar preset</DialogTitle>
-            <DialogDescription>
-              Se guardarán representante, emisor, alcance, tipo de documento,
-              visibilidad e ítems. Las fechas no forman parte del preset.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="preset-name">Nombre del preset</Label>
-            <Input
-              id="preset-name"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              placeholder="Ej. Mantención mensual boleta"
-              autoFocus
-            />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name">Nuevo preset</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="preset-name"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  placeholder="Ej. Mantención mensual boleta"
+                  disabled={isSaving}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleCreatePreset();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  disabled={isSaving || !presetName.trim()}
+                  onClick={() => void handleCreatePreset()}
+                >
+                  <Plus />
+                  Crear
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Presets guardados</p>
+              {presets.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+                  Aún no hay presets. Crea uno con el formulario de arriba.
+                </p>
+              ) : (
+                <ul className="max-h-72 space-y-1 overflow-y-auto rounded-lg border p-1">
+                  {presets.map((preset) => (
+                    <li
+                      key={preset.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {preset.name}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Cargar preset ${preset.name}`}
+                          title="Cargar"
+                          onClick={() => applyPreset(preset)}
+                        >
+                          <FolderOpen />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Actualizar preset ${preset.name}`}
+                          title="Actualizar con el documento actual"
+                          onClick={() => void handleUpdatePreset(preset)}
+                        >
+                          <RefreshCw />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Eliminar preset ${preset.name}`}
+                          title="Eliminar"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setPresetPendingDeleteId(preset.id);
+                            setConfirmDelete("preset");
+                          }}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setSavePresetOpen(false)}
+              onClick={() => setPresetsOpen(false)}
               disabled={isSaving}
             >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={isSaving || !presetName.trim()}
-              onClick={() => void handleSavePreset()}
-            >
-              {isSaving ? "Guardando…" : "Guardar preset"}
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2304,7 +2345,10 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       <ConfirmDialog
         open={confirmDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmDelete(null);
+          if (!open) {
+            setConfirmDelete(null);
+            setPresetPendingDeleteId(null);
+          }
         }}
         title={
           confirmDelete === "quote"

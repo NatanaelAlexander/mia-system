@@ -299,6 +299,19 @@ export function createQuotePreset(payload: {
   }, true);
 }
 
+export function updateQuotePreset(
+  id: string,
+  payload: {
+    name?: string;
+    payload?: QuotePresetPayload;
+  },
+) {
+  return apiFetch<QuotePreset>(`/internal/quotes/presets/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }, true);
+}
+
 export function deleteQuotePreset(id: string) {
   return apiFetch<void>(`/internal/quotes/presets/${id}`, {
     method: "DELETE",
