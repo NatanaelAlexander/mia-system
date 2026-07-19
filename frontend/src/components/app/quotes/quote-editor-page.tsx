@@ -855,9 +855,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     }
     // Fechas no se tocan a propósito
     setPresetsOpen(false);
-    toast.success(
-      `Preset «${preset.name}» cargado (incluidos estilos del PDF, sin fechas)`,
-    );
+    toast.success(`Preset «${preset.name}» cargado`);
   };
 
   const handleCreatePreset = async () => {
