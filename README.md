@@ -10,6 +10,42 @@ Documentación adicional:
 
 ---
 
+## Descripción general
+
+**mia-system** es un CRM / plataforma de gestión de clientes orientada a equipos internos y a clientes externos (portal). Centraliza la operación comercial y de soporte en un solo lugar: empresas, proyectos, tickets, cotizaciones y colaboradores con permisos.
+
+### Finalidad
+
+Dar visibilidad y control sobre el ciclo de trabajo con cada cliente: desde la relación comercial (empresas, representantes, cotizaciones) hasta la ejecución (proyectos y tickets), con colaboración en tiempo real entre el equipo interno y los usuarios del cliente.
+
+### Qué permite
+
+- **Empresas y proyectos:** alta y seguimiento de clientes, vinculación de usuarios/portal y organización del trabajo por proyecto.
+- **Tickets:** conversaciones, estados, adjuntos y responsables; el equipo interno colabora con políticas de acceso por rol (p. ej. Superadmin vs Admin).
+- **Cotizaciones:** emisión y gestión de documentos comerciales (vista previa / PDF, estados, enlace público temporal de revisión).
+- **Colaboradores y permisos:** RBAC (roles y permisos) para controlar qué puede ver o hacer cada persona en el panel interno o en el portal.
+- **Tiempo real y notificaciones:** presencia, actualización de tickets/chat y avisos de cambios o mensajes de clientes sin recargar la página.
+
+### Superficies
+
+| Superficie | Quién | Uso típico |
+|------------|--------|------------|
+| **Internal** | Equipo (Superadmin, Admin, …) | Operación completa según permisos |
+| **Portal** | Clientes vinculados a su empresa | Ver proyectos/tickets y participar en el chat público |
+
+### Tecnologías relevantes
+
+| Tecnología | Rol en el proyecto |
+|------------|--------------------|
+| **NestJS** + **Next.js** | API tipada y UI moderna; monorepo operativo con Docker |
+| **PostgreSQL** | Fuente de verdad (empresas, tickets, cotizaciones, RBAC) |
+| **JWT** | Autenticación / sesión (access + refresh) y autorización en APIs |
+| **Socket.IO** (WebSockets) | Chat de tickets, presencia y eventos en vivo |
+| **Redis** | Infra de apoyo en el stack Docker (tiempo real / caché / servicios auxiliares según configuración) |
+| **Docker Compose** | Entorno reproducible (Postgres, Redis, API, frontend) |
+
+---
+
 ## 1. Requisitos previos
 
 Terminal abierta en la carpeta `mia-system/`.
