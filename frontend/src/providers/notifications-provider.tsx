@@ -3,6 +3,7 @@
 import * as React from "react";
 import { io, type Socket } from "socket.io-client";
 import {
+  dismissNotification,
   listNotifications,
   markAllNotificationsAsRead,
   markNotificationAsRead,
@@ -25,6 +26,7 @@ interface NotificationsContextValue {
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   markTicketAsRead: (ticketId: string) => Promise<void>;
+  dismiss: (notificationId: string) => Promise<void>;
 }
 
 const NotificationsContext =
@@ -117,6 +119,29 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     [claims, surface],
   );
 
+  const dismiss = React.useCallback(
+    async (notificationId: string) => {
+      if (!claims) {
+        return;
+      }
+
+      setNotifications((current) => {
+        const target = current.find((item) => item.id === notificationId);
+        if (target && !target.readAt) {
+          setUnreadCount((count) => Math.max(0, count - 1));
+        }
+        return current.filter((item) => item.id !== notificationId);
+      });
+
+      try {
+        await dismissNotification(surface, notificationId);
+      } catch {
+        await reload();
+      }
+    },
+    [claims, reload, surface],
+  );
+
   React.useEffect(() => {
     if (!claims) {
       setNotifications([]);
@@ -190,8 +215,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       markAsRead,
       markAllAsRead,
       markTicketAsRead,
+      dismiss,
     }),
     [
+      dismiss,
       isConnected,
       isLoading,
       markAllAsRead,

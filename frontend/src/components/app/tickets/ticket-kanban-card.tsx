@@ -27,6 +27,7 @@ interface TicketKanbanCardProps {
   canChangeStatus?: boolean;
   showStatusSelect?: boolean;
   onStatusChange?: (statusId: string) => void;
+  onDenied?: () => void;
   onEditAssignees: (ticket: TicketKanbanItem) => void;
   onDragStart: (ticketId: string) => void;
   onDragEnd: () => void;
@@ -53,6 +54,7 @@ export function TicketKanbanCard({
   canChangeStatus = false,
   showStatusSelect = false,
   onStatusChange,
+  onDenied,
   onEditAssignees,
   onDragStart,
   onDragEnd,
@@ -152,6 +154,20 @@ export function TicketKanbanCard({
             </SelectContent>
           </Select>
         </div>
+      ) : null}
+
+      {showStatusSelect && !canChangeStatus ? (
+        <button
+          type="button"
+          className="mb-2 w-full rounded-md border border-border/70 px-2 py-1.5 text-left text-xs text-muted-foreground"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onDenied?.();
+          }}
+        >
+          Estado: {ticket.statusName}
+        </button>
       ) : null}
 
       <p className="text-xs text-muted-foreground">

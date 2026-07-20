@@ -130,6 +130,11 @@ export class TicketCommentResponseDto {
   })
   authorJobTitles: string[];
 
+  @ApiProperty({
+    description: 'true si el autor tiene rol cliente (portal)',
+  })
+  authorIsClient: boolean;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }

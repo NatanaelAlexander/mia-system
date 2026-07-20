@@ -74,7 +74,6 @@ const DOC_LABEL: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<QuoteStatus, string> = {
-  draft: "Borrador",
   ready: "Lista",
   sent: "Enviada",
 };
@@ -110,10 +109,7 @@ function lifecycleBadgeClass(status: QuoteStatus): string {
   if (status === "sent") {
     return "border-transparent bg-primary text-primary-foreground";
   }
-  if (status === "ready") {
-    return "border-transparent bg-secondary text-secondary-foreground";
-  }
-  return "border-border/80 bg-muted text-foreground";
+  return "border-transparent bg-secondary text-secondary-foreground";
 }
 
 function flagBadgeClass(category: string): string {
@@ -129,12 +125,15 @@ function flagBadgeClass(category: string): string {
   return "border-border/80 bg-muted/80 text-foreground";
 }
 
-/** Flags already covered by the lifecycle badge (Borrador / Lista / Enviada). */
+/** Flags already covered by the lifecycle badge (Enviada). */
 function visibleStatusFlags(quote: QuoteListItem) {
-  return (quote.statusFlags ?? []).filter((flag) => {
+  const flags = (quote.statusFlags ?? []).filter((flag) => {
     if (flag.code === "enviado") return false;
+    if (flag.category === "exchange") return false;
     return true;
   });
+  // Un solo estado comercial visible
+  return flags.slice(0, 1);
 }
 
 function QuoteRow({
@@ -202,12 +201,14 @@ function QuoteRow({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-            <Badge
-              variant="outline"
-              className={lifecycleBadgeClass(quote.status)}
-            >
-              {STATUS_LABEL[quote.status]}
-            </Badge>
+            {quote.status === "sent" ? (
+              <Badge
+                variant="outline"
+                className={lifecycleBadgeClass(quote.status)}
+              >
+                {STATUS_LABEL[quote.status]}
+              </Badge>
+            ) : null}
             <Badge
               variant="outline"
               className={cn(
@@ -451,7 +452,6 @@ export function CompanyQuotesSection({ companyId }: CompanyQuotesSectionProps) {
               <Select
                 items={[
                   { value: "all", label: "Todos" },
-                  { value: "draft", label: "Borrador" },
                   { value: "ready", label: "Lista" },
                   { value: "sent", label: "Enviada" },
                 ]}
@@ -465,7 +465,6 @@ export function CompanyQuotesSection({ companyId }: CompanyQuotesSectionProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="ready">Lista</SelectItem>
                   <SelectItem value="sent">Enviada</SelectItem>
                 </SelectContent>
@@ -678,12 +677,14 @@ export function EntityQuotesList({
                 {formatDay(quote.expiresAt)}
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className={lifecycleBadgeClass(quote.status)}
-            >
-              {STATUS_LABEL[quote.status]}
-            </Badge>
+            {quote.status === "sent" ? (
+              <Badge
+                variant="outline"
+                className={lifecycleBadgeClass(quote.status)}
+              >
+                {STATUS_LABEL[quote.status]}
+              </Badge>
+            ) : null}
           </Link>
         ))}
       </div>

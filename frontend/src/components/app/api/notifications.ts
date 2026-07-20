@@ -77,3 +77,14 @@ export function markTicketNotificationsAsRead(
     true,
   );
 }
+
+export function dismissNotification(
+  surface: ResourceSurface,
+  notificationId: string,
+) {
+  return apiFetch<{ ok: true }>(
+    `${notificationsBase(surface)}/${notificationId}/descartar`,
+    { method: "PATCH" },
+    true,
+  );
+}

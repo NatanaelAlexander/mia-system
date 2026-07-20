@@ -27,6 +27,8 @@ import {
   canAccessModule,
   hasPermission,
   isInternalUser,
+  isScopedAdmin,
+  isSuperAdmin,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { projectsModule } from "@/components/app/projects/projects-module";
@@ -143,12 +145,17 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const surface = claims ? preferredSurface(claims) : "portal";
   const canAccess = canAccessModule(claims, companiesModule);
   const canEdit =
-    isInternalUser(claims) && hasPermission(claims, "companies:update");
+    isInternalUser(claims) &&
+    isSuperAdmin(claims) &&
+    hasPermission(claims, "companies:update");
   const canDeactivate =
-    isInternalUser(claims) && hasPermission(claims, "companies:delete");
+    isInternalUser(claims) &&
+    isSuperAdmin(claims) &&
+    hasPermission(claims, "companies:delete");
   const canViewProjects = canAccessModule(claims, projectsModule);
   const canViewQuotes = canAccessModule(claims, quotesModule);
   const isInternal = isInternalUser(claims);
+  const scopedAdmin = isScopedAdmin(claims);
 
   const [company, setCompany] = React.useState<CompanyDetail | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -157,6 +164,12 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
 
   const allowedTabs = React.useMemo(() => {
+    if (scopedAdmin) {
+      return canViewProjects
+        ? (["proyectos"] as CompanyDetailTab[])
+        : ([] as CompanyDetailTab[]);
+    }
+
     const tabs: CompanyDetailTab[] = ["datos"];
     if (isInternal) {
       tabs.push("representantes", "usuarios");
@@ -168,14 +181,15 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
       tabs.push("cotizaciones");
     }
     return tabs;
-  }, [canViewProjects, canViewQuotes, isInternal]);
+  }, [canViewProjects, canViewQuotes, isInternal, scopedAdmin]);
 
   const tabFromUrl = searchParams.get("tab");
+  const defaultTab: CompanyDetailTab = scopedAdmin ? "proyectos" : "datos";
   const activeTab: CompanyDetailTab = isCompanyDetailTab(tabFromUrl)
     ? allowedTabs.includes(tabFromUrl)
       ? tabFromUrl
-      : "datos"
-    : "datos";
+      : defaultTab
+    : defaultTab;
 
   const handleTabChange = (value: string | number | null) => {
     if (typeof value !== "string" || !isCompanyDetailTab(value)) {
@@ -360,32 +374,34 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTab value="datos">
-            <TabLabel
-              icon={Building2}
-              label="Datos de la empresa"
-              shortLabel="Datos"
-            />
-          </TabsTab>
-          {isInternal ? (
-            <>
-              <TabsTab value="representantes">
-                <TabLabel
-                  icon={Scale}
-                  label="Representantes legales"
-                  shortLabel="Representantes"
-                />
-              </TabsTab>
-              <TabsTab value="usuarios">
-                <TabLabel
-                  icon={Users}
-                  label="Usuarios vinculados"
-                  shortLabel="Usuarios"
-                />
-              </TabsTab>
-            </>
+          {allowedTabs.includes("datos") ? (
+            <TabsTab value="datos">
+              <TabLabel
+                icon={Building2}
+                label="Datos de la empresa"
+                shortLabel="Datos"
+              />
+            </TabsTab>
           ) : null}
-          {canViewProjects ? (
+          {allowedTabs.includes("representantes") ? (
+            <TabsTab value="representantes">
+              <TabLabel
+                icon={Scale}
+                label="Representantes legales"
+                shortLabel="Representantes"
+              />
+            </TabsTab>
+          ) : null}
+          {allowedTabs.includes("usuarios") ? (
+            <TabsTab value="usuarios">
+              <TabLabel
+                icon={Users}
+                label="Usuarios vinculados"
+                shortLabel="Usuarios"
+              />
+            </TabsTab>
+          ) : null}
+          {allowedTabs.includes("proyectos") ? (
             <TabsTab value="proyectos">
               <TabLabel
                 icon={FolderKanban}
@@ -394,7 +410,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
               />
             </TabsTab>
           ) : null}
-          {canViewQuotes ? (
+          {allowedTabs.includes("cotizaciones") ? (
             <TabsTab value="cotizaciones">
               <TabLabel
                 icon={FileText}
@@ -406,6 +422,7 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
           <TabsIndicator />
         </TabsList>
 
+        {allowedTabs.includes("datos") ? (
         <TabsPanel value="datos">
           <Card>
             <CardHeader>
@@ -435,9 +452,9 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
             </CardContent>
           </Card>
         </TabsPanel>
+        ) : null}
 
-        {isInternal ? (
-          <>
+        {allowedTabs.includes("representantes") ? (
             <TabsPanel value="representantes">
               <CompanyRepresentativesSection
                 companyId={company.id}
@@ -446,19 +463,20 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
                 onChanged={loadCompany}
               />
             </TabsPanel>
+        ) : null}
+        {allowedTabs.includes("usuarios") ? (
             <TabsPanel value="usuarios">
               <CompanyUsersSection companyId={company.id} canManage={canEdit} />
             </TabsPanel>
-          </>
         ) : null}
 
-        {canViewProjects ? (
+        {allowedTabs.includes("proyectos") ? (
           <TabsPanel value="proyectos">
             <CompanyProjectsSection companyId={company.id} surface={surface} />
           </TabsPanel>
         ) : null}
 
-        {canViewQuotes ? (
+        {allowedTabs.includes("cotizaciones") ? (
           <TabsPanel value="cotizaciones">
             <CompanyQuotesSection companyId={company.id} />
           </TabsPanel>

@@ -25,6 +25,29 @@ export const QUOTE_PDF_BACKGROUND = "#FFFFFF" as const;
 /** Logo de marca usado en footer de preview y PDF. */
 export const QUOTE_BRAND_LOGO_SRC = "/login/team_prime_dg.PNG";
 
+/** Hoja carta (US Letter) en mm — usada por jsPDF y como referencia de la vista previa. */
+export const QUOTE_PDF_PAGE = {
+  format: "letter" as const,
+  orientation: "portrait" as const,
+  unit: "mm" as const,
+  /** 8.5 in */
+  widthMm: 215.9,
+  /** 11 in */
+  heightMm: 279.4,
+  /** Márgenes por defecto (carta). */
+  marginX: 16,
+  marginXMinimal: 18,
+  marginTop: 18,
+  footerReserve: 62,
+} as const;
+
+/** Tipografía del documento (preview + PDF). */
+export const QUOTE_PDF_FONT_STACK =
+  'Helvetica, Arial, "Liberation Sans", ui-sans-serif, sans-serif';
+
+/** Ancho de referencia de la vista previa a 96dpi (8.5in). */
+export const QUOTE_PREVIEW_WIDTH_PX = 816;
+
 export const DEFAULT_QUOTE_PDF_LAYOUT_ID: QuotePdfLayoutId = "clasico";
 export const DEFAULT_QUOTE_PDF_PRIMARY = "#2563EB";
 export const DEFAULT_QUOTE_PDF_SECONDARY = "#6B7280";

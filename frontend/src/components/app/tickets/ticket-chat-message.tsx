@@ -38,15 +38,18 @@ function getInitials(label: string) {
 function AuthorNameWithCargos({
   label,
   jobTitles,
+  isClient = false,
   alignEnd = false,
 }: {
   label: string;
   jobTitles: string[];
+  isClient?: boolean;
   alignEnd?: boolean;
 }) {
-  const hasCargos = jobTitles.length > 0;
+  const hoverLabels = isClient ? ["Cliente"] : jobTitles;
+  const hasHoverInfo = hoverLabels.length > 0;
 
-  if (!hasCargos) {
+  if (!hasHoverInfo) {
     return <span className="text-sm font-bold text-primary">{label}</span>;
   }
 
@@ -56,7 +59,7 @@ function AuthorNameWithCargos({
         {label}
       </span>
       <span className="flex max-w-[15rem] flex-wrap gap-1 sm:hidden">
-        {jobTitles.map((title) => (
+        {hoverLabels.map((title) => (
           <span
             key={title}
             className="inline-flex rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary"
@@ -77,7 +80,7 @@ function AuthorNameWithCargos({
           alignEnd ? "right-0" : "left-0",
         )}
       >
-        {jobTitles.map((title) => (
+        {hoverLabels.map((title) => (
           <span
             key={title}
             className="inline-flex rounded-md bg-primary/15 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary"
@@ -99,6 +102,7 @@ export function TicketChatMessage({
 }: TicketChatMessageProps) {
   const initials = getInitials(authorLabel === "Tú" ? "TU" : authorLabel);
   const jobTitles = comment.authorJobTitles ?? [];
+  const isClient = Boolean(comment.authorIsClient);
   const assetStatusLabel =
     comment.assetSyncStatus === "uploading"
       ? "Subiendo adjuntos..."
@@ -136,6 +140,7 @@ export function TicketChatMessage({
           <AuthorNameWithCargos
             label={authorLabel}
             jobTitles={jobTitles}
+            isClient={isClient}
             alignEnd={isOwn}
           />
           <span className="text-xs text-muted-foreground">

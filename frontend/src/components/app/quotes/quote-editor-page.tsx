@@ -40,9 +40,10 @@ import {
   listQuoteStatusCatalog,
   removeQuoteSignedDocument,
   sendQuote,
-  setQuoteStatuses,
+  setQuoteStatus,
   toggleQuoteShare,
   updateQuote,
+  updateQuotePreset,
   uploadQuoteSignedDocument,
   type CreateQuotePayload,
   type PriceInputMode,
@@ -116,6 +117,7 @@ import {
   QUOTE_PDF_LAYOUTS,
   QUOTE_PDF_PRIMARY_COLORS,
   QUOTE_PDF_SECONDARY_COLORS,
+  resolveQuotePdfTheme,
   type QuotePdfLayoutId,
 } from "./quote-pdf-styles";
 import {
@@ -157,8 +159,8 @@ const GESTION_STEPS: Array<{
   },
   {
     id: "estados",
-    label: "Estados",
-    description: "Flujo y pago",
+    label: "Estado",
+    description: "Estado único",
     Icon: ListOrdered,
     card: "border-primary/35 bg-primary/5 ring-primary/20",
     iconWrap: "bg-primary text-primary-foreground",
@@ -393,9 +395,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [statusCatalog, setStatusCatalog] = React.useState<QuoteStatusFlag[]>(
     [],
   );
-  const [selectedStatusCodes, setSelectedStatusCodes] = React.useState<
-    string[]
-  >([]);
+  const [selectedStatusCode, setSelectedStatusCode] = React.useState("");
   const [projects, setProjects] = React.useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -425,16 +425,19 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const [expiresAt, setExpiresAt] = React.useState(addDaysIso(todayIso(), 30));
   const [sections, setSections] = React.useState<DraftSection[]>(emptySections());
   const [presets, setPresets] = React.useState<QuotePreset[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = React.useState<string>("");
   const [editorTab, setEditorTab] = React.useState<QuoteEditorTab>("datos");
   const [activeFrequency, setActiveFrequency] =
     React.useState<QuoteFrequency>("unico");
   const [activeGestionStep, setActiveGestionStep] =
     React.useState<GestionStep>("enlace");
-  const [savePresetOpen, setSavePresetOpen] = React.useState(false);
-  const [loadPresetOpen, setLoadPresetOpen] = React.useState(false);
+  const [presetsOpen, setPresetsOpen] = React.useState(false);
   const [presetName, setPresetName] = React.useState("");
+  const [presetPendingDeleteId, setPresetPendingDeleteId] = React.useState<
+    string | null
+  >(null);
   const [generateConfirmOpen, setGenerateConfirmOpen] = React.useState(false);
+  const [defaultStatusConfirmOpen, setDefaultStatusConfirmOpen] =
+    React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState<
     "quote" | "preset" | "signed" | null
   >(null);
@@ -517,7 +520,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         const loadedSections = sectionsFromQuote(detail);
         setSections(loadedSections);
         setActiveFrequency(initialActiveFrequency(loadedSections));
-        setSelectedStatusCodes(detail.statusFlags?.map((f) => f.code) ?? []);
+        setSelectedStatusCode(detail.statusFlags?.[0]?.code ?? "creado");
       } else {
         if (issuerList[0]) setIssuerId(issuerList[0].id);
         const firstRep = company.representativeLinks?.[0]?.legalRepresentativeId;
@@ -593,11 +596,6 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     { value: "gross", label: "Montos brutos" },
     { value: "liquid", label: "Montos líquidos" },
   ] as const;
-
-  const presetItems = React.useMemo(
-    () => presets.map((preset) => ({ value: preset.id, label: preset.name })),
-    [presets],
-  );
 
   const previewModel = React.useMemo((): QuotePreviewModel => {
     const issuer = issuers.find((item) => item.id === issuerId);
@@ -703,6 +701,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       clientVisible,
       issueDate,
       expiresAt,
+      statusCode: selectedStatusCode || undefined,
       sections: sectionPayloads,
     };
   };
@@ -712,6 +711,10 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     if (!isNew && !canUpdate) return;
     const payload = buildPayload();
     if (!payload) return;
+    if (!selectedStatusCode) {
+      setDefaultStatusConfirmOpen(true);
+      return;
+    }
     setGenerateConfirmOpen(true);
   };
 
@@ -721,18 +724,25 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
     const payload = buildPayload();
     if (!payload) return;
+    const statusCode = selectedStatusCode || "creado";
 
     setIsSaving(true);
     try {
       if (isNew) {
-        await createQuote(payload);
+        await createQuote({ ...payload, statusCode });
         setGenerateConfirmOpen(false);
-        toast.success("Cotización creada como borrador");
+        setDefaultStatusConfirmOpen(false);
+        toast.success(
+          statusCode === "creado"
+            ? "Cotización creada con estado Creado"
+            : "Cotización creada",
+        );
         router.push(backHref);
       } else if (quoteId) {
         const { companyId: _companyId, ...updatePayload } = payload;
-        await updateQuote(quoteId, updatePayload);
+        await updateQuote(quoteId, { ...updatePayload, statusCode });
         setGenerateConfirmOpen(false);
+        setDefaultStatusConfirmOpen(false);
         toast.success("Cotización actualizada");
         router.push(backHref);
       }
@@ -745,32 +755,54 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     }
   };
 
-  const buildPresetPayload = (): QuotePresetPayload => ({
-    legalRepresentativeId: legalRepresentativeId || undefined,
-    issuerId: issuerId || undefined,
-    scope,
-    projectId: scope === "company" ? null : projectId || null,
-    ticketId: scope === "ticket" ? ticketId || null : null,
-    documentType,
-    pdfLayoutId,
-    pdfPrimaryColor,
-    pdfSecondaryColor,
-    clientVisible,
-    sections: sections.map((section) => ({
-      frequency: section.frequency,
-      esCanje: section.esCanje,
-      applyTax: section.applyTax,
-      priceInputMode: section.priceInputMode,
-      items: section.items.map((item) => ({
-        title: item.title,
-        description: item.description,
-        price: item.price,
+  const buildPresetPayload = (): QuotePresetPayload => {
+    const theme = resolveQuotePdfTheme({
+      layoutId: pdfLayoutId,
+      primary: pdfPrimaryColor,
+      secondary: pdfSecondaryColor,
+    });
+
+    return {
+      legalRepresentativeId: legalRepresentativeId || undefined,
+      issuerId: issuerId || undefined,
+      scope,
+      projectId: scope === "company" ? null : projectId || null,
+      ticketId: scope === "ticket" ? ticketId || null : null,
+      documentType,
+      pdfLayoutId: theme.layoutId,
+      pdfPrimaryColor: theme.primary,
+      pdfSecondaryColor: theme.secondary,
+      clientVisible,
+      sections: sections.map((section) => ({
+        frequency: section.frequency,
+        esCanje: section.esCanje,
+        applyTax: section.applyTax,
+        priceInputMode: section.priceInputMode,
+        items: section.items.map((item) => ({
+          title: item.title,
+          description: item.description,
+          price: item.price,
+        })),
       })),
-    })),
-  });
+    };
+  };
+
+  const normalizePresetPayload = (
+    raw: QuotePreset["payload"] | string | null | undefined,
+  ): QuotePresetPayload => {
+    if (!raw) return {};
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw) as QuotePresetPayload;
+      } catch {
+        return {};
+      }
+    }
+    return raw;
+  };
 
   const applyPreset = (preset: QuotePreset) => {
-    const data = preset.payload ?? {};
+    const data = normalizePresetPayload(preset.payload);
     if (data.legalRepresentativeId) {
       setLegalRepresentativeId(data.legalRepresentativeId);
     }
@@ -789,15 +821,17 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     if (data.documentType) {
       setDocumentType(data.documentType);
     }
-    if (isQuotePdfLayoutId(data.pdfLayoutId)) {
-      setPdfLayoutId(data.pdfLayoutId);
-    }
-    if (isHexColor(data.pdfPrimaryColor)) {
-      setPdfPrimaryColor(data.pdfPrimaryColor);
-    }
-    if (isHexColor(data.pdfSecondaryColor)) {
-      setPdfSecondaryColor(data.pdfSecondaryColor);
-    }
+
+    // Siempre aplicar estilos del PDF del preset (layout + colores).
+    const theme = resolveQuotePdfTheme({
+      layoutId: data.pdfLayoutId,
+      primary: data.pdfPrimaryColor,
+      secondary: data.pdfSecondaryColor,
+    });
+    setPdfLayoutId(theme.layoutId);
+    setPdfPrimaryColor(theme.primary);
+    setPdfSecondaryColor(theme.secondary);
+
     if (typeof data.clientVisible === "boolean") {
       setClientVisible(data.clientVisible);
     }
@@ -820,20 +854,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       setActiveFrequency(initialActiveFrequency(next));
     }
     // Fechas no se tocan a propósito
-    setLoadPresetOpen(false);
-    toast.success(`Preset «${preset.name}» cargado (sin fechas)`);
+    setPresetsOpen(false);
+    toast.success(`Preset «${preset.name}» cargado`);
   };
 
-  const handleLoadPreset = () => {
-    const preset = presets.find((item) => item.id === selectedPresetId);
-    if (!preset) {
-      toast.error("Selecciona un preset para cargar.");
-      return;
-    }
-    applyPreset(preset);
-  };
-
-  const handleSavePreset = async () => {
+  const handleCreatePreset = async () => {
     if (!presetName.trim()) {
       toast.error("Escribe un nombre para el preset.");
       return;
@@ -848,13 +873,32 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       setPresets((current) =>
         [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      setSelectedPresetId(created.id);
-      setSavePresetOpen(false);
       setPresetName("");
-      toast.success("Preset guardado");
+      toast.success("Preset creado (incluye estilos del PDF)");
     } catch (error) {
       toast.error(
-        error instanceof ApiError ? error.message : "No se pudo guardar el preset.",
+        error instanceof ApiError ? error.message : "No se pudo crear el preset.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePreset = async (preset: QuotePreset) => {
+    setIsSaving(true);
+    try {
+      const updated = await updateQuotePreset(preset.id, {
+        payload: buildPresetPayload(),
+      });
+      setPresets((current) =>
+        current.map((item) => (item.id === preset.id ? updated : item)),
+      );
+      toast.success(`Preset «${preset.name}» actualizado (con estilos del PDF)`);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo actualizar el preset.",
       );
     } finally {
       setIsSaving(false);
@@ -862,14 +906,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   };
 
   const handleDeletePreset = async () => {
-    if (!selectedPresetId) return;
+    if (!presetPendingDeleteId) return;
     setIsSaving(true);
     try {
-      await deleteQuotePreset(selectedPresetId);
+      await deleteQuotePreset(presetPendingDeleteId);
       setPresets((current) =>
-        current.filter((item) => item.id !== selectedPresetId),
+        current.filter((item) => item.id !== presetPendingDeleteId),
       );
-      setSelectedPresetId("");
+      setPresetPendingDeleteId(null);
       setConfirmDelete(null);
       toast.success("Preset eliminado");
     } catch (error) {
@@ -904,7 +948,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     try {
       const updated = await sendQuote(quoteId);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? "creado");
       toast.success("Cotización enviada; enlace activo por 24 horas");
     } catch (error) {
       toast.error(
@@ -921,7 +965,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     try {
       const updated = await toggleQuoteShare(quoteId, enabled);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? "creado");
       toast.success(
         enabled
           ? "Enlace habilitado (24 horas desde ahora)"
@@ -938,37 +982,24 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const handleSaveStatuses = async () => {
     if (!quoteId || !canUpdate) return;
+    const statusCode = selectedStatusCode || "creado";
     setIsSaving(true);
     try {
-      const updated = await setQuoteStatuses(quoteId, selectedStatusCodes);
+      const updated = await setQuoteStatus(quoteId, statusCode);
       setQuote(updated);
-      setSelectedStatusCodes(updated.statusFlags?.map((f) => f.code) ?? []);
-      toast.success("Estados actualizados");
+      setSelectedStatusCode(updated.statusFlags?.[0]?.code ?? statusCode);
+      toast.success("Estado actualizado");
     } catch (error) {
       toast.error(
-        error instanceof ApiError ? error.message : "No se pudieron guardar los estados.",
+        error instanceof ApiError ? error.message : "No se pudo guardar el estado.",
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const toggleStatusCode = (code: string, category: QuoteStatusFlag["category"]) => {
-    setSelectedStatusCodes((current) => {
-      const isSelected = current.includes(code);
-      if (isSelected) {
-        return current.filter((item) => item !== code);
-      }
-      if (category === "payment" || category === "exchange") {
-        const exclusiveCodes = new Set(
-          statusCatalog
-            .filter((item) => item.category === category)
-            .map((item) => item.code),
-        );
-        return [...current.filter((item) => !exclusiveCodes.has(item)), code];
-      }
-      return [...current, code];
-    });
+  const selectStatusCode = (code: string) => {
+    setSelectedStatusCode(code);
   };
 
   const handleUploadSigned = async (file: File | null) => {
@@ -1031,8 +1062,8 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const copyPublicLink = async () => {
     const token = quote?.shareLink?.token;
-    if (!token) return;
-    const url = `${window.location.origin}${publicQuoteHref(token)}`;
+    if (!quote?.id || !token) return;
+    const url = `${window.location.origin}${publicQuoteHref(quote.id, token)}`;
     await navigator.clipboard.writeText(url);
     toast.success("Enlace copiado");
   };
@@ -1412,6 +1443,30 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   label="Visible para el cliente (enlace público y notificación)"
                   tone="secondary"
                 />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Estado de la cotización</Label>
+                <p className="text-xs text-muted-foreground">
+                  Solo un estado a la vez. Si no eliges ninguno, al guardar se
+                  usará «Creado».
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {statusCatalog.map((item) => (
+                    <OptionChip
+                      key={item.code}
+                      id={`status-datos-${item.code}`}
+                      checked={selectedStatusCode === item.code}
+                      onCheckedChange={(checked) =>
+                        selectStatusCode(checked ? item.code : "")
+                      }
+                      label={item.name}
+                      tone={
+                        item.category === "payment" ? "primary" : "secondary"
+                      }
+                    />
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1835,11 +1890,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   </div>
                   <div>
                     <CardTitle className="text-primary">
-                      Estados del documento
+                      Estado del documento
                     </CardTitle>
                     <CardDescription>
-                      Puedes marcar varios a la vez. En pago y canje solo uno de
-                      cada grupo.
+                      Solo un estado a la vez. El canje se marca por tipo de pago
+                      (único / mensual / anual), no aquí.
                     </CardDescription>
                   </div>
                 </div>
@@ -1849,52 +1904,26 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                   disabled={isSaving || !canUpdate}
                   onClick={() => void handleSaveStatuses()}
                 >
-                  Guardar estados
+                  Guardar estado
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                {(
-                  [
-                    ["workflow", "Flujo", "secondary"],
-                    ["payment", "Pago", "primary"],
-                    ["exchange", "Canje", "secondary"],
-                    ["general", "Otros", "primary"],
-                  ] as const
-                ).map(([category, label, tone]) => {
-                  const items = statusCatalog.filter(
-                    (item) => item.category === category,
-                  );
-                  if (items.length === 0) return null;
-                  return (
-                    <div
-                      key={category}
-                      className="space-y-2 rounded-lg border border-border/50 bg-background/50 p-3"
-                    >
-                      <p
-                        className={cn(
-                          "text-sm font-medium",
-                          tone === "primary" ? "text-primary" : "text-secondary",
-                        )}
-                      >
-                        {label}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {items.map((item) => (
-                          <OptionChip
-                            key={item.code}
-                            id={`status-${item.code}`}
-                            checked={selectedStatusCodes.includes(item.code)}
-                            onCheckedChange={() =>
-                              toggleStatusCode(item.code, item.category)
-                            }
-                            label={item.name}
-                            tone={tone}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex flex-wrap gap-2">
+                  {statusCatalog.map((item) => (
+                    <OptionChip
+                      key={item.code}
+                      id={`status-${item.code}`}
+                      checked={selectedStatusCode === item.code}
+                      onCheckedChange={(checked) =>
+                        selectStatusCode(checked ? item.code : "")
+                      }
+                      label={item.name}
+                      tone={
+                        item.category === "payment" ? "primary" : "secondary"
+                      }
+                    />
+                  ))}
+                </div>
               </CardContent>
             </Card>
             ) : null}
@@ -1980,34 +2009,23 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
               <Badge variant="secondary" className="font-normal">
                 {getQuotePdfLayout(pdfLayoutId).name}
               </Badge>
-              <HelpHint
-                label="Qué es un preset"
-                side="bottom"
-                text="Un preset guarda la configuración actual (representante, emisor, alcance, tipo, visibilidad e ítems) para reutilizarla. Al cargar no se tocan las fechas. Generar documento guarda la cotización; si no la envías al cliente, queda como Borrador en el listado."
-              />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 disabled={isSaving}
-                onClick={() => setLoadPresetOpen(true)}
-              >
-                <FolderOpen />
-                Cargar preset
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-primary/40 bg-primary/15 text-primary hover:bg-primary hover:text-primary-foreground"
-                disabled={isSaving}
-                onClick={() => setSavePresetOpen(true)}
+                onClick={() => setPresetsOpen(true)}
               >
                 <BookmarkPlus />
-                Guardar preset
+                Preset
               </Button>
+              <HelpHint
+                label="Qué es un preset"
+                side="bottom"
+                text="Un preset guarda la configuración actual: representante, emisor, alcance, tipo, visibilidad, ítems y también los estilos del PDF (layout y colores). Al cargar no se tocan las fechas."
+              />
               <Button
                 type="button"
                 size="sm"
@@ -2147,107 +2165,152 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={loadPresetOpen} onOpenChange={setLoadPresetOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={presetsOpen}
+        onOpenChange={(open) => {
+          setPresetsOpen(open);
+          if (!open) setPresetName("");
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Cargar preset</DialogTitle>
+            <DialogTitle>Presets</DialogTitle>
             <DialogDescription>
-              Se rellenarán los datos del formulario excepto las fechas. Podrás
-              editarlo después.
+              Guarda la configuración actual del documento, incluidos los
+              estilos del PDF (layout y colores). Las fechas no forman parte del
+              preset. Puedes crear, cargar, actualizar o eliminar.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label>Preset</Label>
-            <Select
-              items={presetItems}
-              value={selectedPresetId || null}
-              onValueChange={(v: string | null) => setSelectedPresetId(v ?? "")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar preset" />
-              </SelectTrigger>
-              <SelectContent>
-                {presetItems.map((preset) => (
-                  <SelectItem key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter className="sm:justify-between">
-            {selectedPresetId ? (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={isSaving}
-                onClick={() => setConfirmDelete("preset")}
-              >
-                <Trash2 />
-                Eliminar
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setLoadPresetOpen(false)}
-                disabled={isSaving}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                disabled={isSaving || !selectedPresetId}
-                onClick={handleLoadPreset}
-              >
-                Cargar
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Guardar preset</DialogTitle>
-            <DialogDescription>
-              Se guardarán representante, emisor, alcance, tipo de documento,
-              visibilidad e ítems. Las fechas no forman parte del preset.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="preset-name">Nombre del preset</Label>
-            <Input
-              id="preset-name"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              placeholder="Ej. Mantención mensual boleta"
-              autoFocus
-            />
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name">Nuevo preset</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="preset-name"
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  placeholder="Ej. Mantención mensual boleta"
+                  disabled={isSaving}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleCreatePreset();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  disabled={isSaving || !presetName.trim()}
+                  onClick={() => void handleCreatePreset()}
+                >
+                  <Plus />
+                  Crear
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Presets guardados</p>
+              {presets.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+                  Aún no hay presets. Crea uno con el formulario de arriba.
+                </p>
+              ) : (
+                <ul className="max-h-72 space-y-1 overflow-y-auto rounded-lg border p-1">
+                  {presets.map((preset) => (
+                    <li
+                      key={preset.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {preset.name}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Cargar preset ${preset.name}`}
+                          title="Cargar"
+                          onClick={() => applyPreset(preset)}
+                        >
+                          <FolderOpen />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Actualizar preset ${preset.name}`}
+                          title="Actualizar con el documento actual"
+                          onClick={() => void handleUpdatePreset(preset)}
+                        >
+                          <RefreshCw />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={isSaving}
+                          aria-label={`Eliminar preset ${preset.name}`}
+                          title="Eliminar"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setPresetPendingDeleteId(preset.id);
+                            setConfirmDelete("preset");
+                          }}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setSavePresetOpen(false)}
+              onClick={() => setPresetsOpen(false)}
               disabled={isSaving}
             >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={isSaving || !presetName.trim()}
-              onClick={() => void handleSavePreset()}
-            >
-              {isSaving ? "Guardando…" : "Guardar preset"}
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={defaultStatusConfirmOpen}
+        onOpenChange={setDefaultStatusConfirmOpen}
+        title="Sin estado seleccionado"
+        description={
+          <div className="space-y-3 text-left leading-relaxed">
+            <p>
+              No elegiste un estado comercial para esta cotización.
+            </p>
+            <p>
+              Al continuar se guardará con el estado{" "}
+              <span className="font-semibold text-foreground">Creado</span>.
+              Esto es solo un aviso: puedes cambiarlo después en el editor.
+            </p>
+          </div>
+        }
+        confirmLabel="Continuar con Creado"
+        cancelLabel="Volver"
+        confirmVariant="default"
+        onConfirm={() => {
+          setSelectedStatusCode("creado");
+          setDefaultStatusConfirmOpen(false);
+          setGenerateConfirmOpen(true);
+        }}
+        isConfirming={false}
+      />
 
       <ConfirmDialog
         open={generateConfirmOpen}
@@ -2279,17 +2342,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                 <span className="font-semibold text-foreground">
                   no la envías al cliente
                 </span>{" "}
-                (botón <span className="font-semibold text-foreground">Enviar</span>
-                ), en el listado aparecerá como{" "}
-                <span className="rounded-md bg-muted px-1.5 py-0.5 font-semibold text-foreground">
-                  Borrador
-                </span>
-                .
-              </p>
-              <p className="rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-foreground/90">
-                <span className="font-semibold">Borrador</span> no significa que
-                falte guardar: significa que{" "}
-                <span className="font-semibold">aún no fue enviada</span>.
+                (botón{" "}
+                <span className="font-semibold text-foreground">Enviar</span>),
+                quedará guardada con su estado comercial (por ejemplo{" "}
+                <span className="font-semibold text-foreground">Creado</span>)
+                sin aparecer como enviada.
               </p>
             </div>
           )
@@ -2304,7 +2361,10 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       <ConfirmDialog
         open={confirmDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmDelete(null);
+          if (!open) {
+            setConfirmDelete(null);
+            setPresetPendingDeleteId(null);
+          }
         }}
         title={
           confirmDelete === "quote"

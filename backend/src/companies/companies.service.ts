@@ -4,6 +4,8 @@ import { AuditService } from '../audit/audit.service';
 import { PortalAccessService } from '../common/portal/portal-access.service';
 import { normalizeRutForStorage } from '../common/utils/rut.util';
 import { DatabaseService } from '../common/database/database.service';
+import { PermissionsService } from '../auth/permissions/permissions.service';
+import { PermisoDenegadoException } from '../auth/exceptions/auth.exceptions';
 import {
   EmpresaNoEncontradaException,
   RepresentanteLegalNoEncontradoException,
@@ -22,6 +24,10 @@ import {
   SQL_INSERT_COMPANY,
   COMPANY_COLUMNS,
 } from './queries/companies.queries';
+import {
+  SQL_ADMIN_SCOPED_COMPANY_IDS,
+  SQL_HAS_COMPANY_SCOPE_ACCESS,
+} from '../tickets/queries/ticket-assignees.queries';
 import {
   SQL_FIND_ALL_LEGAL_REPRESENTATIVES,
   SQL_FIND_LEGAL_REPRESENTATIVE_BY_ID,
@@ -77,6 +83,7 @@ export class CompaniesService {
     private readonly db: DatabaseService,
     private readonly auditService: AuditService,
     private readonly portalAccess: PortalAccessService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   async findAll(actorUserId: string): Promise<Company[]> {
@@ -87,9 +94,11 @@ export class CompaniesService {
     actorUserId: string,
     filters: FilterCompaniesDto = {},
   ): Promise<Company[]> {
+    const scopedCompanyIds = await this.resolveScopedCompanyIds(actorUserId);
     const { rows } = await this.db.query<Company>(SQL_FIND_COMPANIES_FILTERED, [
       filters.status ?? null,
       filters.search?.trim() || null,
+      scopedCompanyIds,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.COMPANIES, null, {
@@ -102,6 +111,7 @@ export class CompaniesService {
   }
 
   async findById(actorUserId: string, id: string): Promise<CompanyDetail> {
+    await this.assertCanReadCompany(actorUserId, id);
     const company = await this.findCompanyById(id);
     const representativeLinks = await this.fetchCompanyRepresentatives(id);
     const detail = { ...company, representativeLinks };
@@ -115,6 +125,7 @@ export class CompaniesService {
   }
 
   async create(actorUserId: string, dto: CreateCompanyDto): Promise<Company> {
+    await this.assertCanManageCompanies(actorUserId);
     const taxId = this.normalizeTaxId(dto.taxId);
     await this.ensureTaxIdAvailable(taxId);
 
@@ -145,6 +156,7 @@ export class CompaniesService {
     id: string,
     dto: UpdateCompanyDto,
   ): Promise<Company> {
+    await this.assertCanManageCompanies(actorUserId);
     const previous = await this.findCompanyById(id);
 
     if (dto.taxId) {
@@ -195,6 +207,7 @@ export class CompaniesService {
   }
 
   async deactivate(actorUserId: string, id: string): Promise<Company> {
+    await this.assertCanManageCompanies(actorUserId);
     const previous = await this.findActiveCompanyById(id);
 
     const { rows } = await this.db.query<Company>(SQL_DEACTIVATE_COMPANY, [
@@ -284,6 +297,7 @@ export class CompaniesService {
     actorUserId: string,
     dto: CreateLegalRepresentativeDto,
   ): Promise<LegalRepresentative> {
+    await this.assertCanManageCompanies(actorUserId);
     const { rows } = await this.db.query<LegalRepresentative>(
       SQL_INSERT_LEGAL_REPRESENTATIVE,
       [
@@ -314,6 +328,7 @@ export class CompaniesService {
     id: string,
     dto: UpdateLegalRepresentativeDto,
   ): Promise<LegalRepresentative> {
+    await this.assertCanManageCompanies(actorUserId);
     const previous = await this.findLegalRepresentativeRowById(id);
 
     const { sets, values } = this.buildLegalRepUpdate(dto);
@@ -353,6 +368,7 @@ export class CompaniesService {
     actorUserId: string,
     companyId: string,
   ): Promise<CompanyRepresentative[]> {
+    await this.assertCanReadCompany(actorUserId, companyId);
     await this.findCompanyById(companyId);
     const representatives = await this.fetchCompanyRepresentatives(companyId);
 
@@ -369,6 +385,7 @@ export class CompaniesService {
     companyId: string,
     dto: LinkRepresentativeDto,
   ): Promise<CompanyRepresentative> {
+    await this.assertCanManageCompanies(actorUserId);
     await this.findCompanyById(companyId);
     await this.findLegalRepresentativeRowById(dto.legalRepresentativeId);
 
@@ -413,6 +430,7 @@ export class CompaniesService {
     legalRepresentativeId: string,
     dto: UpdateCompanyRepresentativeDto,
   ): Promise<CompanyRepresentative> {
+    await this.assertCanManageCompanies(actorUserId);
     await this.findCompanyById(companyId);
 
     const previousLinks = await this.fetchCompanyRepresentatives(companyId);
@@ -450,6 +468,7 @@ export class CompaniesService {
     companyId: string,
     legalRepresentativeId: string,
   ): Promise<void> {
+    await this.assertCanManageCompanies(actorUserId);
     const representatives = await this.fetchCompanyRepresentatives(companyId);
     const existingLink = representatives.find(
       (link) => link.legalRepresentativeId === legalRepresentativeId,
@@ -475,6 +494,53 @@ export class CompaniesService {
         position: existingLink?.position ?? null,
       },
     });
+  }
+
+  private async isActorSuperAdmin(userId: string): Promise<boolean> {
+    const authorization =
+      await this.permissionsService.resolveAuthorization(userId);
+    return Boolean(
+      authorization &&
+        this.permissionsService.isSuperAdmin(authorization.roles),
+    );
+  }
+
+  /** null = sin filtro (superadmin); array = alcance admin. */
+  private async resolveScopedCompanyIds(
+    userId: string,
+  ): Promise<string[] | null> {
+    if (await this.isActorSuperAdmin(userId)) {
+      return null;
+    }
+
+    const { rows } = await this.db.query<{ id: string }>(
+      SQL_ADMIN_SCOPED_COMPANY_IDS,
+      [userId],
+    );
+    return rows.map((row) => row.id);
+  }
+
+  private async assertCanReadCompany(
+    userId: string,
+    companyId: string,
+  ): Promise<void> {
+    if (await this.isActorSuperAdmin(userId)) {
+      return;
+    }
+
+    const { rows } = await this.db.query<{ hasAccess: boolean }>(
+      SQL_HAS_COMPANY_SCOPE_ACCESS,
+      [companyId, userId],
+    );
+    if (!rows[0]?.hasAccess) {
+      throw new EmpresaNoEncontradaException();
+    }
+  }
+
+  private async assertCanManageCompanies(userId: string): Promise<void> {
+    if (!(await this.isActorSuperAdmin(userId))) {
+      throw new PermisoDenegadoException();
+    }
   }
 
   private async findCompanyById(id: string): Promise<Company> {

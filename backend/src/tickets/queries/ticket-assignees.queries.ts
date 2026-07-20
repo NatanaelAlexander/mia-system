@@ -73,6 +73,60 @@ export const SQL_IS_TICKET_ASSIGNEE = `
   ) AS "isAssigned"
 `;
 
+/** Proyectos donde el usuario es responsable de al menos un ticket. */
+export const SQL_ADMIN_SCOPED_PROJECT_IDS = `
+  SELECT DISTINCT t.project_id AS id
+  FROM ticket_assignees ta
+  INNER JOIN tickets t ON t.id = ta.ticket_id
+  WHERE ta.user_id = $1
+`;
+
+/** Empresas de esos proyectos. */
+export const SQL_ADMIN_SCOPED_COMPANY_IDS = `
+  SELECT DISTINCT p.company_id AS id
+  FROM ticket_assignees ta
+  INNER JOIN tickets t ON t.id = ta.ticket_id
+  INNER JOIN projects p ON p.id = t.project_id
+  WHERE ta.user_id = $1
+`;
+
+export const SQL_HAS_PROJECT_SCOPE_ACCESS = `
+  SELECT EXISTS (
+    SELECT 1
+    FROM ticket_assignees ta
+    INNER JOIN tickets t ON t.id = ta.ticket_id
+    WHERE ta.user_id = $2
+      AND t.project_id = $1
+  ) AS "hasAccess"
+`;
+
+export const SQL_HAS_COMPANY_SCOPE_ACCESS = `
+  SELECT EXISTS (
+    SELECT 1
+    FROM ticket_assignees ta
+    INNER JOIN tickets t ON t.id = ta.ticket_id
+    INNER JOIN projects p ON p.id = t.project_id
+    WHERE ta.user_id = $2
+      AND p.company_id = $1
+  ) AS "hasAccess"
+`;
+
+/** El ticket pertenece a un proyecto donde el usuario ya es assignee de algún ticket. */
+export const SQL_IS_TICKET_IN_SCOPED_PROJECT = `
+  SELECT EXISTS (
+    SELECT 1
+    FROM tickets target
+    WHERE target.id = $1
+      AND EXISTS (
+        SELECT 1
+        FROM ticket_assignees ta
+        INNER JOIN tickets scoped ON scoped.id = ta.ticket_id
+        WHERE ta.user_id = $2
+          AND scoped.project_id = target.project_id
+      )
+  ) AS "hasAccess"
+`;
+
 export const SQL_FIND_ASSIGNEES_BY_TICKET_IDS = `
   SELECT
     ta.ticket_id AS "ticketId",

@@ -26,8 +26,10 @@ export class AccesoSuperficieDenegadoException extends AppException {
 }
 
 export class PermisoDenegadoException extends AppException {
-  constructor() {
-    super('No tienes permiso para realizar esta acción', HttpStatus.FORBIDDEN);
+  constructor(
+    message = 'No posee autorización para trabajar en esta área.',
+  ) {
+    super(message, HttpStatus.FORBIDDEN);
   }
 }
 

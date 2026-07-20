@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, FileText, MessageSquare, Ticket } from "lucide-react";
+import { Bell, FileText, MessageSquare, Ticket, XIcon } from "lucide-react";
 import { useNotifications } from "@/providers/notifications-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -49,8 +48,12 @@ function NotificationIcon({ notification }: { notification: AppNotification }) {
 }
 
 function notificationHref(notification: AppNotification): string {
-  if (notification.kind === "quote" && notification.shareToken) {
-    return publicQuoteHref(notification.shareToken);
+  if (
+    notification.kind === "quote" &&
+    notification.quoteId &&
+    notification.shareToken
+  ) {
+    return publicQuoteHref(notification.quoteId, notification.shareToken);
   }
 
   if (
@@ -86,6 +89,7 @@ export function NotificationsMenu({
     isLoading,
     markAsRead,
     markAllAsRead,
+    dismiss,
   } = useNotifications();
 
   const isHeader = variant === "header";
@@ -152,31 +156,45 @@ export function NotificationsMenu({
             </p>
           ) : (
             notifications.map((notification) => (
-              <DropdownMenuItem
+              <div
                 key={notification.id}
                 className={cn(
-                  "flex items-start gap-2 rounded-md px-2 py-2.5",
+                  "group/item flex items-start gap-0.5 rounded-md",
                   !notification.readAt && "bg-primary/5",
                 )}
-                render={
-                  <Link href={notificationHref(notification)} />
-                }
-                onClick={() => {
-                  if (!notification.readAt) {
-                    void markAsRead(notification.id);
-                  }
-                }}
               >
-                <NotificationIcon notification={notification} />
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="line-clamp-2 text-sm leading-snug">
-                    {notification.message}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeTime(notification.createdAt)}
-                  </p>
-                </div>
-              </DropdownMenuItem>
+                <Link
+                  href={notificationHref(notification)}
+                  className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2.5 outline-hidden hover:bg-accent"
+                  onClick={() => {
+                    if (!notification.readAt) {
+                      void markAsRead(notification.id);
+                    }
+                  }}
+                >
+                  <NotificationIcon notification={notification} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="line-clamp-2 text-sm leading-snug">
+                      {notification.message}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatRelativeTime(notification.createdAt)}
+                    </p>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Descartar notificación"
+                  className="mt-1.5 mr-1 shrink-0 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void dismiss(notification.id);
+                  }}
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </div>
             ))
           )}
         </div>

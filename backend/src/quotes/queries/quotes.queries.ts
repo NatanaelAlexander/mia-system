@@ -191,7 +191,7 @@ export const SQL_FIND_SHARE_BY_QUOTE = `
   WHERE quote_id = $1
 `;
 
-export const SQL_FIND_SHARE_BY_TOKEN = `
+export const SQL_FIND_SHARE_BY_QUOTE_AND_TOKEN = `
   SELECT
     sl.id,
     sl.quote_id AS "quoteId",
@@ -205,7 +205,8 @@ export const SQL_FIND_SHARE_BY_TOKEN = `
     q.client_visible AS "clientVisible"
   FROM quote_share_links sl
   JOIN quotes q ON q.id = sl.quote_id
-  WHERE sl.token = $1
+  WHERE sl.quote_id = $1
+    AND sl.token = $2
 `;
 
 export const SQL_UPSERT_SHARE_LINK = `
@@ -347,7 +348,11 @@ export const SQL_FIND_STATUSES_BY_QUOTE_IDS = `
 export const SQL_ASSIGN_STATUS = `
   INSERT INTO quotes_statuses (quote_id, status_id, assigned_by)
   VALUES ($1, $2, $3)
-  ON CONFLICT DO NOTHING
+`;
+
+export const SQL_CLEAR_QUOTE_STATUSES = `
+  DELETE FROM quotes_statuses
+  WHERE quote_id = $1
 `;
 
 export const SQL_REMOVE_STATUS = `

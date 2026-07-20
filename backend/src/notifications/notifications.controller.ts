@@ -87,6 +87,17 @@ export class InternalNotificationsController {
     await this.notificationsService.markAsRead(userId, id);
     return { ok: true };
   }
+
+  @Patch(':id/descartar')
+  @ApiOperation({ summary: 'Descartar una notificación (ocultarla para mí)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  async dismiss(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.notificationsService.dismissForUser(userId, id);
+    return { ok: true };
+  }
 }
 
 @ApiBearerAuth('access-token')
@@ -152,6 +163,19 @@ export class PortalNotificationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.notificationsService.markAsRead(userId, id);
+    return { ok: true };
+  }
+
+  @Patch(':id/descartar')
+  @ApiOperation({
+    summary: 'Descartar una notificación (ocultarla para mí, portal)',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  async dismiss(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.notificationsService.dismissForUser(userId, id);
     return { ok: true };
   }
 }

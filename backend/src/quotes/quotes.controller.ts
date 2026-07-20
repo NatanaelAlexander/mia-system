@@ -33,6 +33,7 @@ import { FindByIdDto } from '../common/dto/find-by-id.dto';
 import {
   CreateQuoteDto,
   FilterQuotesDto,
+  PublicQuoteAccessDto,
   SetQuoteStatusesDto,
   ToggleShareDto,
   UpdateQuoteDto,
@@ -204,7 +205,7 @@ export class InternalQuotesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetQuoteStatusesDto,
   ) {
-    return this.quotesService.setStatuses(actorUserId, id, dto.statusCodes);
+    return this.quotesService.setStatuses(actorUserId, id, dto.statusCode);
   }
 
   @Post(':id/documento-firmado')
@@ -262,12 +263,17 @@ export class InternalQuotesController {
 export class PublicQuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
-  @Get(':token')
+  @Post(':quoteId')
   @ApiOperation({
-    summary: 'Revisar cotización por token público (válido 24h)',
+    summary:
+      'Revisar cotización pública (UUID + token en body; válido 24h desde habilitación)',
   })
-  @ApiParam({ name: 'token' })
-  findByToken(@Param('token') token: string) {
-    return this.quotesService.findByPublicToken(token);
+  @ApiParam({ name: 'quoteId', format: 'uuid' })
+  @ApiBody({ type: PublicQuoteAccessDto })
+  findByPublicAccess(
+    @Param('quoteId', ParseUUIDPipe) quoteId: string,
+    @Body() dto: PublicQuoteAccessDto,
+  ) {
+    return this.quotesService.findByPublicAccess(quoteId, dto.token);
   }
 }

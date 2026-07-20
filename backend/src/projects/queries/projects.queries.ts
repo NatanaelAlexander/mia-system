@@ -13,6 +13,7 @@ export const SQL_FIND_ALL_ACTIVE_PROJECTS = `
   SELECT ${PROJECT_COLUMNS}
   FROM projects
   WHERE status = $1
+    AND ($2::uuid[] IS NULL OR id = ANY($2::uuid[]))
   ORDER BY name ASC
 `;
 
@@ -35,6 +36,7 @@ export const SQL_FIND_PROJECTS_FILTERED = `
       OR c.name ILIKE '%' || $3 || '%'
       OR regexp_replace(c.tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($3, '[.\\-]', '', 'g') || '%'
     )
+    AND ($4::uuid[] IS NULL OR p.id = ANY($4::uuid[]))
   ORDER BY p.name ASC
 `;
 
