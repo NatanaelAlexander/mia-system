@@ -21,12 +21,41 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+type PublicQuoteErrorKind = "not_found" | "expired";
+
+function resolvePublicError(err: unknown): {
+  kind: PublicQuoteErrorKind;
+  message: string;
+} {
+  if (err instanceof ApiError) {
+    if (
+      err.statusCode === 410 ||
+      /24\s*horas|expir/i.test(err.message)
+    ) {
+      return {
+        kind: "expired",
+        message:
+          "Pasaron las 24 horas de validez del enlace de esta cotización.",
+      };
+    }
+  }
+
+  return {
+    kind: "not_found",
+    message: "Cotización no encontrada.",
+  };
+}
+
 export default function PublicQuotePage() {
-  const params = useParams<{ token: string }>();
+  const params = useParams<{ quoteId: string; token: string }>();
+  const quoteId = params.quoteId;
   const token = params.token;
 
   const [quote, setQuote] = React.useState<QuoteDetail | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<{
+    kind: PublicQuoteErrorKind;
+    message: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isDownloading, setIsDownloading] = React.useState(false);
 
@@ -36,16 +65,12 @@ export default function PublicQuotePage() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getPublicQuote(token);
+        const data = await getPublicQuote(quoteId, token);
         if (!cancelled) setQuote(data);
       } catch (err) {
         if (!cancelled) {
           setQuote(null);
-          setError(
-            err instanceof ApiError
-              ? err.message
-              : "El enlace no es válido o ha expirado.",
-          );
+          setError(resolvePublicError(err));
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -54,7 +79,7 @@ export default function PublicQuotePage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [quoteId, token]);
 
   const previewModel = React.useMemo(
     () => (quote ? quoteDetailToPreviewModel(quote) : null),
@@ -80,18 +105,24 @@ export default function PublicQuotePage() {
   }
 
   if (error || !quote || !previewModel) {
+    const kind = error?.kind ?? "not_found";
+    const title =
+      kind === "expired" ? "Enlace vencido" : "Cotización no encontrada";
+    const description =
+      error?.message ??
+      (kind === "expired"
+        ? "Pasaron las 24 horas de validez del enlace de esta cotización."
+        : "Cotización no encontrada.");
+
     return (
       <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center p-6">
         <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileWarning className="size-5" />
-              Enlace no disponible
+              {title}
             </CardTitle>
-            <CardDescription>
-              {error ??
-                "Este enlace solo es válido durante 24 horas o fue deshabilitado."}
-            </CardDescription>
+            <CardDescription>{description}</CardDescription>
           </CardHeader>
         </Card>
       </main>

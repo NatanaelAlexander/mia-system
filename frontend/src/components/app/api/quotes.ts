@@ -249,8 +249,15 @@ export function removeQuoteSignedDocument(id: string) {
   }, true);
 }
 
-export function getPublicQuote(token: string) {
-  return apiFetch<QuoteDetail>(`/public/quotes/${token}`, {}, false);
+export function getPublicQuote(quoteId: string, token: string) {
+  return apiFetch<QuoteDetail>(
+    `/public/quotes/${quoteId}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    },
+    false,
+  );
 }
 
 export interface QuotePresetPayload {

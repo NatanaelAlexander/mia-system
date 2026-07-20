@@ -191,7 +191,7 @@ export const SQL_FIND_SHARE_BY_QUOTE = `
   WHERE quote_id = $1
 `;
 
-export const SQL_FIND_SHARE_BY_TOKEN = `
+export const SQL_FIND_SHARE_BY_QUOTE_AND_TOKEN = `
   SELECT
     sl.id,
     sl.quote_id AS "quoteId",
@@ -205,7 +205,8 @@ export const SQL_FIND_SHARE_BY_TOKEN = `
     q.client_visible AS "clientVisible"
   FROM quote_share_links sl
   JOIN quotes q ON q.id = sl.quote_id
-  WHERE sl.token = $1
+  WHERE sl.quote_id = $1
+    AND sl.token = $2
 `;
 
 export const SQL_UPSERT_SHARE_LINK = `

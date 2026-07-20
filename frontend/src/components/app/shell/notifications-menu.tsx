@@ -48,8 +48,12 @@ function NotificationIcon({ notification }: { notification: AppNotification }) {
 }
 
 function notificationHref(notification: AppNotification): string {
-  if (notification.kind === "quote" && notification.shareToken) {
-    return publicQuoteHref(notification.shareToken);
+  if (
+    notification.kind === "quote" &&
+    notification.quoteId &&
+    notification.shareToken
+  ) {
+    return publicQuoteHref(notification.quoteId, notification.shareToken);
   }
 
   if (

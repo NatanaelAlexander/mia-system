@@ -314,6 +314,17 @@ export class ToggleShareDto {
   enabled: boolean;
 }
 
+export class PublicQuoteAccessDto {
+  @ApiProperty({
+    description: 'Token público de la cotización (no usar Authorization)',
+    example: 'a1b2c3d4e5f6...',
+  })
+  @IsString()
+  @MinLength(32)
+  @MaxLength(64)
+  token: string;
+}
+
 export class SetQuoteStatusesDto {
   @ApiProperty({
     description: 'Código del único estado comercial activo',

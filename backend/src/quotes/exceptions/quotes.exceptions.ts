@@ -37,11 +37,12 @@ export class CotizacionNoVisibleClienteException extends AppException {
   }
 }
 
-export class EnlaceCotizacionInvalidoException extends AppException {
-  constructor(
-    message = 'El enlace de la cotización no es válido o ha expirado',
-  ) {
-    super(message, HttpStatus.GONE);
+export class EnlaceCotizacionExpiradoException extends AppException {
+  constructor() {
+    super(
+      'Pasaron las 24 horas de validez del enlace de esta cotización',
+      HttpStatus.GONE,
+    );
   }
 }
 

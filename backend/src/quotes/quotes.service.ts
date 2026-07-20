@@ -19,7 +19,7 @@ import {
   DocumentoFirmadoNoEncontradoException,
   DocumentoFirmadoYaExisteException,
   EmisorNoEncontradoException,
-  EnlaceCotizacionInvalidoException,
+  EnlaceCotizacionExpiradoException,
   EstadoCotizacionInvalidoException,
   PresetCotizacionNoEncontradoException,
   RepresentanteNoVinculadoException,
@@ -44,7 +44,7 @@ import {
   SQL_FIND_QUOTES_FILTERED,
   SQL_FIND_SECTIONS_BY_QUOTE,
   SQL_FIND_SHARE_BY_QUOTE,
-  SQL_FIND_SHARE_BY_TOKEN,
+  SQL_FIND_SHARE_BY_QUOTE_AND_TOKEN,
   SQL_FIND_SIGNED_ASSET,
   SQL_FIND_STATUS_BY_CODE,
   SQL_FIND_STATUS_CATALOG,
@@ -421,20 +421,25 @@ export class QuotesService {
     return detail;
   }
 
-  async findByPublicToken(token: string): Promise<QuoteDetail> {
+  /**
+   * Acceso público por UUID de cotización + token en body.
+   * Un token estable por cotización; la ventana de 24h se reinicia al habilitar.
+   */
+  async findByPublicAccess(
+    quoteId: string,
+    token: string,
+  ): Promise<QuoteDetail> {
     const { rows } = await this.db.query<
       QuoteShareLink & { clientVisible: boolean }
-    >(SQL_FIND_SHARE_BY_TOKEN, [token]);
+    >(SQL_FIND_SHARE_BY_QUOTE_AND_TOKEN, [quoteId, token]);
 
     const share = rows[0];
     if (!share || !share.clientVisible || !share.isEnabled || !share.expiresAt) {
-      throw new EnlaceCotizacionInvalidoException();
+      throw new CotizacionNoEncontradaException();
     }
 
     if (new Date(share.expiresAt).getTime() <= Date.now()) {
-      throw new EnlaceCotizacionInvalidoException(
-        'El enlace de la cotización ha expirado (válido 24 horas)',
-      );
+      throw new EnlaceCotizacionExpiradoException();
     }
 
     await this.assignStatusCode(share.quoteId, 'revisado_cliente', null);

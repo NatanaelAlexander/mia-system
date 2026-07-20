@@ -1062,8 +1062,8 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const copyPublicLink = async () => {
     const token = quote?.shareLink?.token;
-    if (!token) return;
-    const url = `${window.location.origin}${publicQuoteHref(token)}`;
+    if (!quote?.id || !token) return;
+    const url = `${window.location.origin}${publicQuoteHref(quote.id, token)}`;
     await navigator.clipboard.writeText(url);
     toast.success("Enlace copiado");
   };
