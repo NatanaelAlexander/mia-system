@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   changeTicketStatus,
@@ -12,10 +12,8 @@ import {
   type TicketCatalogItem,
   type TicketDetail,
 } from "@/components/app/api/tickets";
-import { listUsers, type UserListItem } from "@/components/app/api/users";
+import { listUsers } from "@/components/app/api/users";
 import { hasPermission } from "@/components/app/shared/permissions";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -25,7 +23,11 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
-import { TicketAssigneeCandidateList } from "./ticket-assignee-candidate-list";
+import {
+  mergeAssigneeCandidates,
+  TicketAssigneeCandidateList,
+  type TicketAssigneeCandidate,
+} from "./ticket-assignee-candidate-list";
 
 interface UseTicketManagementOptions {
   ticket: TicketDetail | null;
@@ -45,8 +47,9 @@ function useTicketManagement({
 
   const [assignees, setAssignees] = React.useState<TicketAssignee[]>([]);
   const [statuses, setStatuses] = React.useState<TicketCatalogItem[]>([]);
-  const [candidates, setCandidates] = React.useState<UserListItem[]>([]);
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [candidates, setCandidates] = React.useState<TicketAssigneeCandidate[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSavingAssignees, setIsSavingAssignees] = React.useState(false);
   const [isChangingStatus, setIsChangingStatus] = React.useState(false);
@@ -56,6 +59,13 @@ function useTicketManagement({
     hasPermission(claims, "tickets:change_status") &&
     (isSuperAdmin ||
       (isAdmin && assignees.some((assignee) => assignee.id === claims?.sub)));
+
+  const syncAssignees = (updated: TicketAssignee[]) => {
+    setAssignees(updated);
+    if (ticket) {
+      onTicketChange({ ...ticket, assignees: updated });
+    }
+  };
 
   React.useEffect(() => {
     if (!enabled || !ticketId) {
@@ -84,19 +94,9 @@ function useTicketManagement({
           return;
         }
 
-        const uniqueCandidates = new Map<string, UserListItem>();
-        [...superAdminUsers, ...adminUsers].forEach((user) => {
-          uniqueCandidates.set(user.id, user);
-        });
-
         setAssignees(assigneeData);
-        setSelectedIds(
-          assigneeData
-            .filter((assignee) => uniqueCandidates.has(assignee.id))
-            .map((assignee) => assignee.id),
-        );
         setStatuses(statusData.filter((status) => status.name !== "Borrador"));
-        setCandidates([...uniqueCandidates.values()]);
+        setCandidates(mergeAssigneeCandidates(superAdminUsers, adminUsers));
       } catch (error) {
         if (!cancelled) {
           toast.error(
@@ -144,25 +144,15 @@ function useTicketManagement({
     }
   };
 
-  const toggleCandidate = (userId: string, checked: boolean) => {
-    setSelectedIds((current) =>
-      checked
-        ? current.includes(userId)
-          ? current
-          : [...current, userId]
-        : current.filter((id) => id !== userId),
-    );
-  };
-
-  const saveAssignees = async () => {
+  const persistAssignees = async (userIds: string[]) => {
     if (!ticketId) {
       return;
     }
+
     setIsSavingAssignees(true);
     try {
-      const updated = await replaceTicketAssignees(ticketId, selectedIds);
-      setAssignees(updated);
-      setSelectedIds(updated.map((assignee) => assignee.id));
+      const updated = await replaceTicketAssignees(ticketId, userIds);
+      syncAssignees(updated);
       toast.success("Responsables actualizados");
     } catch (error) {
       toast.error(
@@ -175,19 +165,38 @@ function useTicketManagement({
     }
   };
 
+  const addAssignee = async (userId: string) => {
+    if (assignees.some((assignee) => assignee.id === userId)) {
+      return;
+    }
+    await persistAssignees([...assignees.map((item) => item.id), userId]);
+  };
+
+  const removeAssignee = async (userId: string) => {
+    if (
+      assignees.some(
+        (assignee) => assignee.id === userId && assignee.isSuperAdmin,
+      )
+    ) {
+      return;
+    }
+    await persistAssignees(
+      assignees.filter((item) => item.id !== userId).map((item) => item.id),
+    );
+  };
+
   return {
     isSuperAdmin,
     assignees,
     statuses,
     candidates,
-    selectedIds,
     isLoading,
     isSavingAssignees,
     isChangingStatus,
     canChangeStatus,
     handleStatusChange,
-    toggleCandidate,
-    saveAssignees,
+    addAssignee,
+    removeAssignee,
   };
 }
 
@@ -256,31 +265,47 @@ export function TicketAssigneesControl({
     isSuperAdmin,
     assignees,
     candidates,
-    selectedIds,
     isLoading,
     isSavingAssignees,
-    toggleCandidate,
-    saveAssignees,
+    addAssignee,
+    removeAssignee,
   } = management;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Responsables
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {isLoading ? (
-            <span className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Cargando...
-            </span>
-          ) : assignees.length > 0 ? (
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Responsables
+      </p>
+
+      {isLoading ? (
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Cargando...
+        </span>
+      ) : isSuperAdmin ? (
+        <TicketAssigneeCandidateList
+          candidates={candidates}
+          assignees={assignees}
+          isSaving={isSavingAssignees}
+          isMandatory={(userId) =>
+            assignees.some(
+              (assignee) => assignee.id === userId && assignee.isSuperAdmin,
+            )
+          }
+          onAdd={(userId) => void addAssignee(userId)}
+          onRemove={(userId) => void removeAssignee(userId)}
+        />
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {assignees.length > 0 ? (
             assignees.map((assignee) => (
-              <Badge key={assignee.id} variant="secondary">
+              <span
+                key={assignee.id}
+                className="inline-flex h-7 items-center rounded-4xl bg-secondary px-2 text-xs font-medium text-secondary-foreground"
+              >
                 {assignee.firstName} {assignee.lastName}
                 {assignee.isSuperAdmin ? " · Superadmin" : ""}
-              </Badge>
+              </span>
             ))
           ) : (
             <span className="text-sm text-muted-foreground">
@@ -288,39 +313,7 @@ export function TicketAssigneesControl({
             </span>
           )}
         </div>
-      </div>
-
-      {isSuperAdmin && !isLoading ? (
-        <div className="space-y-2 rounded-lg border border-border/70 p-3">
-          <p className="text-sm font-medium">Asignar equipo</p>
-          <TicketAssigneeCandidateList
-            candidates={candidates}
-            selectedIds={selectedIds}
-            isDisabled={isSavingAssignees}
-            isMandatory={(userId) =>
-              assignees.some(
-                (assignee) =>
-                  assignee.id === userId && assignee.isSuperAdmin,
-              )
-            }
-            onToggle={toggleCandidate}
-            gridClassName="grid gap-1 sm:grid-cols-2 lg:grid-cols-3"
-          />
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void saveAssignees()}
-            disabled={isSavingAssignees}
-          >
-            {isSavingAssignees ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Save />
-            )}
-            Guardar responsables
-          </Button>
-        </div>
-      ) : null}
+      )}
     </div>
   );
 }
