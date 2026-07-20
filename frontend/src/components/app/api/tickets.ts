@@ -59,6 +59,7 @@ export interface TicketComment {
   authorFirstName: string;
   authorLastName: string;
   authorJobTitles: string[];
+  authorIsClient: boolean;
 }
 
 export interface ListTicketsFilters {
