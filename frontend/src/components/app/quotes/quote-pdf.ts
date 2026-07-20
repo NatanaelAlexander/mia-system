@@ -3,8 +3,10 @@ import type { QuoteDetail, QuoteSection } from "@/components/app/api/quotes";
 import {
   hexToRgb,
   QUOTE_BRAND_LOGO_SRC,
+  QUOTE_PDF_PAGE,
   resolveQuotePdfTheme,
 } from "@/components/app/quotes/quote-pdf-styles";
+import { formatClp } from "@/components/app/quotes/quotes-tax";
 
 const FREQUENCY_LABEL: Record<string, string> = {
   unico: "PAGOS UNITARIOS",
@@ -23,7 +25,7 @@ function formatDate(dateString: string): string {
 }
 
 function money(value: number): string {
-  return `$${Number(value).toLocaleString("es-CL")}`;
+  return formatClp(Number(value));
 }
 
 async function loadBrandLogoDataUrl(): Promise<string | null> {
@@ -43,7 +45,11 @@ async function loadBrandLogoDataUrl(): Promise<string | null> {
 }
 
 export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
-  const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation: QUOTE_PDF_PAGE.orientation,
+    unit: QUOTE_PDF_PAGE.unit,
+    format: QUOTE_PDF_PAGE.format,
+  });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -53,8 +59,9 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     secondary: quote.pdfSecondaryColor,
   });
   const layout = theme.layoutId;
-  const marginX = layout === "minimal" ? 18 : 15;
-  let yPosition = 20;
+  const marginX =
+    layout === "minimal" ? QUOTE_PDF_PAGE.marginXMinimal : QUOTE_PDF_PAGE.marginX;
+  let yPosition = QUOTE_PDF_PAGE.marginTop;
 
   const grayDark: [number, number, number] = [31, 41, 55];
   const grayBorder: [number, number, number] = [229, 231, 235];
@@ -78,14 +85,14 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     y: number,
     opts?: { align?: "left" | "right"; valueColor?: [number, number, number]; valueSize?: number },
   ) => {
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...secondary);
     doc.text(label, x, y, opts?.align ? { align: opts.align } : undefined);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(opts?.valueSize ?? 8);
+    doc.setFontSize(opts?.valueSize ?? 9.5);
     doc.setTextColor(...(opts?.valueColor ?? grayDark));
-    doc.text(value || "-", x, y + 3.5, opts?.align ? { align: opts.align } : undefined);
+    doc.text(value || "-", x, y + 4, opts?.align ? { align: opts.align } : undefined);
   };
 
   if (layout === "banner") {
@@ -261,7 +268,7 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
       doc.setFillColor(...primary);
       doc.rect(x + 2, yPosition + 3, 2, 2, "F");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8);
       doc.setTextColor(...primary);
       doc.text(title, x + 6, yPosition + 5);
       doc.setFont("helvetica", "normal");
@@ -364,7 +371,7 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     doc.setFillColor(...primary);
     doc.roundedRect(pageWidth - marginX - 28, 10, 28, 14, 2, 2, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.text("Nº", pageWidth - marginX - 14, 15, { align: "center" });
     doc.setFontSize(12);
     doc.text(String(quote.quoteNumber), pageWidth - marginX - 14, 21, {
@@ -520,7 +527,7 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     );
 
     const xRight = pageWidth - marginX - 5;
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...secondary);
     doc.text("COTIZACIÓN Nº", xRight, yPosition + 7, { align: "right" });
@@ -565,7 +572,7 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     const title = section.esCanje ? `${baseTitle} (CANJE)` : baseTitle;
     const contentWidth = pageWidth - marginX * 2;
 
-    if (currentY > pageHeight - 80) {
+    if (currentY > pageHeight - QUOTE_PDF_PAGE.footerReserve) {
       doc.addPage();
       doc.setFillColor(...background);
       doc.rect(0, 0, pageWidth, pageHeight, "F");
@@ -573,23 +580,24 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
         doc.setFillColor(...primary);
         doc.rect(0, 0, 4, pageHeight, "F");
       }
-      currentY = 20;
+      currentY = QUOTE_PDF_PAGE.marginTop;
     }
 
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...grayDark);
     doc.text(title, marginX, currentY);
     doc.setDrawColor(...primary);
     doc.setLineWidth(layout === "editorial" ? 0.8 : 0.5);
-    doc.line(marginX, currentY + 1, marginX + 20, currentY + 1);
-    currentY += 8;
+    doc.line(marginX, currentY + 1, marginX + 24, currentY + 1);
+    currentY += 9;
 
+    const descriptionWidth = Math.max(72, contentWidth * 0.48);
     const rowHeights: number[] = [];
-    let totalTableHeight = 7;
+    let totalTableHeight = 8;
     section.items.forEach((item) => {
-      const lines = doc.splitTextToSize(item.description || "-", 80);
-      const rowHeight = Math.max(7, lines.length * 4 + 3);
+      const lines = doc.splitTextToSize(item.description || "-", descriptionWidth);
+      const rowHeight = Math.max(8, lines.length * 4.2 + 3.5);
       rowHeights.push(rowHeight);
       totalTableHeight += rowHeight;
     });
@@ -607,43 +615,46 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
       layout === "dual"
     ) {
       doc.setFillColor(...primary);
-      doc.rect(marginX, currentY, contentWidth, 7, "F");
+      doc.rect(marginX, currentY, contentWidth, 8, "F");
       doc.setTextColor(255, 255, 255);
     } else {
       doc.setFillColor(...grayLight);
-      doc.rect(marginX, currentY, contentWidth, 7, "F");
+      doc.rect(marginX, currentY, contentWidth, 8, "F");
       doc.setTextColor(...secondary);
     }
-    doc.line(marginX, currentY + 7, pageWidth - marginX, currentY + 7);
+    doc.line(marginX, currentY + 8, pageWidth - marginX, currentY + 8);
 
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("PROYECTO", marginX + 5, currentY + 4.5);
-    doc.text("DESCRIPCIÓN", marginX + 50, currentY + 4.5);
-    doc.text("PRECIO", pageWidth - marginX - 5, currentY + 4.5, {
+    doc.text("PROYECTO", marginX + 5, currentY + 5.2);
+    doc.text("DESCRIPCIÓN", marginX + 50, currentY + 5.2);
+    doc.text("PRECIO", pageWidth - marginX - 5, currentY + 5.2, {
       align: "right",
     });
-    currentY += 7;
+    currentY += 8;
 
     section.items.forEach((item, index) => {
       const rowHeight = rowHeights[index];
       const rowStartY = currentY;
 
       doc.setTextColor(...grayDark);
-      doc.setFontSize(8);
+      doc.setFontSize(9.5);
       doc.setFont("helvetica", "bold");
-      doc.text(item.title, marginX + 5, rowStartY + 4.5);
+      doc.text(item.title, marginX + 5, rowStartY + 5);
 
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...secondary);
-      const lines = doc.splitTextToSize(item.description || "-", 80) as string[];
+      const lines = doc.splitTextToSize(
+        item.description || "-",
+        descriptionWidth,
+      ) as string[];
       lines.forEach((line, lineIndex) => {
-        doc.text(line, marginX + 50, rowStartY + 4.5 + lineIndex * 4);
+        doc.text(line, marginX + 50, rowStartY + 5 + lineIndex * 4.2);
       });
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...(item.price < 0 ? red : grayDark));
-      doc.text(money(item.price), pageWidth - marginX - 5, rowStartY + 4.5, {
+      doc.text(money(item.price), pageWidth - marginX - 5, rowStartY + 5, {
         align: "right",
       });
 
@@ -658,22 +669,22 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
     currentY += 3;
     if (layout !== "minimal") {
       doc.setFillColor(...grayLight);
-      doc.roundedRect(marginX, currentY, contentWidth, 6, 2, 2, "F");
+      doc.roundedRect(marginX, currentY, contentWidth, 7, 2, 2, "F");
     }
     doc.setTextColor(...secondary);
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("Sub-Total", marginX + 5, currentY + 4);
+    doc.text("Sub-Total", marginX + 5, currentY + 4.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...grayDark);
-    doc.text(money(section.subtotal ?? 0), pageWidth - marginX - 5, currentY + 4, {
+    doc.text(money(section.subtotal ?? 0), pageWidth - marginX - 5, currentY + 4.5, {
       align: "right",
     });
-    currentY += 9;
+    currentY += 10;
 
     if (quote.documentType === "boleta") {
       doc.setTextColor(...secondary);
-      doc.setFontSize(7);
+      doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       if (section.applyTax && (section.retentionAmount ?? 0) > 0) {
         doc.text(
@@ -688,7 +699,7 @@ export async function generateQuotePdf(quote: QuoteDetail): Promise<void> {
           currentY,
         );
       }
-      currentY += 5;
+      currentY += 6;
     }
 
     if (

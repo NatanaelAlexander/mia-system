@@ -8,12 +8,14 @@ import {
   type QuoteDetail,
 } from "@/components/app/api/quotes";
 import { generateQuotePdf } from "@/components/app/quotes/quote-pdf";
-import { formatClp } from "@/components/app/quotes/quotes-tax";
+import {
+  QuotePreviewDocument,
+  quoteDetailToPreviewModel,
+} from "@/components/app/quotes/quote-preview";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -26,6 +28,7 @@ export default function PublicQuotePage() {
   const [quote, setQuote] = React.useState<QuoteDetail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -53,17 +56,32 @@ export default function PublicQuotePage() {
     };
   }, [token]);
 
+  const previewModel = React.useMemo(
+    () => (quote ? quoteDetailToPreviewModel(quote) : null),
+    [quote],
+  );
+
+  const handleDownloadPdf = async () => {
+    if (!quote || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await generateQuotePdf(quote);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center p-6">
+      <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center p-6">
         <p className="text-sm text-muted-foreground">Cargando cotización…</p>
       </main>
     );
   }
 
-  if (error || !quote) {
+  if (error || !quote || !previewModel) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center p-6">
+      <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center p-6">
         <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -85,84 +103,44 @@ export default function PublicQuotePage() {
     : null;
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl space-y-6 p-6">
-      <div className="space-y-2">
+    <main className="mx-auto min-h-screen max-w-4xl space-y-6 p-4 sm:p-6">
+      <div className="space-y-3 text-center sm:text-left">
         <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
           Este enlace es temporal y dura solo 24 horas desde que fue habilitado.
           {expiresAt
             ? ` Vence el ${expiresAt.toLocaleString("es-CL")}.`
             : null}
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Cotización #{quote.quoteNumber}
-        </h1>
-        <p className="text-muted-foreground">
-          {quote.companyName} ·{" "}
-          {quote.documentType === "factura" ? "Factura" : "Boleta"}
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Cotización #{quote.quoteNumber}
+          </h1>
+          <p className="text-muted-foreground">
+            {quote.companyName} ·{" "}
+            {quote.documentType === "factura" ? "Factura" : "Boleta"}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <Button
+          type="button"
+          size="lg"
+          className="h-12 w-full text-base font-semibold sm:h-14 sm:text-lg"
+          disabled={isDownloading}
+          onClick={() => void handleDownloadPdf()}
+        >
+          <Download className="size-5" />
+          {isDownloading ? "Generando PDF…" : "Descargar PDF"}
+        </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          Revisa la vista previa del documento. No se requiere firma.
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>Revisión del documento</CardTitle>
-            <CardDescription>
-              Puedes descargar el PDF para revisarlo. No se requiere firma.
-            </CardDescription>
-          </div>
-          <Button type="button" onClick={() => void generateQuotePdf(quote)}>
-            <Download />
-            Descargar PDF
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
-            <p>
-              <span className="text-muted-foreground">Fecha: </span>
-              {quote.issueDate}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Validez: </span>
-              {quote.expiresAt}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Representante: </span>
-              {quote.legalRepresentativeName}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Emisor: </span>
-              {quote.issuer.fullName}
-            </p>
-          </div>
-
-          {quote.sections.map((section) => (
-            <div key={section.frequency} className="rounded-lg border p-3">
-              <p className="mb-2 font-medium capitalize">
-                {section.frequency}
-                {section.esCanje ? " (canje)" : ""}
-              </p>
-              <ul className="space-y-1 text-sm">
-                {section.items.map((item, index) => (
-                  <li
-                    key={`${section.frequency}-${index}`}
-                    className="flex justify-between gap-4"
-                  >
-                    <span>
-                      {item.title}
-                      {item.description ? ` — ${item.description}` : ""}
-                    </span>
-                    <span>{formatClp(item.price)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex justify-between border-t pt-2 text-sm font-medium">
-                <span>Total</span>
-                <span>{formatClp(section.total ?? 0)}</span>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <section className="rounded-xl border bg-muted/30 p-3 sm:p-4">
+        <QuotePreviewDocument model={previewModel} />
+      </section>
     </main>
   );
 }
