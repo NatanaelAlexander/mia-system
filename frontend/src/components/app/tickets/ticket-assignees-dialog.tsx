@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listTicketAssignees,
   replaceTicketAssignees,
   type TicketAssignee,
 } from "@/components/app/api/tickets";
-import { listUsers, type UserListItem } from "@/components/app/api/users";
+import { listUsers } from "@/components/app/api/users";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +19,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ApiError } from "@/lib/api/errors";
-import { TicketAssigneeCandidateList } from "./ticket-assignee-candidate-list";
+import {
+  mergeAssigneeCandidates,
+  TicketAssigneeCandidateList,
+  type TicketAssigneeCandidate,
+} from "./ticket-assignee-candidate-list";
 
 interface TicketAssigneesDialogProps {
   open: boolean;
@@ -37,8 +41,9 @@ export function TicketAssigneesDialog({
   onSaved,
 }: TicketAssigneesDialogProps) {
   const [assignees, setAssignees] = React.useState<TicketAssignee[]>([]);
-  const [candidates, setCandidates] = React.useState<UserListItem[]>([]);
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [candidates, setCandidates] = React.useState<TicketAssigneeCandidate[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -62,18 +67,8 @@ export function TicketAssigneesDialog({
           return;
         }
 
-        const uniqueCandidates = new Map<string, UserListItem>();
-        [...superAdminUsers, ...adminUsers].forEach((user) => {
-          uniqueCandidates.set(user.id, user);
-        });
-
         setAssignees(assigneeData);
-        setSelectedIds(
-          assigneeData
-            .filter((assignee) => uniqueCandidates.has(assignee.id))
-            .map((assignee) => assignee.id),
-        );
-        setCandidates([...uniqueCandidates.values()]);
+        setCandidates(mergeAssigneeCandidates(superAdminUsers, adminUsers));
       } catch (error) {
         if (!cancelled) {
           toast.error(
@@ -95,25 +90,13 @@ export function TicketAssigneesDialog({
     };
   }, [open, ticketId]);
 
-  const toggleCandidate = (userId: string, checked: boolean) => {
-    setSelectedIds((current) =>
-      checked
-        ? current.includes(userId)
-          ? current
-          : [...current, userId]
-        : current.filter((id) => id !== userId),
-    );
-  };
-
-  const handleSave = async () => {
+  const persistAssignees = async (userIds: string[]) => {
     setIsSaving(true);
     try {
-      const updated = await replaceTicketAssignees(ticketId, selectedIds);
+      const updated = await replaceTicketAssignees(ticketId, userIds);
       setAssignees(updated);
-      setSelectedIds(updated.map((assignee) => assignee.id));
       onSaved(updated);
       toast.success("Responsables actualizados");
-      onOpenChange(false);
     } catch (error) {
       toast.error(
         error instanceof ApiError
@@ -123,6 +106,26 @@ export function TicketAssigneesDialog({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const addAssignee = async (userId: string) => {
+    if (assignees.some((assignee) => assignee.id === userId)) {
+      return;
+    }
+    await persistAssignees([...assignees.map((item) => item.id), userId]);
+  };
+
+  const removeAssignee = async (userId: string) => {
+    if (
+      assignees.some(
+        (assignee) => assignee.id === userId && assignee.isSuperAdmin,
+      )
+    ) {
+      return;
+    }
+    await persistAssignees(
+      assignees.filter((item) => item.id !== userId).map((item) => item.id),
+    );
   };
 
   return (
@@ -141,15 +144,16 @@ export function TicketAssigneesDialog({
         ) : (
           <TicketAssigneeCandidateList
             candidates={candidates}
-            selectedIds={selectedIds}
-            isDisabled={isSaving}
+            assignees={assignees}
+            isSaving={isSaving}
             isMandatory={(userId) =>
               assignees.some(
                 (assignee) =>
                   assignee.id === userId && assignee.isSuperAdmin,
               )
             }
-            onToggle={toggleCandidate}
+            onAdd={(userId) => void addAssignee(userId)}
+            onRemove={(userId) => void removeAssignee(userId)}
           />
         )}
 
@@ -160,15 +164,7 @@ export function TicketAssigneesDialog({
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isLoading || isSaving}
-          >
-            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
-            Guardar
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>

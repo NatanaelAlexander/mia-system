@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsRealtimeService } from './realtime/notifications-realtime.service';
 import {
@@ -9,7 +10,7 @@ import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ScheduleModule.forRoot()],
   controllers: [InternalNotificationsController, PortalNotificationsController],
   providers: [
     NotificationsService,

@@ -71,11 +71,11 @@ export const SQL_FIND_ALL_TICKETS_KANBAN = `
     ${KANBAN_FILTER_CLAUSE}
     AND (
       COALESCE($6::boolean, FALSE)
-      OR EXISTS (
-        SELECT 1
+      OR t.project_id IN (
+        SELECT DISTINCT scoped.project_id
         FROM ticket_assignees ta
-        WHERE ta.ticket_id = t.id
-          AND ta.user_id = $7::uuid
+        INNER JOIN tickets scoped ON scoped.id = ta.ticket_id
+        WHERE ta.user_id = $7::uuid
       )
     )
   ORDER BY t.updated_at DESC

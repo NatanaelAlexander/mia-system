@@ -34,11 +34,11 @@ export const SQL_TICKET_TIMELINE = `
       AND ts.name <> 'Borrador'
       AND (
         COALESCE($4::boolean, FALSE)
-        OR EXISTS (
-          SELECT 1
+        OR t.project_id IN (
+          SELECT DISTINCT scoped.project_id
           FROM ticket_assignees ta
-          WHERE ta.ticket_id = t.id
-            AND ta.user_id = $5::uuid
+          INNER JOIN tickets scoped ON scoped.id = ta.ticket_id
+          WHERE ta.user_id = $5::uuid
         )
       )
     GROUP BY 1

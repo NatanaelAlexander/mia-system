@@ -10,7 +10,14 @@ export const TICKET_COMMENT_COLUMNS = `
   COALESCE(
     array_agg(jt.name ORDER BY jt.name) FILTER (WHERE jt.name IS NOT NULL),
     ARRAY[]::text[]
-  ) AS "authorJobTitles"
+  ) AS "authorJobTitles",
+  EXISTS (
+    SELECT 1
+    FROM users_roles ur
+    INNER JOIN roles r ON r.id = ur.role_id
+    WHERE ur.user_id = tc.user_id
+      AND r.name = 'cliente'
+  ) AS "authorIsClient"
 `;
 
 const TICKET_COMMENT_JOINS = `

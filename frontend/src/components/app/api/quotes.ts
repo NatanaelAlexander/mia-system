@@ -2,7 +2,7 @@ import { apiFetch, apiFetchDetalle, apiUpload } from "@/lib/api/client";
 
 export type QuoteScope = "company" | "project" | "ticket";
 export type QuoteDocumentType = "boleta" | "factura";
-export type QuoteStatus = "draft" | "ready" | "sent";
+export type QuoteStatus = "ready" | "sent";
 export type QuoteFrequency = "unico" | "mensual" | "anual";
 export type PriceInputMode = "gross" | "liquid";
 export type QuoteStatusCategory =
@@ -136,6 +136,8 @@ export interface CreateQuotePayload {
   issueDate: string;
   expiresAt?: string;
   status?: QuoteStatus;
+  /** Estado comercial único. Si se omite, el API usa «creado». */
+  statusCode?: string;
   sections: QuoteSectionPayload[];
 }
 
@@ -212,11 +214,16 @@ export function listQuoteStatusCatalog() {
   return apiFetch<QuoteStatusFlag[]>("/internal/quotes/estados", {}, true);
 }
 
-export function setQuoteStatuses(id: string, statusCodes: string[]) {
+export function setQuoteStatus(id: string, statusCode: string) {
   return apiFetch<QuoteDetail>(`/internal/quotes/${id}/estados`, {
     method: "POST",
-    body: JSON.stringify({ statusCodes }),
+    body: JSON.stringify({ statusCode }),
   }, true);
+}
+
+/** @deprecated use setQuoteStatus */
+export function setQuoteStatuses(id: string, statusCodes: string[]) {
+  return setQuoteStatus(id, statusCodes[0] ?? "creado");
 }
 
 export function uploadQuoteSignedDocument(
@@ -242,8 +249,15 @@ export function removeQuoteSignedDocument(id: string) {
   }, true);
 }
 
-export function getPublicQuote(token: string) {
-  return apiFetch<QuoteDetail>(`/public/quotes/${token}`, {}, false);
+export function getPublicQuote(quoteId: string, token: string) {
+  return apiFetch<QuoteDetail>(
+    `/public/quotes/${quoteId}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    },
+    false,
+  );
 }
 
 export interface QuotePresetPayload {
@@ -295,6 +309,19 @@ export function createQuotePreset(payload: {
 }) {
   return apiFetch<QuotePreset>("/internal/quotes/presets", {
     method: "POST",
+    body: JSON.stringify(payload),
+  }, true);
+}
+
+export function updateQuotePreset(
+  id: string,
+  payload: {
+    name?: string;
+    payload?: QuotePresetPayload;
+  },
+) {
+  return apiFetch<QuotePreset>(`/internal/quotes/presets/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
   }, true);
 }

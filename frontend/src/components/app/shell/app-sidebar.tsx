@@ -156,7 +156,7 @@ export function AppSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2 text-left text-sm outline-hidden transition-colors hover:bg-sidebar-accent",
+                  "flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2 text-left text-sm text-sidebar-foreground outline-hidden transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
                 render={<button type="button" />}
               >
@@ -167,11 +167,11 @@ export function AppSidebar() {
                   <p className="truncate font-medium">
                     {claims?.firstName} {claims?.lastName}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
+                  <p className="truncate text-xs opacity-75">
                     {claims?.email}
                   </p>
                 </div>
-                <EllipsisVertical className="size-4 shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+                <EllipsisVertical className="size-4 shrink-0 opacity-75 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"

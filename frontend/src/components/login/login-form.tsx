@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { ForgotPasswordDialog } from "./forgot-password-dialog";
 
 const loginSchema = z.object({
@@ -23,11 +24,12 @@ export function LoginForm() {
   const { login } = useAuth();
   const [forgotOpen, setForgotOpen] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -38,11 +40,14 @@ export function LoginForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     setErrorMessage(null);
+    setIsLoading(true);
 
     try {
       const tokens = await loginRequest(values.email, values.password);
       login(tokens);
     } catch (error) {
+      setIsLoading(false);
+
       if (error instanceof ApiError) {
         setErrorMessage(error.message);
         return;
@@ -79,6 +84,7 @@ export function LoginForm() {
               autoComplete="email"
               placeholder="tu@empresa.cl"
               aria-invalid={Boolean(errors.email)}
+              disabled={isLoading}
               {...register("email")}
             />
             {errors.email ? (
@@ -92,7 +98,8 @@ export function LoginForm() {
               <button
                 type="button"
                 onClick={() => setForgotOpen(true)}
-                className="text-sm font-medium text-primary hover:underline"
+                disabled={isLoading}
+                className="text-sm font-medium text-primary hover:underline disabled:pointer-events-none disabled:opacity-50"
               >
                 Recuperar contraseña
               </button>
@@ -102,6 +109,7 @@ export function LoginForm() {
               type="password"
               autoComplete="current-password"
               aria-invalid={Boolean(errors.password)}
+              disabled={isLoading}
               {...register("password")}
             />
             {errors.password ? (
@@ -117,8 +125,16 @@ export function LoginForm() {
             </p>
           ) : null}
 
-          <Button type="submit" className="h-10 w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Ingresando..." : "Ingresar"}
+          <Button
+            type="submit"
+            className={cn(
+              "h-10 w-full transition-opacity",
+              isLoading && "pointer-events-none opacity-60",
+            )}
+            disabled={isLoading}
+            aria-busy={isLoading}
+          >
+            {isLoading ? "Cargando..." : "Ingresar"}
           </Button>
         </form>
       </div>

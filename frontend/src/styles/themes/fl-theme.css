@@ -31,10 +31,11 @@
   --sidebar-foreground: oklch(1.0000 0 0);
   --sidebar-primary: oklch(0.7347 0.1447 228.9136);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9352 0.0412 217.6616);
-  --sidebar-accent-foreground: oklch(0.3098 0.0748 248.9089);
-  --sidebar-border: oklch(0.9220 0 0);
-  --sidebar-ring: oklch(0.7080 0 0);
+  /* Accent del sidebar: un tono más claro del fondo oscuro (no blanco), para hover usable */
+  --sidebar-accent: oklch(0.4000 0.0700 248.9089);
+  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-border: oklch(0.4500 0.0500 248.9089);
+  --sidebar-ring: oklch(0.7347 0.1447 228.9136);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -92,10 +93,10 @@
   --sidebar-foreground: oklch(1.0000 0 0);
   --sidebar-primary: oklch(0.7347 0.1447 228.9136);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9352 0.0412 217.6616);
-  --sidebar-accent-foreground: oklch(0.3098 0.0748 248.9089);
-  --sidebar-border: oklch(0.2750 0 0);
-  --sidebar-ring: oklch(0.5560 0 0);
+  --sidebar-accent: oklch(0.4000 0.0700 248.9089);
+  --sidebar-accent-foreground: oklch(1.0000 0 0);
+  --sidebar-border: oklch(0.4500 0.0500 248.9089);
+  --sidebar-ring: oklch(0.7347 0.1447 228.9136);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

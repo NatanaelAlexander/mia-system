@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../common/database/database.service';
 import { Ticket } from '../tickets/types/ticket.types';
 import { TicketComment } from '../tickets/types/ticket.types';
 import {
   SQL_COUNT_UNREAD_NOTIFICATIONS,
+  SQL_DISMISS_QUOTE_NOTIFICATION,
+  SQL_DISMISS_TICKET_NOTIFICATION,
   SQL_FIND_INTERNAL_USER_IDS,
   SQL_FIND_NOTIFICATIONS_BY_USER,
   SQL_FIND_TICKET_ASSIGNEE_USER_IDS,
@@ -12,6 +15,7 @@ import {
   SQL_MARK_NOTIFICATION_READ,
   SQL_MARK_QUOTE_NOTIFICATION_READ,
   SQL_MARK_TICKET_NOTIFICATIONS_READ,
+  SQL_PURGE_OLD_NOTIFICATIONS,
 } from './queries/notifications.queries';
 import { NotificationsRealtimeService } from './realtime/notifications-realtime.service';
 import {
@@ -23,11 +27,24 @@ import {
 const DEFAULT_LIMIT = 30;
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly realtimeService: NotificationsRealtimeService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // Limpia al arrancar las notificaciones que ya cumplieron 7 días.
+    await this.purgeOlderThanSevenDays();
+  }
+
+  /** Cada día a las 3:00: borra solo las notificaciones con más de 7 días de antigüedad. */
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async handleDailyPurge(): Promise<void> {
+    await this.purgeOlderThanSevenDays();
+  }
 
   async listForUser(
     userId: string,
@@ -76,6 +93,41 @@ export class NotificationsService {
   async markTicketAsRead(userId: string, ticketId: string): Promise<void> {
     await this.db.query(SQL_MARK_TICKET_NOTIFICATIONS_READ, [userId, ticketId]);
     await this.emitUnreadCount(userId);
+  }
+
+  async dismissForUser(userId: string, notificationId: string): Promise<void> {
+    const ticketResult = await this.db.query(SQL_DISMISS_TICKET_NOTIFICATION, [
+      notificationId,
+      userId,
+    ]);
+    if (!ticketResult.rowCount) {
+      await this.db.query(SQL_DISMISS_QUOTE_NOTIFICATION, [
+        notificationId,
+        userId,
+      ]);
+    }
+    await this.emitUnreadCount(userId);
+  }
+
+  async purgeOlderThanSevenDays(): Promise<number> {
+    try {
+      const { rows } = await this.db.query<{ count: number }>(
+        SQL_PURGE_OLD_NOTIFICATIONS,
+      );
+      const deleted = rows[0]?.count ?? 0;
+      if (deleted > 0) {
+        this.logger.log(
+          `Purgadas ${deleted} notificaciones con más de 7 días`,
+        );
+      }
+      return deleted;
+    } catch (error) {
+      this.logger.error(
+        'No se pudieron purgar notificaciones antiguas',
+        error instanceof Error ? error.stack : undefined,
+      );
+      return 0;
+    }
   }
 
   async notifyTicketCreated(

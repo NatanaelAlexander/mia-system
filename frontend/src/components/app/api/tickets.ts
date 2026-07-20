@@ -38,6 +38,7 @@ export interface TicketDetail extends TicketListItem {
   paymentStatusId: string | null;
   paymentStatusName: string | null;
   assignedToId: string | null;
+  assignees?: TicketAssignee[];
 }
 
 export interface TicketAssignee {
@@ -59,6 +60,7 @@ export interface TicketComment {
   authorFirstName: string;
   authorLastName: string;
   authorJobTitles: string[];
+  authorIsClient: boolean;
 }
 
 export interface ListTicketsFilters {

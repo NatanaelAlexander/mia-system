@@ -19,6 +19,6 @@ export function companyQuoteHref(companyId: string, quoteId?: string): string {
   return `/app/companies/${companyId}/quotes/${quoteId}`;
 }
 
-export function publicQuoteHref(token: string): string {
-  return `/r/cotizaciones/${token}`;
+export function publicQuoteHref(quoteId: string, token: string): string {
+  return `/r/cotizaciones/${quoteId}/${token}`;
 }

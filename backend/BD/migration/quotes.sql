@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS quotes (
   client_visible BOOLEAN NOT NULL DEFAULT FALSE,
   issue_date DATE NOT NULL,
   expires_at DATE NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'ready', 'sent')),
+  status VARCHAR(20) NOT NULL DEFAULT 'ready'
+    CHECK (status IN ('ready', 'sent')),
   created_by UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

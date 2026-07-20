@@ -140,10 +140,20 @@ export class CreateQuoteDto {
   @IsDateString()
   expiresAt?: string;
 
-  @ApiPropertyOptional({ enum: QuoteStatus, default: QuoteStatus.DRAFT })
+  @ApiPropertyOptional({ enum: QuoteStatus, default: QuoteStatus.READY })
   @IsOptional()
   @IsEnum(QuoteStatus)
   status?: QuoteStatus;
+
+  @ApiPropertyOptional({
+    example: 'creado',
+    description:
+      'Estado comercial único. Si se omite, se asigna «creado».',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  statusCode?: string;
 
   @ApiProperty({ type: [QuoteSectionDto] })
   @IsArray()
@@ -224,6 +234,15 @@ export class UpdateQuoteDto {
   @IsEnum(QuoteStatus)
   status?: QuoteStatus;
 
+  @ApiPropertyOptional({
+    example: 'creado',
+    description: 'Estado comercial único (reemplaza el actual si se envía).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  statusCode?: string;
+
   @ApiPropertyOptional({ type: [QuoteSectionDto] })
   @IsOptional()
   @IsArray()
@@ -295,15 +314,26 @@ export class ToggleShareDto {
   enabled: boolean;
 }
 
+export class PublicQuoteAccessDto {
+  @ApiProperty({
+    description: 'Token público de la cotización (no usar Authorization)',
+    example: 'a1b2c3d4e5f6...',
+  })
+  @IsString()
+  @MinLength(32)
+  @MaxLength(64)
+  token: string;
+}
+
 export class SetQuoteStatusesDto {
   @ApiProperty({
-    type: [String],
-    description: 'Códigos de estado a dejar activos (reemplaza el set actual)',
-    example: ['enviado', 'pendiente_pago', 'no_canje'],
+    description: 'Código del único estado comercial activo',
+    example: 'pendiente_pago',
   })
-  @IsArray()
-  @IsString({ each: true })
-  statusCodes: string[];
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  statusCode: string;
 }
 
 export class UploadSignedDocumentDto {

@@ -70,6 +70,7 @@ import {
   SQL_FIND_TICKET_ASSIGNEES,
   SQL_FIND_VALID_INTERNAL_ASSIGNEES,
   SQL_IS_TICKET_ASSIGNEE,
+  SQL_IS_TICKET_IN_SCOPED_PROJECT,
   SQL_REPLACE_TICKET_ASSIGNEES,
 } from './queries/ticket-assignees.queries';
 import {
@@ -348,10 +349,19 @@ export class TicketsService {
       throw new ProyectoNoEncontradoException();
     });
 
-    return this.create(userId, dto);
+    return this.create(userId, dto, { requireSuperAdmin: false });
   }
 
-  async create(actorUserId: string, dto: CreateTicketDto): Promise<Ticket> {
+  async create(
+    actorUserId: string,
+    dto: CreateTicketDto,
+    options: { requireSuperAdmin?: boolean } = {},
+  ): Promise<Ticket> {
+    const requireSuperAdmin = options.requireSuperAdmin !== false;
+    if (requireSuperAdmin && !(await this.isActorSuperAdmin(actorUserId))) {
+      throw new PermisoDenegadoException();
+    }
+
     await this.projectsService.findProjectRowById(dto.projectId);
     await this.ensurePriorityExists(dto.priorityId);
 
@@ -407,7 +417,7 @@ export class TicketsService {
     id: string,
     dto: UpdateTicketDto,
   ): Promise<Ticket> {
-    const previous = await this.assertCanAccessTicket(actorUserId, id);
+    const previous = await this.assertCanMutateTicket(actorUserId, id);
 
     if (dto.priorityId) {
       await this.ensurePriorityExists(dto.priorityId);
@@ -459,7 +469,7 @@ export class TicketsService {
     id: string,
     dto: ChangeTicketStatusDto,
   ): Promise<Ticket> {
-    const previous = await this.assertCanAccessTicket(actorUserId, id);
+    const previous = await this.assertCanMutateTicket(actorUserId, id);
     await this.assertCanChangeStatus(actorUserId, id);
     await this.ensureStatusExists(dto.statusId);
 
@@ -565,7 +575,7 @@ export class TicketsService {
 
   async moveToDraft(id: string, userId: string): Promise<Ticket> {
     const draftStatus = await this.getStatusByName(TicketStatusName.DRAFT);
-    const previous = await this.assertCanAccessTicket(userId, id);
+    const previous = await this.assertCanMutateTicket(userId, id);
     await this.assertCanChangeStatus(userId, id);
 
     if (previous.statusId === draftStatus.id) {
@@ -684,7 +694,7 @@ export class TicketsService {
     actorUserId: string,
     dto: CreateTicketCommentDto,
   ): Promise<TicketComment> {
-    await this.assertCanAccessTicket(actorUserId, dto.ticketId);
+    await this.assertCanMutateTicket(actorUserId, dto.ticketId);
     return this.insertComment(actorUserId, dto);
   }
 
@@ -804,7 +814,7 @@ export class TicketsService {
     ticketId: string,
     assetId: string,
   ): Promise<void> {
-    await this.assertCanAccessTicket(actorUserId, ticketId);
+    await this.assertCanMutateTicket(actorUserId, ticketId);
     await this.assetsService.findById(assetId);
 
     const exists = await this.db.query(SQL_EXISTS_TICKET_ASSET_LINK, [
@@ -832,7 +842,7 @@ export class TicketsService {
     ticketId: string,
     assetId: string,
   ): Promise<void> {
-    await this.assertCanAccessTicket(actorUserId, ticketId);
+    await this.assertCanMutateTicket(actorUserId, ticketId);
 
     const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [
       ticketId,
@@ -858,7 +868,7 @@ export class TicketsService {
     file: Express.Multer.File,
     displayName?: string,
   ): Promise<Asset> {
-    await this.assertCanAccessTicket(actorUserId, ticketId);
+    await this.assertCanMutateTicket(actorUserId, ticketId);
     return this.insertTicketUpload(actorUserId, ticketId, file, displayName);
   }
 
@@ -926,7 +936,7 @@ export class TicketsService {
     assetId: string,
   ): Promise<void> {
     const comment = await this.findCommentRowById(ticketCommentId);
-    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
+    await this.assertCanMutateTicket(actorUserId, comment.ticketId);
     await this.assetsService.findById(assetId);
 
     const exists = await this.db.query(SQL_EXISTS_COMMENT_ASSET_LINK, [
@@ -955,7 +965,7 @@ export class TicketsService {
     assetId: string,
   ): Promise<void> {
     const comment = await this.findCommentRowById(ticketCommentId);
-    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
+    await this.assertCanMutateTicket(actorUserId, comment.ticketId);
 
     const result = await this.db.query(SQL_DELETE_COMMENT_ASSET, [
       ticketCommentId,
@@ -982,7 +992,7 @@ export class TicketsService {
     displayName?: string,
   ): Promise<Asset> {
     const comment = await this.findCommentRowById(ticketCommentId);
-    await this.assertCanAccessTicket(actorUserId, comment.ticketId);
+    await this.assertCanMutateTicket(actorUserId, comment.ticketId);
     return this.insertCommentUpload(
       actorUserId,
       comment,
@@ -1210,8 +1220,8 @@ export class TicketsService {
   }
 
   /**
-   * Internal ticket ACL: superadmin sees all; everyone else must be assigned.
-   * Returns the ticket row when access is allowed.
+   * Lectura: superadmin todo; admin si el ticket está en un proyecto
+   * donde ya es responsable de al menos un ticket.
    */
   private async assertCanAccessTicket(
     userId: string,
@@ -1223,12 +1233,36 @@ export class TicketsService {
       return ticket;
     }
 
+    const { rows } = await this.db.query<{ hasAccess: boolean }>(
+      SQL_IS_TICKET_IN_SCOPED_PROJECT,
+      [ticketId, userId],
+    );
+    if (!rows[0]?.hasAccess) {
+      throw new TicketNoEncontradoException();
+    }
+
+    return ticket;
+  }
+
+  /**
+   * Escritura: superadmin todo; admin solo si es assignee del ticket.
+   */
+  private async assertCanMutateTicket(
+    userId: string,
+    ticketId: string,
+  ): Promise<Ticket> {
+    const ticket = await this.assertCanAccessTicket(userId, ticketId);
+
+    if (await this.isActorSuperAdmin(userId)) {
+      return ticket;
+    }
+
     const { rows } = await this.db.query<{ isAssigned: boolean }>(
       SQL_IS_TICKET_ASSIGNEE,
       [ticketId, userId],
     );
     if (!rows[0]?.isAssigned) {
-      throw new TicketNoEncontradoException();
+      throw new PermisoDenegadoException();
     }
 
     return ticket;

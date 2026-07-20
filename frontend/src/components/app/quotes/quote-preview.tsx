@@ -1,13 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { QuoteDocumentType, QuoteFrequency } from "@/components/app/api/quotes";
+import type {
+  QuoteDetail,
+  QuoteDocumentType,
+  QuoteFrequency,
+} from "@/components/app/api/quotes";
 import {
   calculateSectionTotals,
   formatClp,
 } from "@/components/app/quotes/quotes-tax";
 import {
   QUOTE_BRAND_LOGO_SRC,
+  QUOTE_PDF_FONT_STACK,
+  QUOTE_PREVIEW_WIDTH_PX,
   resolveQuotePdfTheme,
   type QuotePdfLayoutId,
   type QuotePdfTheme,
@@ -71,23 +77,85 @@ export function QuotePreviewDocument({ model }: { model: QuotePreviewModel }) {
     secondary: model.pdfSecondaryColor,
   });
 
+  let content: ReactNode;
   switch (theme.layoutId) {
     case "tarjetas":
-      return <LayoutTarjetas model={model} theme={theme} />;
+      content = <LayoutTarjetas model={model} theme={theme} />;
+      break;
     case "minimal":
-      return <LayoutMinimal model={model} theme={theme} />;
+      content = <LayoutMinimal model={model} theme={theme} />;
+      break;
     case "editorial":
-      return <LayoutEditorial model={model} theme={theme} />;
+      content = <LayoutEditorial model={model} theme={theme} />;
+      break;
     case "informe":
-      return <LayoutInforme model={model} theme={theme} />;
+      content = <LayoutInforme model={model} theme={theme} />;
+      break;
     case "banner":
-      return <LayoutBanner model={model} theme={theme} />;
+      content = <LayoutBanner model={model} theme={theme} />;
+      break;
     case "dual":
-      return <LayoutDual model={model} theme={theme} />;
+      content = <LayoutDual model={model} theme={theme} />;
+      break;
     case "clasico":
     default:
-      return <LayoutClasico model={model} theme={theme} />;
+      content = <LayoutClasico model={model} theme={theme} />;
+      break;
   }
+
+  return (
+    <div className="flex justify-center">
+      <div
+        className="w-full overflow-hidden rounded-sm border border-black/10 bg-white shadow-md"
+        style={{
+          maxWidth: QUOTE_PREVIEW_WIDTH_PX,
+          minHeight: Math.round((QUOTE_PREVIEW_WIDTH_PX * 11) / 8.5),
+          fontFamily: QUOTE_PDF_FONT_STACK,
+        }}
+      >
+        <div className="h-full overflow-y-auto">{content}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Mapea el detalle de cotización (API) al modelo de vista previa/PDF. */
+export function quoteDetailToPreviewModel(
+  quote: QuoteDetail,
+): QuotePreviewModel {
+  return {
+    quoteNumber: quote.quoteNumber,
+    companyName: quote.companyName || "—",
+    companyTaxId: quote.companyTaxId || "—",
+    legalRepresentativeName: quote.legalRepresentativeName || "—",
+    legalRepresentativeTaxId: quote.legalRepresentativeTaxId || "—",
+    issuerName: quote.issuer.fullName || "—",
+    issuerTaxId: quote.issuer.taxId || "—",
+    issuerService: quote.issuer.serviceDescription || "—",
+    issuerPhone: quote.issuer.phoneNumber ?? null,
+    issuerEmail: quote.issuer.email ?? null,
+    documentType: quote.documentType,
+    issueDate: quote.issueDate,
+    expiresAt: quote.expiresAt,
+    pdfLayoutId: quote.pdfLayoutId,
+    pdfPrimaryColor: quote.pdfPrimaryColor,
+    pdfSecondaryColor: quote.pdfSecondaryColor,
+    sections: (quote.sections ?? [])
+      .map((section) => ({
+        frequency: section.frequency,
+        esCanje: section.esCanje,
+        applyTax: section.applyTax,
+        priceInputMode: section.priceInputMode ?? "gross",
+        items: (section.items ?? [])
+          .filter((item) => item.title.trim() && Number(item.price) !== 0)
+          .map((item) => ({
+            title: item.title.trim(),
+            description: item.description?.trim() ?? "",
+            price: Number(item.price),
+          })),
+      }))
+      .filter((section) => section.items.length > 0),
+  };
 }
 
 function LayoutClasico({

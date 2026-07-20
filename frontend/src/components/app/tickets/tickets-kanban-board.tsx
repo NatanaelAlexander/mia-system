@@ -17,6 +17,10 @@ import {
 import type { ResourceSurface } from "@/components/app/api/types";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
+import {
+  AuthorizationDeniedDialog,
+  isAuthorizationDeniedError,
+} from "@/components/app/shared/authorization-denied-dialog";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -100,6 +104,7 @@ export function TicketsKanbanBoard({
   >(null);
   const [assigneeDialogTicket, setAssigneeDialogTicket] =
     React.useState<TicketKanbanItem | null>(null);
+  const [authDeniedOpen, setAuthDeniedOpen] = React.useState(false);
   const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
 
   React.useEffect(() => {
@@ -156,7 +161,12 @@ export function TicketsKanbanBoard({
     }
 
     const ticket = tickets.find((item) => item.id === ticketId);
-    if (!ticket || ticket.statusId === statusId || !canDragTicket(ticket, claims)) {
+    if (!ticket || ticket.statusId === statusId) {
+      return;
+    }
+
+    if (!canDragTicket(ticket, claims)) {
+      setAuthDeniedOpen(true);
       return;
     }
 
@@ -211,11 +221,15 @@ export function TicketsKanbanBoard({
       toast.success("Estado actualizado");
     } catch (error) {
       onTicketsChange(previous);
-      toast.error(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo mover el ticket.",
-      );
+      if (isAuthorizationDeniedError(error)) {
+        setAuthDeniedOpen(true);
+      } else {
+        toast.error(
+          error instanceof ApiError
+            ? error.message
+            : "No se pudo mover el ticket.",
+        );
+      }
     }
   };
 
@@ -354,6 +368,7 @@ export function TicketsKanbanBoard({
                       onStatusChange={(statusId) =>
                         void changeStatus(ticket.id, statusId)
                       }
+                      onDenied={() => setAuthDeniedOpen(true)}
                       onEditAssignees={setAssigneeDialogTicket}
                       onDragStart={setDraggingTicketId}
                       onDragEnd={() => {
@@ -384,6 +399,11 @@ export function TicketsKanbanBoard({
           }
         />
       ) : null}
+
+      <AuthorizationDeniedDialog
+        open={authDeniedOpen}
+        onOpenChange={setAuthDeniedOpen}
+      />
     </div>
   );
 }
