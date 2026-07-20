@@ -50,3 +50,12 @@ export function hasPermission(
 export function isInternalUser(claims: AccessTokenClaims | null) {
   return claims?.surfaces.includes("internal") ?? false;
 }
+
+export function isSuperAdmin(claims: AccessTokenClaims | null) {
+  return claims?.roles.includes("super_admin") ?? false;
+}
+
+/** Admin trabajador: acceso acotado por tickets asignados. */
+export function isScopedAdmin(claims: AccessTokenClaims | null) {
+  return Boolean(claims?.roles.includes("admin") && !isSuperAdmin(claims));
+}

@@ -6,6 +6,8 @@ import { AuditService } from '../audit/audit.service';
 import { CompaniesService } from '../companies/companies.service';
 import { PortalAccessService } from '../common/portal/portal-access.service';
 import { DatabaseService } from '../common/database/database.service';
+import { PermissionsService } from '../auth/permissions/permissions.service';
+import { PermisoDenegadoException } from '../auth/exceptions/auth.exceptions';
 import {
   ArchivoYaVinculadoAlProyectoException,
   ProyectoNoEncontradoException,
@@ -26,6 +28,10 @@ import {
   SQL_FIND_PROJECT_BY_ID,
   SQL_INSERT_PROJECT,
 } from './queries/projects.queries';
+import {
+  SQL_ADMIN_SCOPED_PROJECT_IDS,
+  SQL_HAS_PROJECT_SCOPE_ACCESS,
+} from '../tickets/queries/ticket-assignees.queries';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { FilterProjectsDto } from './dto/filter-projects.dto';
@@ -44,11 +50,14 @@ export class ProjectsService {
     private readonly portalAccess: PortalAccessService,
     private readonly companiesService: CompaniesService,
     private readonly assetsService: AssetsService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   async findAllActive(actorUserId: string): Promise<Project[]> {
+    const scopedProjectIds = await this.resolveScopedProjectIds(actorUserId);
     const { rows } = await this.db.query<Project>(SQL_FIND_ALL_ACTIVE_PROJECTS, [
       ProjectStatus.ACTIVE,
+      scopedProjectIds,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
@@ -63,10 +72,12 @@ export class ProjectsService {
     actorUserId: string,
     filters: FilterProjectsDto = {},
   ): Promise<Project[]> {
+    const scopedProjectIds = await this.resolveScopedProjectIds(actorUserId);
     const { rows } = await this.db.query<Project>(SQL_FIND_PROJECTS_FILTERED, [
       filters.status ?? null,
       filters.companyId ?? null,
       filters.companySearch?.trim() || null,
+      scopedProjectIds,
     ]);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, null, {
@@ -123,6 +134,7 @@ export class ProjectsService {
   }
 
   async findById(actorUserId: string, id: string): Promise<Project> {
+    await this.assertCanReadProject(actorUserId, id);
     const project = await this.findProjectRowById(id);
 
     await this.auditRead(actorUserId, AUDIT_TABLE.PROJECTS, id, { scope: 'detail' });
@@ -131,6 +143,7 @@ export class ProjectsService {
   }
 
   async create(actorUserId: string, dto: CreateProjectDto): Promise<Project> {
+    await this.assertCanManageProjects(actorUserId);
     await this.companiesService.findById(actorUserId, dto.companyId);
 
     const { rows } = await this.db.query<Project>(SQL_INSERT_PROJECT, [
@@ -159,6 +172,7 @@ export class ProjectsService {
     id: string,
     dto: UpdateProjectDto,
   ): Promise<Project> {
+    await this.assertCanManageProjects(actorUserId);
     const previous = await this.findProjectRowById(id);
 
     const { sets, values } = this.buildProjectUpdate(dto);
@@ -195,6 +209,7 @@ export class ProjectsService {
   }
 
   async deactivate(actorUserId: string, id: string): Promise<Project> {
+    await this.assertCanManageProjects(actorUserId);
     const previous = await this.findProjectRowById(id);
 
     const { rows } = await this.db.query<Project>(SQL_DEACTIVATE_PROJECT, [
@@ -224,6 +239,7 @@ export class ProjectsService {
     actorUserId: string,
     projectId: string,
   ): Promise<Asset[]> {
+    await this.assertCanReadProject(actorUserId, projectId);
     await this.findProjectRowById(projectId);
 
     const { rows } = await this.db.query<Asset>(SQL_FIND_PROJECT_ASSETS, [
@@ -243,6 +259,7 @@ export class ProjectsService {
     projectId: string,
     assetId: string,
   ): Promise<void> {
+    await this.assertCanManageProjects(actorUserId);
     await this.findProjectRowById(projectId);
     await this.assetsService.findById(assetId);
 
@@ -271,6 +288,7 @@ export class ProjectsService {
     projectId: string,
     assetId: string,
   ): Promise<void> {
+    await this.assertCanManageProjects(actorUserId);
     const result = await this.db.query(SQL_DELETE_PROJECT_ASSET, [
       projectId,
       assetId,
@@ -295,6 +313,7 @@ export class ProjectsService {
     file: Express.Multer.File,
     displayName?: string,
   ): Promise<Asset> {
+    await this.assertCanManageProjects(actorUserId);
     await this.findProjectRowById(projectId);
 
     const asset = await this.assetsService.uploadFile({
@@ -333,6 +352,52 @@ export class ProjectsService {
     }
 
     return rows[0];
+  }
+
+  private async isActorSuperAdmin(userId: string): Promise<boolean> {
+    const authorization =
+      await this.permissionsService.resolveAuthorization(userId);
+    return Boolean(
+      authorization &&
+        this.permissionsService.isSuperAdmin(authorization.roles),
+    );
+  }
+
+  private async resolveScopedProjectIds(
+    userId: string,
+  ): Promise<string[] | null> {
+    if (await this.isActorSuperAdmin(userId)) {
+      return null;
+    }
+
+    const { rows } = await this.db.query<{ id: string }>(
+      SQL_ADMIN_SCOPED_PROJECT_IDS,
+      [userId],
+    );
+    return rows.map((row) => row.id);
+  }
+
+  private async assertCanReadProject(
+    userId: string,
+    projectId: string,
+  ): Promise<void> {
+    if (await this.isActorSuperAdmin(userId)) {
+      return;
+    }
+
+    const { rows } = await this.db.query<{ hasAccess: boolean }>(
+      SQL_HAS_PROJECT_SCOPE_ACCESS,
+      [projectId, userId],
+    );
+    if (!rows[0]?.hasAccess) {
+      throw new ProyectoNoEncontradoException();
+    }
+  }
+
+  private async assertCanManageProjects(userId: string): Promise<void> {
+    if (!(await this.isActorSuperAdmin(userId))) {
+      throw new PermisoDenegadoException();
+    }
   }
 
   private async auditRead(

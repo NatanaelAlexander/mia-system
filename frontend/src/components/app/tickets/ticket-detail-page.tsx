@@ -33,8 +33,13 @@ import { ErrorState } from "@/components/app/shared/list-states";
 import {
   hasPermission,
   isInternalUser,
+  isSuperAdmin,
   canAccessModule,
 } from "@/components/app/shared/permissions";
+import {
+  AuthorizationDeniedDialog,
+  isAuthorizationDeniedError,
+} from "@/components/app/shared/authorization-denied-dialog";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAuth } from "@/hooks/use-auth";
@@ -210,6 +215,7 @@ export function TicketDetailPage({
   const [attachmentInitialFile, setAttachmentInitialFile] =
     React.useState<File | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [authDeniedOpen, setAuthDeniedOpen] = React.useState(false);
   const [ticket, setTicket] = React.useState<TicketDetail | null>(null);
   const [projectName, setProjectName] = React.useState("");
   const [companyName, setCompanyName] = React.useState("");
@@ -227,7 +233,16 @@ export function TicketDetailPage({
     ticket,
     onTicketChange: setTicket,
     enabled: isInternal,
+    onAuthorizationDenied: () => setAuthDeniedOpen(true),
   });
+
+  const isAssignee = management.assignees.some(
+    (assignee) => assignee.id === claims?.sub,
+  );
+  const canMutateTicket =
+    !isInternal || isSuperAdmin(claims) || isAssignee;
+  const canUseComposer = canComment && canMutateTicket;
+  const showDenied = () => setAuthDeniedOpen(true);
 
   const commentsRef = React.useRef(comments);
   const pendingCommentAssetsRef = React.useRef(
@@ -651,6 +666,11 @@ export function TicketDetailPage({
       return;
     }
 
+    if (!canMutateTicket) {
+      showDenied();
+      return;
+    }
+
     setIsSending(true);
     emitTyping(false, isInternalComment);
 
@@ -697,11 +717,15 @@ export function TicketDetailPage({
       setPendingAttachments([]);
       setIsInternalComment(false);
     } catch (error) {
-      const errorText =
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo enviar el mensaje.";
-      toast.error(errorText);
+      if (isAuthorizationDeniedError(error)) {
+        showDenied();
+      } else {
+        const errorText =
+          error instanceof ApiError
+            ? error.message
+            : "No se pudo enviar el mensaje.";
+        toast.error(errorText);
+      }
     } finally {
       const commentId = createdCommentId;
       if (commentId) {
@@ -761,6 +785,7 @@ export function TicketDetailPage({
                   <TicketStatusControl
                     ticket={ticket}
                     management={management}
+                    onDenied={showDenied}
                   />
                 ) : (
                   <TicketMetaField label="Estado" value={ticket.statusName} />
@@ -875,9 +900,17 @@ export function TicketDetailPage({
                 className={cn(
                   "sticky bottom-0 relative border-t border-border/70 bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-colors supports-backdrop-filter:bg-card/80",
                   isComposerDragging && "ring-2 ring-inset ring-primary/20",
+                  !canUseComposer && "cursor-not-allowed opacity-80",
                 )}
+                onClickCapture={(event) => {
+                  if (!canUseComposer) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    showDenied();
+                  }
+                }}
                 onDragOver={(event) => {
-                  if (!canUpload || attachmentPickOpen) {
+                  if (!canUseComposer || !canUpload || attachmentPickOpen) {
                     return;
                   }
                   event.preventDefault();
@@ -892,7 +925,7 @@ export function TicketDetailPage({
                   setIsComposerDragging(false);
                 }}
                 onDrop={(event) => {
-                  if (!canUpload || attachmentPickOpen) {
+                  if (!canUseComposer || !canUpload || attachmentPickOpen) {
                     return;
                   }
                   event.preventDefault();
@@ -1056,6 +1089,11 @@ export function TicketDetailPage({
           Volver al proyecto
         </Link>
       </div>
+
+      <AuthorizationDeniedDialog
+        open={authDeniedOpen}
+        onOpenChange={setAuthDeniedOpen}
+      />
     </div>
   );
 }

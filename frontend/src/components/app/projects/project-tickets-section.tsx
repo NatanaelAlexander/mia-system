@@ -5,7 +5,7 @@ import { Plus, RefreshCcw } from "lucide-react";
 import { listTickets } from "@/components/app/api/tickets";
 import type { ResourceSurface } from "@/components/app/api/types";
 import { ErrorState } from "@/components/app/shared/list-states";
-import { canAccessModule, hasPermission } from "@/components/app/shared/permissions";
+import { canAccessModule, hasPermission, isSuperAdmin } from "@/components/app/shared/permissions";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ export function ProjectTicketsSection({
 }: ProjectTicketsSectionProps) {
   const { claims, isLoading: isAuthLoading } = useAuth();
   const canAccess = canAccessModule(claims, ticketsModule);
-  const canCreate = hasPermission(claims, "tickets:create");
+  const canCreate =
+    isSuperAdmin(claims) && hasPermission(claims, "tickets:create");
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [createOpen, setCreateOpen] = React.useState(false);

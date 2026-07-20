@@ -26,6 +26,7 @@ export const SQL_FIND_COMPANIES_FILTERED = `
       OR name ILIKE '%' || $2 || '%'
       OR regexp_replace(tax_id, '[.\\-]', '', 'g') ILIKE '%' || regexp_replace($2, '[.\\-]', '', 'g') || '%'
     )
+    AND ($3::uuid[] IS NULL OR id = ANY($3::uuid[]))
   ORDER BY name ASC
 `;
 

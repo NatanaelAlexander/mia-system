@@ -38,6 +38,7 @@ export interface TicketDetail extends TicketListItem {
   paymentStatusId: string | null;
   paymentStatusName: string | null;
   assignedToId: string | null;
+  assignees?: TicketAssignee[];
 }
 
 export interface TicketAssignee {

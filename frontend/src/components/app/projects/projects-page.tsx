@@ -20,6 +20,7 @@ import {
   canAccessModule,
   hasPermission,
   isInternalUser,
+  isSuperAdmin,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,7 +66,9 @@ export function ProjectsPage() {
   const isInternal = isInternalUser(claims);
   const canAccess = canAccessModule(claims, projectsModule);
   const canCreate =
-    isInternalUser(claims) && hasPermission(claims, "projects:create");
+    isInternalUser(claims) &&
+    isSuperAdmin(claims) &&
+    hasPermission(claims, "projects:create");
 
   const [state, setState] = React.useState<LoadState>({
     status: "loading",

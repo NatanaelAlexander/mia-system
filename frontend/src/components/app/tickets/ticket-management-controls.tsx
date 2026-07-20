@@ -24,6 +24,9 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import {
+  isAuthorizationDeniedError,
+} from "@/components/app/shared/authorization-denied-dialog";
+import {
   mergeAssigneeCandidates,
   TicketAssigneeCandidateList,
   type TicketAssigneeCandidate,
@@ -33,12 +36,14 @@ interface UseTicketManagementOptions {
   ticket: TicketDetail | null;
   onTicketChange: (ticket: TicketDetail) => void;
   enabled?: boolean;
+  onAuthorizationDenied?: () => void;
 }
 
 function useTicketManagement({
   ticket,
   onTicketChange,
   enabled = true,
+  onAuthorizationDenied,
 }: UseTicketManagementOptions) {
   const { claims } = useAuth();
   const isSuperAdmin = claims?.roles.includes("super_admin") ?? false;
@@ -134,11 +139,15 @@ function useTicketManagement({
       onTicketChange(updated);
       toast.success("Estado actualizado");
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudo cambiar el estado.",
-      );
+      if (isAuthorizationDeniedError(error)) {
+        onAuthorizationDenied?.();
+      } else {
+        toast.error(
+          error instanceof ApiError
+            ? error.message
+            : "No se pudo cambiar el estado.",
+        );
+      }
     } finally {
       setIsChangingStatus(false);
     }
@@ -155,11 +164,15 @@ function useTicketManagement({
       syncAssignees(updated);
       toast.success("Responsables actualizados");
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? error.message
-          : "No se pudieron actualizar los responsables.",
-      );
+      if (isAuthorizationDeniedError(error)) {
+        onAuthorizationDenied?.();
+      } else {
+        toast.error(
+          error instanceof ApiError
+            ? error.message
+            : "No se pudieron actualizar los responsables.",
+        );
+      }
     } finally {
       setIsSavingAssignees(false);
     }
@@ -205,9 +218,11 @@ type TicketManagement = ReturnType<typeof useTicketManagement>;
 export function TicketStatusControl({
   ticket,
   management,
+  onDenied,
 }: {
   ticket: TicketDetail;
   management: TicketManagement;
+  onDenied?: () => void;
 }) {
   const {
     statuses,
@@ -248,9 +263,13 @@ export function TicketStatusControl({
           </SelectContent>
         </Select>
       ) : (
-        <p className="text-base font-semibold text-foreground">
+        <button
+          type="button"
+          className="text-left text-base font-semibold text-foreground"
+          onClick={() => onDenied?.()}
+        >
           {ticket.statusName}
-        </p>
+        </button>
       )}
     </div>
   );

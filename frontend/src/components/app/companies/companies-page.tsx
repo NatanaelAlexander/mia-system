@@ -24,6 +24,7 @@ import {
   canAccessModule,
   hasPermission,
   isInternalUser,
+  isSuperAdmin,
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/app/shared/list-states";
@@ -112,7 +113,9 @@ export function CompaniesPage() {
   const isInternal = isInternalUser(claims);
   const canAccess = canAccessModule(claims, companiesModule);
   const canCreate =
-    isInternalUser(claims) && hasPermission(claims, "companies:create");
+    isInternalUser(claims) &&
+    isSuperAdmin(claims) &&
+    hasPermission(claims, "companies:create");
 
   const [state, setState] = React.useState<LoadState>({
     status: "loading",
