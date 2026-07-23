@@ -17,6 +17,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { CompanyFilesModule } from './company-files/company-files.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { QuotesModule } from './quotes/quotes.module';
     NotificationsModule,
     UsersModule,
     QuotesModule,
+    CompanyFilesModule,
   ],
   controllers: [AppController],
   providers: [

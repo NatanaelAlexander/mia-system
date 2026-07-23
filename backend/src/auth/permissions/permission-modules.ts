@@ -11,4 +11,6 @@ export type PermissionModule =
   | 'job_titles'
   | 'audit_logs'
   | 'system'
-  | 'quotes';
+  | 'quotes'
+  | 'contracts'
+  | 'company_files';

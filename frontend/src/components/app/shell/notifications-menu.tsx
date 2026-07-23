@@ -61,7 +61,7 @@ function notificationHref(notification: AppNotification): string {
     notification.companyId &&
     notification.quoteId
   ) {
-    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+    return `/app/companies/${notification.companyId}?tab=documentos&docs=cotizaciones`;
   }
 
   if (notification.projectId && notification.ticketId) {
@@ -69,7 +69,7 @@ function notificationHref(notification: AppNotification): string {
   }
 
   if (notification.companyId) {
-    return `/app/companies/${notification.companyId}?tab=cotizaciones`;
+    return `/app/companies/${notification.companyId}?tab=documentos&docs=cotizaciones`;
   }
 
   return "/app";

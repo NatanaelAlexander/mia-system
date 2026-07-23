@@ -24,11 +24,14 @@ import { ticketsModule } from "../tickets/tickets-module";
 interface ProjectTicketsSectionProps {
   projectId: string;
   surface: ResourceSurface;
+  /** Sin Card propia (p. ej. dentro de un accordion). */
+  embedded?: boolean;
 }
 
 export function ProjectTicketsSection({
   projectId,
   surface,
+  embedded = false,
 }: ProjectTicketsSectionProps) {
   const { claims, isLoading: isAuthLoading } = useAuth();
   const canAccess = canAccessModule(claims, ticketsModule);
@@ -89,53 +92,73 @@ export function ProjectTicketsSection({
     return null;
   }
 
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      {canCreate ? (
+        <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus />
+          Nuevo ticket
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => void reload()}
+        disabled={isLoading}
+      >
+        <RefreshCcw />
+        Actualizar
+      </Button>
+    </div>
+  );
+
+  const body = (
+    <div className="space-y-4">
+      {embedded ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Solicitudes y seguimiento de trabajo del proyecto.
+          </p>
+          {toolbar}
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <ErrorState message={errorMessage} onRetry={reload} />
+      ) : (
+        <TicketsKanbanBoard
+          projectId={projectId}
+          surface={surface}
+          tickets={tickets}
+          isLoading={isLoading || isAuthLoading}
+          lifecycle={lifecycle}
+          workingOnly={workingOnly}
+          onLifecycleChange={setLifecycle}
+          onWorkingOnlyChange={setWorkingOnly}
+          onTicketsChange={setTickets}
+        />
+      )}
+    </div>
+  );
+
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Tickets</CardTitle>
-            <CardDescription>
-              Solicitudes y seguimiento de trabajo del proyecto.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreate ? (
-              <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-                <Plus />
-                Nuevo ticket
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void reload()}
-              disabled={isLoading}
-            >
-              <RefreshCcw />
-              Actualizar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {errorMessage ? (
-            <ErrorState message={errorMessage} onRetry={reload} />
-          ) : (
-            <TicketsKanbanBoard
-              projectId={projectId}
-              surface={surface}
-              tickets={tickets}
-              isLoading={isLoading || isAuthLoading}
-              lifecycle={lifecycle}
-              workingOnly={workingOnly}
-              onLifecycleChange={setLifecycle}
-              onWorkingOnlyChange={setWorkingOnly}
-              onTicketsChange={setTickets}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {embedded ? (
+        body
+      ) : (
+        <Card>
+          <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Tickets</CardTitle>
+              <CardDescription>
+                Solicitudes y seguimiento de trabajo del proyecto.
+              </CardDescription>
+            </div>
+            {toolbar}
+          </CardHeader>
+          <CardContent className="pt-6">{body}</CardContent>
+        </Card>
+      )}
 
       {canCreate ? (
         <TicketCreateDialog

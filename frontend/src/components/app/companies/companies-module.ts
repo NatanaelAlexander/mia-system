@@ -17,16 +17,28 @@ export type CompanyDetailTab =
   | "representantes"
   | "usuarios"
   | "proyectos"
-  | "cotizaciones";
+  | "documentos";
 
-/** Enlace a la ficha de empresa con una pestaña concreta (p. ej. proyectos). */
+export type CompanyDocumentsSubTab =
+  | "cotizaciones"
+  | "contratos"
+  | "general";
+
+/** Enlace a la ficha de empresa con pestaña (y subpestaña de Documentos). */
 export function companyDetailHref(
   companyId: string,
   tab?: CompanyDetailTab,
+  docs?: CompanyDocumentsSubTab,
 ): string {
   if (!tab || tab === "datos") {
     return `/app/companies/${companyId}`;
   }
 
-  return `/app/companies/${companyId}?tab=${tab}`;
+  const params = new URLSearchParams();
+  params.set("tab", tab);
+  if (tab === "documentos" && docs) {
+    params.set("docs", docs);
+  }
+
+  return `/app/companies/${companyId}?${params.toString()}`;
 }

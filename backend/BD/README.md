@@ -64,7 +64,7 @@ docker compose exec api pnpm run migrate:data
 | Rol | Alcance |
 |-----|---------|
 | `super_admin` | Todo excepto `audit_logs:*` |
-| `admin` | Operación general sin `system:manage`, roles, permissions ni CRUD usuarios |
+| `admin` | Operación general sin `system:manage`, roles, permissions, `quotes:*`, `contracts:*`, `company_files:*` ni CRUD usuarios (solo `users:read`) |
 | `cliente` | Portal cliente: empresas/proyectos lectura, tickets y comentarios propios |
 
 > El scoping por empresa (cliente solo ve lo suyo) se aplicará en la API; los permisos definen el techo por rol.

@@ -160,7 +160,7 @@ Usuarios de desarrollo (tras `migrate:data`):
 |----------|-----|-------|
 | Health check (API) | http://localhost:3000/ | Respuesta simple; sin prefijo `/api` |
 | API REST (base) | http://localhost:3000/api | Ej: `/api/internal/companies` |
-| Swagger | http://localhost:3000/api/docs | Documentación y prueba de endpoints |
+| Scalar (API docs) | http://localhost:3000/api/reference | Documentación interactiva (sidebar + Try it out) |
 | OpenAPI JSON | http://localhost:3000/api/docs/json | Esquema para herramientas |
 | Frontend | http://localhost:3001 | Next.js |
 | Postgres (desde tu PC) | `localhost:5432` | Usuario/DB según `.env` (`mia_user` / `mia_system` por defecto) |
@@ -237,7 +237,7 @@ En BD guardas el **key** de R2 (`file_path`). La descarga pasa por el API (URL f
 
 ---
 
-## 5. API y Swagger
+## 5. API y documentación (Scalar)
 
 - Prefijo global: `/api`
 - Superficies: `/api/internal/*` (equipo) y `/api/portal/*` (clientes)
@@ -289,8 +289,8 @@ mia-system/
 │   └── ARQUITECTURA-BACKEND.md
 ├── backend/                    ← NestJS
 │   ├── src/
-│   │   ├── main.ts             ← prefix /api, Swagger, validación
-│   │   ├── common/             ← database (pg), filters, exceptions, swagger
+│   │   ├── main.ts             ← prefix /api, Scalar docs, validación
+│   │   ├── common/             ← database (pg), filters, exceptions, swagger/Scalar
 │   │   └── companies/          ← queries + types + controller + service
 │   └── BD/
 │       ├── migration/          ← esquema (CREATE)
@@ -313,5 +313,5 @@ mia-system/
 | Hot reload no funciona (Windows) | Clonar y abrir el proyecto dentro de WSL; el frontend usa `next dev --webpack` con polling |
 | Dependencias no se ven | `docker compose exec api pnpm install` → `docker compose restart api` |
 | API no compila (`Cannot find module …`) | `docker compose exec api pnpm install` y reiniciar `api` |
-| Swagger 404 | Comprobar que `api` compiló sin errores; URL correcta: http://localhost:3000/api/docs |
+| Scalar 404 | Comprobar que `api` compiló sin errores; URL correcta: http://localhost:3000/api/reference |
 | Error SASL / password Postgres | Revisar que `.env` exista y que `DATABASE_URL` coincida con `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` |

@@ -45,6 +45,14 @@ export const Permission = {
   QuotesUpdate: 'quotes:update',
   QuotesDelete: 'quotes:delete',
   QuotesSend: 'quotes:send',
+  ContractsRead: 'contracts:read',
+  ContractsCreate: 'contracts:create',
+  ContractsUpdate: 'contracts:update',
+  ContractsDelete: 'contracts:delete',
+  CompanyFilesRead: 'company_files:read',
+  CompanyFilesCreate: 'company_files:create',
+  CompanyFilesUpdate: 'company_files:update',
+  CompanyFilesDelete: 'company_files:delete',
 } as const;
 
 export type PermissionName = (typeof Permission)[keyof typeof Permission];
