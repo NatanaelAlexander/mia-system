@@ -3,7 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardList,
+  FileText,
+  LayoutGrid,
+} from "lucide-react";
 import { listCompanies } from "@/components/app/api/companies";
 import { getProjectDetail } from "@/components/app/api/projects";
 import { companyDetailHref } from "@/components/app/companies/companies-module";
@@ -13,21 +18,40 @@ import { preferredSurface } from "@/components/app/shared/surface";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { projectsModule } from "./projects-module";
-import { ProjectHubPanel } from "./project-hub-panel";
+import {
+  ProjectGeneralFields,
+  ProjectHubPanel,
+} from "./project-hub-panel";
 import { ProjectTicketsSection } from "./project-tickets-section";
 import { EntityQuotesList } from "@/components/app/quotes/company-quotes-section";
 import { quotesModule } from "@/components/app/quotes/quotes-module";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ticketsModule } from "@/components/app/tickets/tickets-module";
 
 interface ProjectHubPageProps {
   projectId: string;
+}
+
+function SectionTitle({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Icon className="size-4 shrink-0 text-primary" />
+      <span>{label}</span>
+    </span>
+  );
 }
 
 export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
@@ -36,6 +60,7 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
   const surface = claims ? preferredSurface(claims) : "portal";
   const canAccess = canAccessModule(claims, projectsModule);
   const canViewQuotes = canAccessModule(claims, quotesModule);
+  const canViewTickets = canAccessModule(claims, ticketsModule);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -109,6 +134,12 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
     );
   }
 
+  const openSections = [
+    "datos",
+    ...(canViewQuotes ? (["cotizaciones"] as const) : []),
+    ...(canViewTickets ? (["tickets"] as const) : []),
+  ];
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <Link
@@ -130,21 +161,49 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
         }}
       />
 
-      {canViewQuotes ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Cotizaciones del proyecto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EntityQuotesList
-              companyId={project.companyId}
-              projectId={project.id}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <Accordion
+        multiple
+        defaultValue={openSections}
+        className="gap-4"
+      >
+        <AccordionItem value="datos">
+          <AccordionTrigger>
+            <SectionTitle icon={LayoutGrid} label="Datos generales" />
+          </AccordionTrigger>
+          <AccordionPanel>
+            <ProjectGeneralFields project={project} />
+          </AccordionPanel>
+        </AccordionItem>
 
-      <ProjectTicketsSection projectId={project.id} surface={surface} />
+        {canViewQuotes ? (
+          <AccordionItem value="cotizaciones">
+            <AccordionTrigger>
+              <SectionTitle icon={FileText} label="Cotizaciones del proyecto" />
+            </AccordionTrigger>
+            <AccordionPanel>
+              <EntityQuotesList
+                companyId={project.companyId}
+                projectId={project.id}
+              />
+            </AccordionPanel>
+          </AccordionItem>
+        ) : null}
+
+        {canViewTickets ? (
+          <AccordionItem value="tickets">
+            <AccordionTrigger>
+              <SectionTitle icon={ClipboardList} label="Tickets" />
+            </AccordionTrigger>
+            <AccordionPanel>
+              <ProjectTicketsSection
+                projectId={project.id}
+                surface={surface}
+                embedded
+              />
+            </AccordionPanel>
+          </AccordionItem>
+        ) : null}
+      </Accordion>
     </div>
   );
 }
