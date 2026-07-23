@@ -58,7 +58,10 @@ import {
   type QuoteStatusFlag,
 } from "@/components/app/api/quotes";
 import { getAssetDownloadUrl } from "@/components/app/api/assets";
-import { listProjects } from "@/components/app/api/projects";
+import {
+  listProjects,
+  type ProjectStatus,
+} from "@/components/app/api/projects";
 import { listTickets } from "@/components/app/api/tickets";
 import { getCompanyDetail } from "@/components/app/api/companies";
 import { companyDetailHref } from "@/components/app/companies/companies-module";
@@ -144,36 +147,24 @@ const GESTION_STEPS: Array<{
   label: string;
   description: string;
   Icon: React.ComponentType<{ className?: string }>;
-  card: string;
-  iconWrap: string;
-  accentText: string;
 }> = [
   {
     id: "enlace",
     label: "Enlace",
     description: "Revisión pública",
     Icon: Link2,
-    card: "border-secondary/40 bg-secondary/10 ring-secondary/25",
-    iconWrap: "bg-secondary text-secondary-foreground",
-    accentText: "text-secondary",
   },
   {
     id: "estados",
     label: "Estado",
     description: "Estado único",
     Icon: ListOrdered,
-    card: "border-primary/35 bg-primary/5 ring-primary/20",
-    iconWrap: "bg-primary text-primary-foreground",
-    accentText: "text-primary",
   },
   {
     id: "firmado",
     label: "Firmado",
     description: "Documento",
     Icon: FileSignature,
-    card: "border-chart-3/50 bg-chart-3/10 ring-chart-3/30",
-    iconWrap: "bg-chart-3 text-zinc-950",
-    accentText: "text-chart-3",
   },
 ];
 
@@ -290,6 +281,14 @@ function initialActiveFrequency(sections: DraftSection[]): QuoteFrequency {
   );
 }
 
+const FREQUENCY_SURFACE = {
+  card: "border-primary/35 bg-primary/5 ring-primary/20",
+  iconWrap: "bg-primary text-primary-foreground",
+  accentText: "text-primary",
+  addVariant: "default" as const,
+  totals: "border-primary/25 bg-primary/10",
+};
+
 const FREQUENCY_THEME: Record<
   QuoteFrequency,
   {
@@ -302,32 +301,9 @@ const FREQUENCY_THEME: Record<
     Icon: React.ComponentType<{ className?: string }>;
   }
 > = {
-  unico: {
-    card: "border-primary/35 bg-primary/5 ring-primary/20",
-    iconWrap: "bg-primary text-primary-foreground",
-    accentText: "text-primary",
-    addVariant: "default",
-    totals: "border-primary/25 bg-primary/10",
-    Icon: Receipt,
-  },
-  mensual: {
-    card: "border-secondary/40 bg-secondary/10 ring-secondary/25",
-    iconWrap: "bg-secondary text-secondary-foreground",
-    accentText: "text-secondary",
-    addVariant: "secondary",
-    totals: "border-secondary/30 bg-secondary/15",
-    Icon: CalendarClock,
-  },
-  anual: {
-    card: "border-chart-3/50 bg-chart-3/10 ring-chart-3/30",
-    iconWrap: "bg-chart-3 text-zinc-950",
-    accentText: "text-chart-3",
-    addVariant: "default",
-    addClassName:
-      "border-transparent bg-chart-3 text-zinc-950 hover:bg-chart-3/85 hover:text-zinc-950",
-    totals: "border-chart-3/35 bg-chart-3/15",
-    Icon: RefreshCw,
-  },
+  unico: { ...FREQUENCY_SURFACE, Icon: Receipt },
+  mensual: { ...FREQUENCY_SURFACE, Icon: CalendarClock },
+  anual: { ...FREQUENCY_SURFACE, Icon: RefreshCw },
 };
 
 function OptionChip({
@@ -370,6 +346,103 @@ function OptionChip({
   );
 }
 
+function ProjectTitleInput({
+  id,
+  value,
+  onChange,
+  projects,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  projects: Array<{ id: string; name: string }>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const filtered = React.useMemo(() => {
+    const query = value.trim().toLowerCase();
+    if (!query) {
+      return projects;
+    }
+    return projects.filter((project) =>
+      project.name.toLowerCase().includes(query),
+    );
+  }, [projects, value]);
+
+  const exactMatch = projects.some(
+    (project) => project.name.toLowerCase() === value.trim().toLowerCase(),
+  );
+
+  React.useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        id={id}
+        placeholder="Proyecto / servicio"
+        value={value}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {open ? (
+        <ul className="thin-scrollbar absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
+          {projects.length === 0 ? (
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">
+              Sin proyectos activos. Escribe un nombre manualmente.
+            </li>
+          ) : null}
+          {filtered.map((project) => (
+            <li key={project.id}>
+              <button
+                type="button"
+                className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(project.name);
+                  setOpen(false);
+                }}
+              >
+                {project.name}
+              </button>
+            </li>
+          ))}
+          {value.trim() && !exactMatch ? (
+            <li>
+              <button
+                type="button"
+                className="w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-muted"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setOpen(false)}
+              >
+                Usar «{value.trim()}»
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   const router = useRouter();
   const { claims, isLoading: isAuthLoading } = useAuth();
@@ -397,7 +470,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   );
   const [selectedStatusCode, setSelectedStatusCode] = React.useState("");
   const [projects, setProjects] = React.useState<
-    Array<{ id: string; name: string }>
+    Array<{ id: string; name: string; status: ProjectStatus }>
   >([]);
   const [tickets, setTickets] = React.useState<
     Array<{ id: string; title: string; projectId: string }>
@@ -476,7 +549,13 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       setIssuers(issuerList);
       setStatusCatalog(statusList);
       setPresets(presetList);
-      setProjects(projectList.map((p) => ({ id: p.id, name: p.name })));
+      setProjects(
+        projectList.map((p) => ({
+          id: p.id,
+          name: p.name,
+          status: p.status,
+        })),
+      );
 
       const ticketLists = await Promise.all(
         projectList.map(async (project) => {
@@ -569,6 +648,14 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
   const projectItems = React.useMemo(
     () => projects.map((project) => ({ value: project.id, label: project.name })),
+    [projects],
+  );
+
+  const activeProjects = React.useMemo(
+    () =>
+      projects
+        .filter((project) => project.status === "active")
+        .map((project) => ({ id: project.id, name: project.name })),
     [projects],
   );
 
@@ -1142,7 +1229,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   return (
     <div className="mx-auto max-w-[90rem] pr-1 sm:pr-2 md:pr-3">
       <div className="grid items-start gap-8 lg:gap-10 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:grid-cols-2 2xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
-        <aside className="min-w-0 space-y-4 self-start lg:sticky lg:top-4 lg:pr-3 xl:pr-4">
+        <aside className="thin-scrollbar min-w-0 space-y-4 self-start lg:sticky lg:top-4 lg:max-h-[calc(100svh-8rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 xl:pr-4">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -1643,13 +1730,13 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
                         <div className="space-y-1.5">
                           <Label htmlFor={`${item.key}-title`}>Nombre</Label>
-                          <Input
+                          <ProjectTitleInput
                             id={`${item.key}-title`}
-                            placeholder="Proyecto / servicio"
                             value={item.title}
-                            onChange={(e) =>
+                            projects={activeProjects}
+                            onChange={(title) =>
                               updateItem(section.frequency, item.key, {
-                                title: e.target.value,
+                                title,
                               })
                             }
                           />
@@ -1765,7 +1852,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                       className={cn(
                         "rounded-xl border p-3 text-left transition-colors",
                         selected
-                          ? cn("ring-1", step.card)
+                          ? cn("ring-1", FREQUENCY_SURFACE.card)
                           : "border-border/70 bg-muted/20 hover:border-primary/40 hover:bg-muted/40",
                       )}
                     >
@@ -1774,7 +1861,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                           className={cn(
                             "flex size-8 shrink-0 items-center justify-center rounded-lg",
                             selected
-                              ? step.iconWrap
+                              ? FREQUENCY_SURFACE.iconWrap
                               : "bg-muted text-muted-foreground",
                           )}
                         >
@@ -1784,7 +1871,9 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                           <p
                             className={cn(
                               "text-sm font-semibold",
-                              selected ? step.accentText : "text-foreground",
+                              selected
+                                ? FREQUENCY_SURFACE.accentText
+                                : "text-foreground",
                             )}
                           >
                             {step.label}
@@ -1801,14 +1890,19 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
             </div>
 
             {activeGestionStep === "enlace" ? (
-            <Card className="border-secondary/35 bg-secondary/10 ring-1 ring-secondary/20">
-              <CardHeader className="border-b border-secondary/20 pb-4">
+            <Card className={cn("border ring-1", FREQUENCY_SURFACE.card)}>
+              <CardHeader className="border-b border-border/40 pb-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                  <div
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      FREQUENCY_SURFACE.iconWrap,
+                    )}
+                  >
                     <Link2 className="size-4" />
                   </div>
                   <div>
-                    <CardTitle className="text-secondary">
+                    <CardTitle className={FREQUENCY_SURFACE.accentText}>
                       Enlace de revisión
                     </CardTitle>
                     <CardDescription>
@@ -1824,7 +1918,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                     variant="outline"
                     className={
                       shareActive
-                        ? "border-transparent bg-secondary text-secondary-foreground"
+                        ? "border-transparent bg-primary text-primary-foreground"
                         : "border-border/70 text-muted-foreground"
                     }
                   >
@@ -1868,7 +1962,6 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="border-secondary/40 text-secondary"
                         onClick={() => void copyPublicLink()}
                       >
                         <Copy />
@@ -1882,14 +1975,19 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
             ) : null}
 
             {activeGestionStep === "estados" ? (
-            <Card className="border-primary/30 bg-primary/5 ring-1 ring-primary/15">
-              <CardHeader className="gap-3 border-b border-primary/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <Card className={cn("border ring-1", FREQUENCY_SURFACE.card)}>
+              <CardHeader className="gap-3 border-b border-border/40 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <div
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      FREQUENCY_SURFACE.iconWrap,
+                    )}
+                  >
                     <ListOrdered className="size-4" />
                   </div>
                   <div>
-                    <CardTitle className="text-primary">
+                    <CardTitle className={FREQUENCY_SURFACE.accentText}>
                       Estado del documento
                     </CardTitle>
                     <CardDescription>
@@ -1918,9 +2016,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                         selectStatusCode(checked ? item.code : "")
                       }
                       label={item.name}
-                      tone={
-                        item.category === "payment" ? "primary" : "secondary"
-                      }
+                      tone="primary"
                     />
                   ))}
                 </div>
@@ -1929,14 +2025,21 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
             ) : null}
 
             {activeGestionStep === "firmado" ? (
-            <Card className="border-chart-3/40 bg-chart-3/10 ring-1 ring-chart-3/25">
-              <CardHeader className="border-b border-chart-3/25 pb-4">
+            <Card className={cn("border ring-1", FREQUENCY_SURFACE.card)}>
+              <CardHeader className="border-b border-border/40 pb-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chart-3 text-foreground">
+                  <div
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                      FREQUENCY_SURFACE.iconWrap,
+                    )}
+                  >
                     <FileSignature className="size-4" />
                   </div>
                   <div>
-                    <CardTitle>Documento firmado</CardTitle>
+                    <CardTitle className={FREQUENCY_SURFACE.accentText}>
+                      Documento firmado
+                    </CardTitle>
                     <CardDescription>
                       Máximo 1 archivo: el PDF u otro documento que el cliente te
                       devolvió firmado (la app no firma).
@@ -1973,7 +2076,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
                     ) : null}
                   </div>
                 ) : canUpdate ? (
-                  <div className="rounded-lg border border-dashed border-chart-3/40 bg-background/50 p-3">
+                  <div className="rounded-lg border border-dashed border-primary/40 bg-background/50 p-3">
                     <Label htmlFor="signed-upload" className="mb-2 block">
                       Subir documento firmado
                     </Label>
