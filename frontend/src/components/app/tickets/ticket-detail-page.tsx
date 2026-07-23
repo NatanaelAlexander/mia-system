@@ -13,6 +13,7 @@ import {
   Paperclip,
   RefreshCcw,
   Send,
+  SquarePen,
   Tag,
   X,
 } from "lucide-react";
@@ -80,6 +81,7 @@ import {
   TicketStatusControl,
   useTicketManagement,
 } from "./ticket-management-controls";
+import { TicketEditGeneralDialog } from "./ticket-edit-general-dialog";
 
 type CommentWithAssets = TicketChatComment;
 
@@ -299,6 +301,8 @@ export function TicketDetailPage({
   const canPostInternal =
     isInternal && hasPermission(claims, "ticket_comments:create");
   const canViewQuotes = canAccessModule(claims, quotesModule);
+  const canEditGeneral =
+    isSuperAdmin(claims) && hasPermission(claims, "tickets:update");
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -323,6 +327,7 @@ export function TicketDetailPage({
     PendingAttachment[]
   >([]);
   const [typingUsers, setTypingUsers] = React.useState<string[]>([]);
+  const [editGeneralOpen, setEditGeneralOpen] = React.useState(false);
   const [openSections, setOpenSections] = React.useState<string[]>([
     "datos",
     "cotizaciones",
@@ -895,45 +900,56 @@ export function TicketDetailPage({
           <AccordionPanel>
             {ticket ? (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-                  {priority ? (
-                    <TicketTagChip
-                      label="Prioridad"
-                      value={ticket.priorityName}
-                      helpLabel="Qué es la prioridad"
-                      helpText={priority.help}
-                      icon={priority.icon}
-                      variant={priority.variant}
-                    />
-                  ) : null}
-                  {ticket.categoryName ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                    {priority ? (
+                      <TicketTagChip
+                        label="Prioridad"
+                        value={ticket.priorityName}
+                        helpLabel="Qué es la prioridad"
+                        helpText={priority.help}
+                        icon={priority.icon}
+                        variant={priority.variant}
+                      />
+                    ) : null}
                     <TicketTagChip
                       label="Categoría"
-                      value={ticket.categoryName}
+                      value={ticket.categoryName ?? "Sin categoría"}
                       helpLabel="Qué es la categoría"
                       helpText="Clasifica el tipo de solicitud (por ejemplo soporte, mejora o incidencia)."
                       icon={Tag}
                       variant="outline"
                     />
-                  ) : null}
-                  {ticket.paymentStatusName ? (
-                    <TicketMetaField
-                      label="Pago"
-                      value={ticket.paymentStatusName}
-                    />
+                    {ticket.paymentStatusName ? (
+                      <TicketMetaField
+                        label="Pago"
+                        value={ticket.paymentStatusName}
+                      />
+                    ) : null}
+                  </div>
+                  {canEditGeneral ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditGeneralOpen(true)}
+                    >
+                      <SquarePen />
+                      Editar
+                    </Button>
                   ) : null}
                 </div>
 
-                {ticket.description ? (
-                  <div className="space-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Descripción
-                    </p>
-                    <p className="text-sm leading-relaxed text-foreground">
-                      {ticket.description}
-                    </p>
-                  </div>
-                ) : null}
+                <div className="space-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Descripción
+                  </p>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {ticket.description?.trim()
+                      ? ticket.description
+                      : "Sin descripción"}
+                  </p>
+                </div>
 
                 {isInternal ? (
                   <TicketAssigneesControl management={management} />
@@ -1208,6 +1224,15 @@ export function TicketDetailPage({
           onConfirm={(attachment) =>
             setPendingAttachments((current) => [...current, attachment])
           }
+        />
+      ) : null}
+
+      {ticket && canEditGeneral ? (
+        <TicketEditGeneralDialog
+          open={editGeneralOpen}
+          onOpenChange={setEditGeneralOpen}
+          ticket={ticket}
+          onUpdated={setTicket}
         />
       ) : null}
 
