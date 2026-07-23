@@ -59,6 +59,8 @@ const textareaClassName =
 interface ProjectCreateFormProps {
   companies: CompanyListItem[];
   defaultValues?: Partial<CreateProjectFormValues>;
+  /** When true, the company select is disabled (already chosen by context). */
+  lockCompany?: boolean;
   onSubmit: (values: CreateProjectFormValues) => Promise<void>;
   submitLabel?: string;
   isSubmitting?: boolean;
@@ -67,6 +69,7 @@ interface ProjectCreateFormProps {
 export function ProjectCreateForm({
   companies,
   defaultValues,
+  lockCompany = false,
   onSubmit,
   submitLabel = "Crear proyecto",
   isSubmitting = false,
@@ -112,7 +115,9 @@ export function ProjectCreateForm({
               onValueChange={(value) =>
                 field.onChange(typeof value === "string" ? value : "")
               }
-              disabled={isSubmitting || companies.length === 0}
+              disabled={
+                isSubmitting || companies.length === 0 || lockCompany
+              }
             >
               <SelectTrigger id="project-company">
                 <SelectValue />
