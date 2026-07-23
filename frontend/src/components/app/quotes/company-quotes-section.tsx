@@ -699,5 +699,5 @@ export function EntityQuotesList({
 }
 
 function companyDetailQuotesHref(companyId: string): string {
-  return `/app/companies/${companyId}?tab=cotizaciones`;
+  return `/app/companies/${companyId}?tab=documentos&docs=cotizaciones`;
 }

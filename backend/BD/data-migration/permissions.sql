@@ -45,5 +45,13 @@ INSERT INTO permissions (name, module) VALUES
   ('quotes:create', 'quotes'),
   ('quotes:update', 'quotes'),
   ('quotes:delete', 'quotes'),
-  ('quotes:send', 'quotes')
+  ('quotes:send', 'quotes'),
+  ('contracts:read', 'contracts'),
+  ('contracts:create', 'contracts'),
+  ('contracts:update', 'contracts'),
+  ('contracts:delete', 'contracts'),
+  ('company_files:read', 'company_files'),
+  ('company_files:create', 'company_files'),
+  ('company_files:update', 'company_files'),
+  ('company_files:delete', 'company_files')
 ON CONFLICT (name) DO NOTHING;

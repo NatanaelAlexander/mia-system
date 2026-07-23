@@ -25,6 +25,7 @@ const MIGRATIONS = [
   'notification_dismiss_cleanup',
   'quote_status_single',
   'quote_remove_draft',
+  'company_files',
 ] as const;
 
 const SEPARATOR = '----------------------------------------';

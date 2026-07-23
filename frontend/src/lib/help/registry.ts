@@ -272,7 +272,7 @@ export const HELP_ARTICLES = [
           "La jerarquía operativa es: Empresa → Proyecto → Ticket. Todo ticket pertenece a un proyecto, no directamente a una empresa.",
         ],
         bullets: [
-          "Empresas: datos, representantes legales y usuarios cliente vinculados",
+          "Empresas: datos, representantes, usuarios vinculados, proyectos y Documentos (cotizaciones, contratos, drive general)",
           "Proyectos: activos vinculados a una empresa",
           "Tickets: soporte y desarrollo dentro de un proyecto",
           "Assets: archivos en R2 referenciados desde proyectos, tickets o comentarios",

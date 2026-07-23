@@ -32,6 +32,7 @@ export function setupSwagger(app: INestApplication): void {
     .addTag('Tickets — Internal', 'Tickets, comentarios, estados y archivos')
     .addTag('Tickets — Portal', 'Tickets para clientes')
     .addTag('Audit — Internal', 'Consulta de audit_logs (solo lectura)')
+    .addTag('Company files — Internal', 'Drive de empresa: carpetas y archivos')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
