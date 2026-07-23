@@ -1,5 +1,6 @@
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { INestApplication } from '@nestjs/common';
+import { apiReference } from '@scalar/nestjs-api-reference';
 import { ErrorResponseDto } from '../exceptions/app.exception';
 
 export function setupSwagger(app: INestApplication): void {
@@ -37,8 +38,16 @@ export function setupSwagger(app: INestApplication): void {
     extraModels: [ErrorResponseDto],
   });
 
-  SwaggerModule.setup('docs', app, document, {
-    jsonDocumentUrl: 'docs/json',
-    useGlobalPrefix: true,
+  // OpenAPI JSON para herramientas (Postman, Insomnia, etc.)
+  app.getHttpAdapter().get('/api/docs/json', (_req: unknown, res: { json: (body: unknown) => void }) => {
+    res.json(document);
   });
+
+  // Scalar UI (sidebar + Try it out); OpenAPI lo genera @nestjs/swagger.
+  app.use(
+    '/api/reference',
+    apiReference({
+      content: document,
+    }),
+  );
 }
