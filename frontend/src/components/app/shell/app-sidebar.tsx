@@ -150,28 +150,29 @@ export function AppSidebar() {
         ) : null}
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu className="gap-2">
-          <SidebarMenuItem>
+      <SidebarFooter className="overflow-hidden group-data-[collapsible=icon]:items-center">
+        <SidebarMenu className="gap-2 overflow-hidden group-data-[collapsible=icon]:items-center">
+          <SidebarMenuItem className="overflow-hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2 text-left text-sm text-sidebar-foreground outline-hidden transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "flex w-full items-center gap-2 overflow-hidden rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 p-2 text-left text-sm text-sidebar-foreground outline-hidden transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  "group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0!",
                 )}
                 render={<button type="button" />}
               >
                 <Avatar className="size-8 shrink-0">
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
-                <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                  <p className="truncate font-medium">
+                <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-medium">
                     {claims?.firstName} {claims?.lastName}
-                  </p>
-                  <p className="truncate text-xs opacity-75">
+                  </span>
+                  <span className="truncate text-xs opacity-75">
                     {claims?.email}
-                  </p>
+                  </span>
                 </div>
-                <EllipsisVertical className="size-4 shrink-0 opacity-75 group-data-[collapsible=icon]:hidden" />
+                <EllipsisVertical className="ml-auto size-4 shrink-0 opacity-75 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
