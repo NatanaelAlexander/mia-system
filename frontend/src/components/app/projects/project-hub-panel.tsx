@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import {
   AlignLeft,
-  Building2,
   CalendarDays,
   FolderKanban,
   Files,
@@ -22,6 +21,7 @@ import {
   formatProjectStatus,
   formatProjectType,
 } from "@/components/app/shared/format";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import {
   canAccessModule,
   hasPermission,
@@ -34,7 +34,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -58,11 +57,15 @@ function InfoField({
   icon: Icon,
   label,
   value,
+  helpLabel,
+  helpText,
   className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: React.ReactNode;
+  helpLabel?: string;
+  helpText?: string;
   className?: string;
 }) {
   return (
@@ -76,7 +79,12 @@ function InfoField({
         <Icon className="size-4" />
       </div>
       <div className="min-w-0 space-y-0.5">
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          {label}
+          {helpText ? (
+            <HelpHint label={helpLabel ?? label} text={helpText} />
+          ) : null}
+        </p>
         <div className="text-sm font-medium wrap-break-word">{value}</div>
       </div>
     </div>
@@ -128,7 +136,7 @@ export function ProjectHubPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-3 border-b sm:flex-row sm:items-start sm:justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <p className="truncate text-sm text-muted-foreground">{companyName}</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -185,44 +193,54 @@ export function ProjectHubPanel({
           ) : null}
         </div>
       </CardHeader>
-
-      <CardContent className="space-y-3 pt-6">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoField icon={Building2} label="Empresa" value={companyName} />
-          <InfoField
-            icon={FolderKanban}
-            label="Nombre"
-            value={currentProject.name}
-          />
-          <InfoField
-            icon={Tag}
-            label="Tipo"
-            value={formatProjectType(currentProject.type)}
-          />
-          <InfoField
-            icon={Layers}
-            label="Estado"
-            value={formatProjectStatus(currentProject.status)}
-          />
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <InfoField
-            icon={AlignLeft}
-            label="Descripción"
-            value={
-              currentProject.description?.trim()
-                ? currentProject.description
-                : "Sin descripción"
-            }
-          />
-          <InfoField
-            icon={CalendarDays}
-            label="Creado"
-            value={formatDate(currentProject.createdAt)}
-          />
-        </div>
-      </CardContent>
     </Card>
+  );
+}
+
+/** Campos de resumen del proyecto (para la sección colapsable Datos generales). */
+export function ProjectGeneralFields({ project }: { project: ProjectListItem }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <InfoField
+          icon={FolderKanban}
+          label="Nombre"
+          value={project.name}
+          helpLabel="Qué es el nombre"
+          helpText="Nombre del proyecto. Identifica el trabajo o iniciativa dentro de la empresa."
+        />
+        <InfoField
+          icon={Tag}
+          label="Tipo"
+          value={formatProjectType(project.type)}
+          helpLabel="Qué es el tipo"
+          helpText="Externo: visible para el cliente en el portal. Interno: solo lo ve el equipo."
+        />
+        <InfoField
+          icon={Layers}
+          label="Estado"
+          value={formatProjectStatus(project.status)}
+          helpLabel="Qué es el estado"
+          helpText="Activo: en curso. Inactivo: pausado o deshabilitado. Completado: ya finalizado."
+        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <InfoField
+          icon={AlignLeft}
+          label="Descripción"
+          value={
+            project.description?.trim()
+              ? project.description
+              : "Sin descripción"
+          }
+        />
+        <InfoField
+          icon={CalendarDays}
+          label="Creado"
+          value={formatDate(project.createdAt)}
+        />
+      </div>
+    </div>
   );
 }

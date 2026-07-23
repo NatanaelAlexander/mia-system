@@ -87,6 +87,14 @@ export interface CreateTicketPayload {
   paymentStatusId?: string;
 }
 
+export interface UpdateTicketPayload {
+  title?: string;
+  description?: string | null;
+  priorityId?: string;
+  categoryId?: string | null;
+  paymentStatusId?: string | null;
+}
+
 export interface AddTicketCommentPayload {
   ticketId: string;
   comment: string;
@@ -135,6 +143,17 @@ export function createTicket(
     ticketsBase(surface),
     {
       method: "POST",
+      body: JSON.stringify(payload),
+    },
+    true,
+  );
+}
+
+export function updateTicket(ticketId: string, payload: UpdateTicketPayload) {
+  return apiFetch<TicketDetail>(
+    `/internal/tickets/${ticketId}`,
+    {
+      method: "PATCH",
       body: JSON.stringify(payload),
     },
     true,

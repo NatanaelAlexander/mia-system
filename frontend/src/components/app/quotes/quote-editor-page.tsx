@@ -442,7 +442,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
     "quote" | "preset" | "signed" | null
   >(null);
 
-  const backHref = companyDetailHref(companyId, "cotizaciones");
+  const backHref = companyDetailHref(companyId, "documentos", "cotizaciones");
 
   const load = React.useCallback(async () => {
     if (!claims || !canAccess) {

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Building2,
-  FileText,
+  FileStack,
   FolderKanban,
   IdCard,
   Scale,
@@ -32,7 +32,6 @@ import {
 } from "@/components/app/shared/permissions";
 import { preferredSurface } from "@/components/app/shared/surface";
 import { projectsModule } from "@/components/app/projects/projects-module";
-import { quotesModule } from "@/components/app/quotes/quotes-module";
 import { ErrorState } from "@/components/app/shared/list-states";
 import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { useAuth } from "@/hooks/use-auth";
@@ -69,7 +68,7 @@ import {
 import { CompanyRepresentativesSection } from "./company-representatives-section";
 import { CompanyUsersSection } from "./company-users-section";
 import { CompanyProjectsSection } from "./company-projects-section";
-import { CompanyQuotesSection } from "@/components/app/quotes/company-quotes-section";
+import { CompanyDocumentsSection } from "./company-documents-section";
 
 interface CompanyDetailPageProps {
   companyId: string;
@@ -80,7 +79,7 @@ const COMPANY_TABS = [
   "representantes",
   "usuarios",
   "proyectos",
-  "cotizaciones",
+  "documentos",
 ] as const satisfies readonly CompanyDetailTab[];
 
 const STATUS_HELP: Record<CompanyStatus, string> = {
@@ -99,8 +98,8 @@ const TAB_HELP: Record<CompanyDetailTab, string> = {
     "Cuentas del sistema vinculadas a esta empresa. Pueden acceder al portal o a la operación según su rol.",
   proyectos:
     "Proyectos asociados a esta empresa. Puedes filtrar por activos, inactivos o completados.",
-  cotizaciones:
-    "Cotizaciones (boleta o factura) asociadas a esta empresa, un proyecto o un ticket. Solo superAdmin.",
+  documentos:
+    "Documentos de la empresa: cotizaciones, contratos y drive general. Solo superAdmin escribe.",
 };
 
 function isCompanyDetailTab(value: string | null): value is CompanyDetailTab {
@@ -153,7 +152,10 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     isSuperAdmin(claims) &&
     hasPermission(claims, "companies:delete");
   const canViewProjects = canAccessModule(claims, projectsModule);
-  const canViewQuotes = canAccessModule(claims, quotesModule);
+  const canViewDocuments =
+    hasPermission(claims, "quotes:read") ||
+    hasPermission(claims, "contracts:read") ||
+    hasPermission(claims, "company_files:read");
   const isInternal = isInternalUser(claims);
   const scopedAdmin = isScopedAdmin(claims);
 
@@ -177,14 +179,24 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     if (canViewProjects) {
       tabs.push("proyectos");
     }
-    if (canViewQuotes) {
-      tabs.push("cotizaciones");
+    if (canViewDocuments) {
+      tabs.push("documentos");
     }
     return tabs;
-  }, [canViewProjects, canViewQuotes, isInternal, scopedAdmin]);
+  }, [canViewDocuments, canViewProjects, isInternal, scopedAdmin]);
 
   const tabFromUrl = searchParams.get("tab");
   const defaultTab: CompanyDetailTab = scopedAdmin ? "proyectos" : "datos";
+
+  // Compat: ?tab=cotizaciones → documentos + docs=cotizaciones
+  React.useEffect(() => {
+    if (tabFromUrl === "cotizaciones" && canViewDocuments) {
+      router.replace(companyDetailHref(companyId, "documentos", "cotizaciones"), {
+        scroll: false,
+      });
+    }
+  }, [canViewDocuments, companyId, router, tabFromUrl]);
+
   const activeTab: CompanyDetailTab = isCompanyDetailTab(tabFromUrl)
     ? allowedTabs.includes(tabFromUrl)
       ? tabFromUrl
@@ -197,6 +209,19 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
     }
 
     if (!allowedTabs.includes(value)) {
+      return;
+    }
+
+    if (value === "documentos") {
+      const docsSub =
+        hasPermission(claims, "quotes:read")
+          ? "cotizaciones"
+          : hasPermission(claims, "contracts:read")
+            ? "contratos"
+            : "general";
+      router.replace(companyDetailHref(companyId, "documentos", docsSub), {
+        scroll: false,
+      });
       return;
     }
 
@@ -410,12 +435,12 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
               />
             </TabsTab>
           ) : null}
-          {allowedTabs.includes("cotizaciones") ? (
-            <TabsTab value="cotizaciones">
+          {allowedTabs.includes("documentos") ? (
+            <TabsTab value="documentos">
               <TabLabel
-                icon={FileText}
-                label="Cotizaciones"
-                shortLabel="Cotizaciones"
+                icon={FileStack}
+                label="Documentos"
+                shortLabel="Documentos"
               />
             </TabsTab>
           ) : null}
@@ -476,9 +501,9 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
           </TabsPanel>
         ) : null}
 
-        {allowedTabs.includes("cotizaciones") ? (
-          <TabsPanel value="cotizaciones">
-            <CompanyQuotesSection companyId={company.id} />
+        {allowedTabs.includes("documentos") ? (
+          <TabsPanel value="documentos">
+            <CompanyDocumentsSection companyId={company.id} />
           </TabsPanel>
         ) : null}
       </Tabs>

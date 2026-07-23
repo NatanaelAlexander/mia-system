@@ -26,6 +26,8 @@ WHERE r.name = 'admin'
   AND p.name NOT LIKE 'roles:%'
   AND p.name NOT LIKE 'permissions:%'
   AND p.name NOT LIKE 'quotes:%'
+  AND p.name NOT LIKE 'contracts:%'
+  AND p.name NOT LIKE 'company_files:%'
   AND (
     p.name NOT LIKE 'users:%'
     OR p.name = 'users:read'

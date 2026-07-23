@@ -219,10 +219,13 @@ export function TicketStatusControl({
   ticket,
   management,
   onDenied,
+  compact = false,
 }: {
   ticket: TicketDetail;
   management: TicketManagement;
   onDenied?: () => void;
+  /** Dropdown compacto para el encabezado (sin label arriba). */
+  compact?: boolean;
 }) {
   const {
     statuses,
@@ -231,6 +234,47 @@ export function TicketStatusControl({
     canChangeStatus,
     handleStatusChange,
   } = management;
+
+  if (compact) {
+    if (canChangeStatus) {
+      return (
+        <Select
+          items={statuses.map((status) => ({
+            value: status.id,
+            label: status.name,
+          }))}
+          value={ticket.statusId}
+          onValueChange={handleStatusChange}
+          disabled={isLoading || isChangingStatus}
+        >
+          <SelectTrigger className="w-[min(100%,12rem)] sm:w-44">
+            <SelectValue
+              placeholder={
+                isChangingStatus ? "Actualizando..." : ticket.statusName
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {statuses.map((status) => (
+              <SelectItem key={status.id} value={status.id}>
+                {status.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="inline-flex h-9 items-center rounded-lg border border-border/70 bg-muted/30 px-3 text-sm font-medium"
+        onClick={() => onDenied?.()}
+      >
+        {ticket.statusName}
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-1">

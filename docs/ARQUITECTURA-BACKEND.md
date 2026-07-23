@@ -148,10 +148,11 @@ El GET original se mantiene para herramientas que sí envían body en GET.
 
 ---
 
-## Swagger
+## Documentación API (Scalar)
 
-Documentación interactiva en **`/api/docs`** (JSON en `/api/docs/json`).
+UI interactiva (sidebar + Try it out) en **`/api/reference`**. OpenAPI JSON en `/api/docs/json`.
 
+- El esquema lo genera `@nestjs/swagger`; la UI es Scalar (`@scalar/nestjs-api-reference`).
 - DTOs con `@ApiProperty` → request body documentado y probabile desde la UI.
 - `dto/responses/` → schemas de respuesta.
 - `@ApiOperation`, `@ApiBody`, `@ApiOkResponse` en cada endpoint.
@@ -179,7 +180,7 @@ backend/src/
 │   ├── pipes/
 │   │   └── validation.factory.ts
 │   ├── swagger/
-│   │   └── setup-swagger.ts           ← /api/docs
+│   │   └── setup-swagger.ts           ← Scalar /api/reference
 │   ├── storage/
 │   │   ├── storage.module.ts          ← R2 (S3 API)
 │   │   ├── r2-storage.service.ts
@@ -521,4 +522,4 @@ Variables: `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BU
 - [ ] Guards: internal, portal, permissions (`module:action`)
 - [ ] Decorators: `@CurrentUser()`, `@RequirePermission()`
 - [x] Portal companies/projects/tickets: filtrar por `users_companies`
-- [x] Swagger en `/api/docs`
+- [x] Scalar en `/api/reference` (OpenAPI vía `@nestjs/swagger`)
