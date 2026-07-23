@@ -1,9 +1,21 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Download, Paperclip, RefreshCcw, Send, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Download,
+  FileText,
+  LayoutGrid,
+  MessageSquare,
+  Minus,
+  Paperclip,
+  RefreshCcw,
+  Send,
+  Tag,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   getAssetDownloadUrl,
@@ -29,6 +41,7 @@ import {
   type PendingAttachment,
 } from "@/components/app/shared/attachment-utils";
 import { formatFileSize } from "@/components/app/shared/format";
+import { HelpHint } from "@/components/app/shared/help-hint";
 import { ErrorState } from "@/components/app/shared/list-states";
 import {
   hasPermission,
@@ -48,7 +61,12 @@ import { ApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ProjectContextHeader } from "../projects/project-context-header";
 import { EntityQuotesList } from "@/components/app/quotes/company-quotes-section";
 import { quotesModule } from "@/components/app/quotes/quotes-module";
@@ -178,13 +196,91 @@ function setCommentAssetSyncStatus(
   return next;
 }
 
+function SectionTitle({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Icon className="size-4 shrink-0 text-primary" />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function priorityVisual(name: string): {
+  icon: React.ComponentType<{ className?: string }>;
+  variant: "default" | "secondary" | "destructive" | "outline";
+  help: string;
+} {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === "urgente") {
+    return {
+      icon: AlertTriangle,
+      variant: "destructive",
+      help: "Prioridad máxima: requiere atención inmediata.",
+    };
+  }
+  if (normalized === "alta") {
+    return {
+      icon: ArrowUp,
+      variant: "default",
+      help: "Alta prioridad: atender pronto respecto al resto.",
+    };
+  }
+  if (normalized === "baja") {
+    return {
+      icon: ArrowDown,
+      variant: "outline",
+      help: "Baja prioridad: puede esperar frente a otros tickets.",
+    };
+  }
+  return {
+    icon: Minus,
+    variant: "secondary",
+    help: "Prioridad media: seguimiento habitual del equipo.",
+  };
+}
+
+function TicketTagChip({
+  label,
+  value,
+  helpLabel,
+  helpText,
+  icon: Icon,
+  variant = "outline",
+}: {
+  label: string;
+  value: string;
+  helpLabel: string;
+  helpText: string;
+  icon: React.ComponentType<{ className?: string }>;
+  variant?: "default" | "secondary" | "destructive" | "outline";
+}) {
+  return (
+    <div className="inline-flex min-w-0 items-center gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <HelpHint label={helpLabel} text={helpText} />
+      <Badge variant={variant} className="w-fit">
+        <Icon data-icon="inline-start" />
+        {value}
+      </Badge>
+    </div>
+  );
+}
+
 function TicketMetaField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="inline-flex min-w-0 items-center gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
-      </p>
-      <p className="text-base font-semibold text-foreground">{value}</p>
+      </span>
+      <p className="text-sm font-medium text-foreground">{value}</p>
     </div>
   );
 }
@@ -193,7 +289,6 @@ export function TicketDetailPage({
   projectId,
   ticketId,
 }: TicketDetailPageProps) {
-  const router = useRouter();
   const { claims, isLoading: isAuthLoading } = useAuth();
   const { markTicketAsRead } = useNotifications();
   const surface = claims ? preferredSurface(claims) : "portal";
@@ -228,6 +323,11 @@ export function TicketDetailPage({
     PendingAttachment[]
   >([]);
   const [typingUsers, setTypingUsers] = React.useState<string[]>([]);
+  const [openSections, setOpenSections] = React.useState<string[]>([
+    "datos",
+    "cotizaciones",
+    "chat",
+  ]);
 
   const management = useTicketManagement({
     ticket,
@@ -594,7 +694,7 @@ export function TicketDetailPage({
     [claims?.sub, isInternal, stashPendingAssets],
   );
 
-  const { isConnected, emitTyping, emitAssetsUploading } = useTicketRealtime({
+  const { emitTyping, emitAssetsUploading } = useTicketRealtime({
     ticketId,
     enabled: Boolean(claims && ticket),
     onCommentCreated: handleRealtimeComment,
@@ -741,6 +841,8 @@ export function TicketDetailPage({
     return <ErrorState message={errorMessage} onRetry={loadThread} />;
   }
 
+  const priority = ticket ? priorityVisual(ticket.priorityName) : null;
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <ProjectContextHeader
@@ -748,53 +850,126 @@ export function TicketDetailPage({
         projectName={projectName || "Proyecto"}
         companyName={companyName}
         sectionTitle={ticket?.title ?? "Ticket"}
-        sectionDescription="Conversación y archivos del ticket."
+        actions={
+          <>
+            {ticket ? (
+              isInternal ? (
+                <TicketStatusControl
+                  ticket={ticket}
+                  management={management}
+                  onDenied={showDenied}
+                  compact
+                />
+              ) : (
+                <span className="inline-flex h-9 items-center rounded-lg border border-border/70 bg-muted/30 px-3 text-sm font-medium">
+                  {ticket.statusName}
+                </span>
+              )
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void loadThread()}
+              disabled={isLoading}
+            >
+              <RefreshCcw />
+              Actualizar
+            </Button>
+          </>
+        }
       />
 
-      {canViewQuotes && companyId ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Cotizaciones del ticket</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EntityQuotesList
-              companyId={companyId}
-              projectId={projectId}
-              ticketId={ticketId}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader className="border-b">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <Accordion
+        multiple
+        value={openSections}
+        onValueChange={(next) => {
+          setOpenSections(Array.isArray(next) ? next : [next]);
+        }}
+        className="gap-4"
+      >
+        <AccordionItem value="datos">
+          <AccordionTrigger>
+            <SectionTitle icon={LayoutGrid} label="Datos generales" />
+          </AccordionTrigger>
+          <AccordionPanel>
             {ticket ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <TicketMetaField
-                  label="Prioridad"
-                  value={ticket.priorityName}
-                />
-                {ticket.categoryName ? (
-                  <TicketMetaField
-                    label="Categoría"
-                    value={ticket.categoryName}
-                  />
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                  {priority ? (
+                    <TicketTagChip
+                      label="Prioridad"
+                      value={ticket.priorityName}
+                      helpLabel="Qué es la prioridad"
+                      helpText={priority.help}
+                      icon={priority.icon}
+                      variant={priority.variant}
+                    />
+                  ) : null}
+                  {ticket.categoryName ? (
+                    <TicketTagChip
+                      label="Categoría"
+                      value={ticket.categoryName}
+                      helpLabel="Qué es la categoría"
+                      helpText="Clasifica el tipo de solicitud (por ejemplo soporte, mejora o incidencia)."
+                      icon={Tag}
+                      variant="outline"
+                    />
+                  ) : null}
+                  {ticket.paymentStatusName ? (
+                    <TicketMetaField
+                      label="Pago"
+                      value={ticket.paymentStatusName}
+                    />
+                  ) : null}
+                </div>
+
+                {ticket.description ? (
+                  <div className="space-y-1 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Descripción
+                    </p>
+                    <p className="text-sm leading-relaxed text-foreground">
+                      {ticket.description}
+                    </p>
+                  </div>
                 ) : null}
+
                 {isInternal ? (
-                  <TicketStatusControl
-                    ticket={ticket}
-                    management={management}
-                    onDenied={showDenied}
-                  />
-                ) : (
-                  <TicketMetaField label="Estado" value={ticket.statusName} />
-                )}
-                {ticket.paymentStatusName ? (
-                  <TicketMetaField
-                    label="Pago"
-                    value={ticket.paymentStatusName}
-                  />
+                  <TicketAssigneesControl management={management} />
+                ) : null}
+
+                {ticketAssets.length > 0 ? (
+                  <div className="space-y-2 rounded-xl border border-border/70 p-4">
+                    <p className="text-sm font-medium">Archivos del ticket</p>
+                    <div className="space-y-1">
+                      {ticketAssets.map((asset) => (
+                        <div
+                          key={asset.id}
+                          className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">
+                              {asset.fileName}
+                            </p>
+                            <p className="text-muted-foreground">
+                              {formatFileSize(asset.fileSize)}
+                            </p>
+                          </div>
+                          {canDownload ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon-sm"
+                              onClick={() => void handleDownload(asset)}
+                            >
+                              <Download />
+                            </Button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ) : null}
               </div>
             ) : (
@@ -802,263 +977,225 @@ export function TicketDetailPage({
                 Cargando detalle del ticket...
               </p>
             )}
-            <div className="flex shrink-0 items-center gap-2">
-              <Badge variant={isConnected ? "secondary" : "outline"}>
-                {isConnected ? "En vivo" : "Sin conexión"}
-              </Badge>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void loadThread()}
-                disabled={isLoading}
-              >
-                <RefreshCcw />
-                Actualizar
-              </Button>
-            </div>
-          </div>
-          {ticket?.description ? (
-            <div className="mt-4 space-y-1 border-t border-border/60 pt-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Descripción
-              </p>
-              <p className="text-sm leading-relaxed text-foreground">
-                {ticket.description}
-              </p>
-            </div>
-          ) : null}
-          {ticket && isInternal ? (
-            <div className="mt-4 border-t border-border/60 pt-4">
-              <TicketAssigneesControl management={management} />
-            </div>
-          ) : null}
-        </CardHeader>
+          </AccordionPanel>
+        </AccordionItem>
 
-        <CardContent className="space-y-4 pt-6">
-          {ticketAssets.length > 0 ? (
-            <div className="space-y-2 rounded-xl border border-border/70 p-4">
-              <p className="text-sm font-medium">Archivos del ticket</p>
-              <div className="space-y-1">
-                {ticketAssets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{asset.fileName}</p>
-                      <p className="text-muted-foreground">
-                        {formatFileSize(asset.fileSize)}
-                      </p>
-                    </div>
-                    {canDownload ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        onClick={() => void handleDownload(asset)}
-                      >
-                        <Download />
-                      </Button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+        {canViewQuotes && companyId ? (
+          <AccordionItem value="cotizaciones">
+            <AccordionTrigger>
+              <SectionTitle icon={FileText} label="Cotizaciones" />
+            </AccordionTrigger>
+            <AccordionPanel>
+              <EntityQuotesList
+                companyId={companyId}
+                projectId={projectId}
+                ticketId={ticketId}
+              />
+            </AccordionPanel>
+          </AccordionItem>
+        ) : null}
 
-          <div className="flex min-h-[min(70dvh,32rem)] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40 md:max-h-[32rem] md:min-h-[18rem]">
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
-              {isLoading ? (
-                <p className="text-sm text-muted-foreground">
-                  Cargando conversación...
-                </p>
-              ) : comments.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground">
-                  Aún no hay mensajes. Escribe el primero o adjunta archivos.
-                </p>
-              ) : (
-                comments.map((comment) => (
-                  <TicketChatMessage
-                    key={comment.id}
-                    comment={comment}
-                    isOwn={comment.userId === claims?.sub}
-                    authorLabel={resolveAuthorName(comment)}
-                    canDownload={canDownload}
-                    onDownload={(asset) => void handleDownload(asset)}
-                  />
-                ))
-              )}
-              {typingUsers.length > 0 ? (
-                <TicketChatTypingIndicator names={typingUsers} />
-              ) : null}
-              <div ref={threadEndRef} />
-            </div>
-
-            {canComment ? (
-              <div
-                className={cn(
-                  "sticky bottom-0 relative border-t border-border/70 bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-colors supports-backdrop-filter:bg-card/80",
-                  isComposerDragging && "ring-2 ring-inset ring-primary/20",
-                  !canUseComposer && "cursor-not-allowed opacity-80",
-                )}
-                onClickCapture={(event) => {
-                  if (!canUseComposer) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    showDenied();
-                  }
-                }}
-                onDragOver={(event) => {
-                  if (!canUseComposer || !canUpload || attachmentPickOpen) {
-                    return;
-                  }
-                  event.preventDefault();
-                  setIsComposerDragging(true);
-                }}
-                onDragLeave={(event) => {
-                  event.preventDefault();
-                  const nextTarget = event.relatedTarget as Node | null;
-                  if (nextTarget && event.currentTarget.contains(nextTarget)) {
-                    return;
-                  }
-                  setIsComposerDragging(false);
-                }}
-                onDrop={(event) => {
-                  if (!canUseComposer || !canUpload || attachmentPickOpen) {
-                    return;
-                  }
-                  event.preventDefault();
-                  setIsComposerDragging(false);
-                  addFiles(event.dataTransfer.files);
-                }}
-              >
-                {isComposerDragging ? (
-                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary/5">
-                    <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
-                      Suelta los archivos para adjuntarlos al mensaje
-                    </div>
-                  </div>
-                ) : null}
-
-                {canPostInternal ? (
-                  <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={isInternalComment}
-                      disabled={isSending}
-                      onChange={(event) =>
-                        setIsInternalComment(event.target.checked)
-                      }
+        <AccordionItem value="chat">
+          <AccordionTrigger>
+            <SectionTitle icon={MessageSquare} label="Chat" />
+          </AccordionTrigger>
+          <AccordionPanel>
+            <div className="flex min-h-[min(70dvh,32rem)] flex-col overflow-hidden rounded-xl border border-border/70 bg-background/40 md:max-h-[32rem] md:min-h-[18rem]">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
+                {isLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    Cargando conversación...
+                  </p>
+                ) : comments.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground">
+                    Aún no hay mensajes. Escribe el primero o adjunta archivos.
+                  </p>
+                ) : (
+                  comments.map((comment) => (
+                    <TicketChatMessage
+                      key={comment.id}
+                      comment={comment}
+                      isOwn={comment.userId === claims?.sub}
+                      authorLabel={resolveAuthorName(comment)}
+                      canDownload={canDownload}
+                      onDownload={(asset) => void handleDownload(asset)}
                     />
-                    Comentario interno (solo equipo)
-                  </label>
+                  ))
+                )}
+                {typingUsers.length > 0 ? (
+                  <TicketChatTypingIndicator names={typingUsers} />
                 ) : null}
+                <div ref={threadEndRef} />
+              </div>
 
-                {pendingAttachments.length > 0 ? (
-                  <div className="mb-2 space-y-1.5">
-                    {pendingAttachments.map((attachment, index) => (
-                      <div
-                        key={`${getAttachmentLabel(attachment)}-${index}`}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1.5 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">
-                            {getAttachmentLabel(attachment)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(attachment.file.size)}
-                          </p>
+              {canComment ? (
+                <div
+                  className={cn(
+                    "sticky bottom-0 relative border-t border-border/70 bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-colors supports-backdrop-filter:bg-card/80",
+                    isComposerDragging && "ring-2 ring-inset ring-primary/20",
+                    !canUseComposer && "cursor-not-allowed opacity-80",
+                  )}
+                  onClickCapture={(event) => {
+                    if (!canUseComposer) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      showDenied();
+                    }
+                  }}
+                  onDragOver={(event) => {
+                    if (!canUseComposer || !canUpload || attachmentPickOpen) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setIsComposerDragging(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    const nextTarget = event.relatedTarget as Node | null;
+                    if (
+                      nextTarget &&
+                      event.currentTarget.contains(nextTarget)
+                    ) {
+                      return;
+                    }
+                    setIsComposerDragging(false);
+                  }}
+                  onDrop={(event) => {
+                    if (!canUseComposer || !canUpload || attachmentPickOpen) {
+                      return;
+                    }
+                    event.preventDefault();
+                    setIsComposerDragging(false);
+                    addFiles(event.dataTransfer.files);
+                  }}
+                >
+                  {isComposerDragging ? (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-primary/5">
+                      <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
+                        Suelta los archivos para adjuntarlos al mensaje
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {canPostInternal ? (
+                    <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={isInternalComment}
+                        disabled={isSending}
+                        onChange={(event) =>
+                          setIsInternalComment(event.target.checked)
+                        }
+                      />
+                      Comentario interno (solo equipo)
+                    </label>
+                  ) : null}
+
+                  {pendingAttachments.length > 0 ? (
+                    <div className="mb-2 space-y-1.5">
+                      {pendingAttachments.map((attachment, index) => (
+                        <div
+                          key={`${getAttachmentLabel(attachment)}-${index}`}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border/70 bg-muted/30 px-2 py-1.5 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">
+                              {getAttachmentLabel(attachment)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(attachment.file.size)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() =>
+                              setPendingAttachments((current) =>
+                                current.filter(
+                                  (_, itemIndex) => itemIndex !== index,
+                                ),
+                              )
+                            }
+                          >
+                            <X />
+                          </Button>
                         </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-end gap-2">
+                    {canUpload ? (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          disabled={isSending}
+                          onChange={(event) => {
+                            addFiles(event.target.files);
+                            event.target.value = "";
+                          }}
+                        />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() =>
-                            setPendingAttachments((current) =>
-                              current.filter(
-                                (_, itemIndex) => itemIndex !== index,
-                              ),
-                            )
-                          }
+                          className="shrink-0 text-muted-foreground"
+                          disabled={isSending}
+                          onClick={() => fileInputRef.current?.click()}
                         >
-                          <X />
+                          <Paperclip />
                         </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                      </>
+                    ) : null}
 
-                <div className="flex items-end gap-2">
-                  {canUpload ? (
-                    <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        disabled={isSending}
-                        onChange={(event) => {
-                          addFiles(event.target.files);
-                          event.target.value = "";
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground"
-                        disabled={isSending}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Paperclip />
-                      </Button>
-                    </>
-                  ) : null}
+                    <textarea
+                      id="ticket-message"
+                      rows={1}
+                      value={message}
+                      disabled={isSending}
+                      onChange={(event) => {
+                        setMessage(event.target.value);
+                        emitTyping(
+                          event.target.value.trim().length > 0,
+                          isInternalComment,
+                        );
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSend();
+                        }
+                      }}
+                      placeholder="Escribe un mensaje..."
+                      className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50"
+                    />
 
-                  <textarea
-                    id="ticket-message"
-                    rows={1}
-                    value={message}
-                    disabled={isSending}
-                    onChange={(event) => {
-                      setMessage(event.target.value);
-                      emitTyping(
-                        event.target.value.trim().length > 0,
-                        isInternalComment,
-                      );
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void handleSend();
+                    <Button
+                      type="button"
+                      size="icon"
+                      className="size-10 shrink-0 rounded-full"
+                      disabled={
+                        isSending ||
+                        (!message.trim() && pendingAttachments.length === 0)
                       }
-                    }}
-                    placeholder="Escribe un mensaje..."
-                    className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:opacity-50"
-                  />
-
-                  <Button
-                    type="button"
-                    size="icon"
-                    className="size-10 shrink-0 rounded-full"
-                    disabled={
-                      isSending ||
-                      (!message.trim() && pendingAttachments.length === 0)
-                    }
-                    onClick={() => void handleSend()}
-                  >
-                    <Send />
-                    <span className="sr-only">
-                      {isSending ? "Enviando..." : "Enviar"}
-                    </span>
-                  </Button>
+                      onClick={() => void handleSend()}
+                    >
+                      <Send />
+                      <span className="sr-only">
+                        {isSending ? "Enviando..." : "Enviar"}
+                      </span>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
+              ) : null}
+            </div>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
 
       {canUpload ? (
         <AttachmentPickDialog
@@ -1073,22 +1210,6 @@ export function TicketDetailPage({
           }
         />
       ) : null}
-
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <button
-          type="button"
-          className="text-primary hover:underline"
-          onClick={() => router.push(`/app/projects/${projectId}/tickets`)}
-        >
-          Volver a tickets del proyecto
-        </button>
-        <Link
-          href={`/app/projects/${projectId}`}
-          className="text-primary hover:underline"
-        >
-          Volver al proyecto
-        </Link>
-      </div>
 
       <AuthorizationDeniedDialog
         open={authDeniedOpen}

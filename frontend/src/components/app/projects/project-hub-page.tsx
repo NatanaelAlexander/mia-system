@@ -68,6 +68,11 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
   const [project, setProject] = React.useState<
     Awaited<ReturnType<typeof getProjectDetail>> | null
   >(null);
+  const [openSections, setOpenSections] = React.useState<string[]>([
+    "datos",
+    "cotizaciones",
+    "tickets",
+  ]);
 
   const backHref = project
     ? companyDetailHref(project.companyId, "proyectos")
@@ -134,12 +139,6 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
     );
   }
 
-  const openSections = [
-    "datos",
-    ...(canViewQuotes ? (["cotizaciones"] as const) : []),
-    ...(canViewTickets ? (["tickets"] as const) : []),
-  ];
-
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <Link
@@ -163,7 +162,10 @@ export function ProjectHubPage({ projectId }: ProjectHubPageProps) {
 
       <Accordion
         multiple
-        defaultValue={openSections}
+        value={openSections}
+        onValueChange={(next) => {
+          setOpenSections(Array.isArray(next) ? next : [next]);
+        }}
         className="gap-4"
       >
         <AccordionItem value="datos">
