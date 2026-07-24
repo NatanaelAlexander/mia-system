@@ -1050,6 +1050,10 @@ export function TicketDetailPage({
         }
       />
 
+      {isInternal ? (
+        <TicketAssigneesControl management={management} />
+      ) : null}
+
       <Accordion
         multiple
         value={openSections}
@@ -1115,10 +1119,6 @@ export function TicketDetailPage({
                       : "Sin descripción"}
                   </p>
                 </div>
-
-                {isInternal ? (
-                  <TicketAssigneesControl management={management} />
-                ) : null}
 
                 {showTicketAssetsSection ? (
                   <div

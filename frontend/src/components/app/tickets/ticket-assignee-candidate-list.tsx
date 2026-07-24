@@ -81,6 +81,8 @@ interface TicketAssigneeCandidateListProps {
   className?: string;
   /** When false, only shows the add dropdown (assignees rendered by parent). Default true. */
   showAssigned?: boolean;
+  /** When false, hides the "Agregar responsable" heading inside the add panel. Default true. */
+  showAddHeading?: boolean;
 }
 
 export function TicketAssigneeCandidateList({
@@ -93,6 +95,7 @@ export function TicketAssigneeCandidateList({
   onRemove,
   className,
   showAssigned = true,
+  showAddHeading = true,
 }: TicketAssigneeCandidateListProps) {
   const [nameFilter, setNameFilter] = React.useState("");
   const [jobTitleFilter, setJobTitleFilter] = React.useState(ALL_FILTER);
@@ -217,7 +220,9 @@ export function TicketAssigneeCandidateList({
       ) : null}
 
       <div className="space-y-2 rounded-lg border border-border/70 p-3">
-        <p className="text-sm font-medium">Agregar responsable</p>
+        {showAddHeading ? (
+          <p className="text-sm font-medium">Agregar responsable</p>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-3">
           <Input
             value={nameFilter}
