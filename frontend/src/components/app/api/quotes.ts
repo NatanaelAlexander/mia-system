@@ -75,7 +75,7 @@ export interface QuoteListItem {
   quoteNumber: number;
   companyId: string;
   companyName: string | null;
-  legalRepresentativeId: string;
+  legalRepresentativeId: string | null;
   issuerId: string;
   scope: QuoteScope;
   projectId: string | null;
@@ -123,7 +123,7 @@ export interface QuoteSectionPayload {
 
 export interface CreateQuotePayload {
   companyId: string;
-  legalRepresentativeId: string;
+  legalRepresentativeId?: string | null;
   issuerId: string;
   scope: QuoteScope;
   projectId?: string | null;

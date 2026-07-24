@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_number INTEGER NOT NULL DEFAULT nextval('quotes_number_seq'),
   company_id UUID NOT NULL REFERENCES companies (id) ON DELETE CASCADE,
-  legal_representative_id UUID NOT NULL REFERENCES legal_representatives (id) ON DELETE RESTRICT,
+  legal_representative_id UUID REFERENCES legal_representatives (id) ON DELETE RESTRICT,
   issuer_id UUID NOT NULL REFERENCES quote_issuers (id) ON DELETE RESTRICT,
   scope VARCHAR(20) NOT NULL CHECK (scope IN ('company', 'project', 'ticket')),
   project_id UUID REFERENCES projects (id) ON DELETE SET NULL,

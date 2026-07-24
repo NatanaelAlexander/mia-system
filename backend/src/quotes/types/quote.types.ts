@@ -88,7 +88,7 @@ export interface QuoteListItem {
   quoteNumber: number;
   companyId: string;
   companyName: string | null;
-  legalRepresentativeId: string;
+  legalRepresentativeId: string | null;
   issuerId: string;
   scope: QuoteScope;
   projectId: string | null;

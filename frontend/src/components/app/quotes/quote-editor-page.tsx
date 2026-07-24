@@ -572,7 +572,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
       if (quoteId) {
         const detail = await getQuoteDetail(quoteId);
         setQuote(detail);
-        setLegalRepresentativeId(detail.legalRepresentativeId);
+        setLegalRepresentativeId(detail.legalRepresentativeId ?? "");
         setIssuerId(detail.issuerId);
         setScope(detail.scope);
         setProjectId(detail.projectId ?? "");
@@ -711,11 +711,11 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
           applyTax: section.applyTax,
           priceInputMode: section.priceInputMode,
           items: section.items
-            .filter((item) => item.title.trim() && Number(item.price) !== 0)
+            .filter((item) => item.title.trim())
             .map((item) => ({
               title: item.title.trim(),
               description: item.description.trim(),
-              price: Number(item.price),
+              price: Number(item.price) || 0,
             })),
         }))
         .filter((section) => section.items.length > 0),
@@ -738,8 +738,8 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
   ]);
 
   const buildPayload = (): CreateQuotePayload | null => {
-    if (!legalRepresentativeId || !issuerId) {
-      toast.error("Selecciona emisor y representante legal.");
+    if (!issuerId) {
+      toast.error("Selecciona el emisor del documento.");
       return null;
     }
 
@@ -751,17 +751,17 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
         priceInputMode:
           documentType === "boleta" ? section.priceInputMode : "gross",
         items: section.items
-          .filter((item) => item.title.trim() && Number(item.price) !== 0)
+          .filter((item) => item.title.trim())
           .map((item) => ({
             title: item.title.trim(),
             description: item.description.trim(),
-            price: Number(item.price),
+            price: Number(item.price) || 0,
           })),
       }))
       .filter((section) => section.items.length > 0);
 
     if (sectionPayloads.length === 0) {
-      toast.error("Agrega al menos un ítem en alguna sección de pagos.");
+      toast.error("Agrega al menos un ítem con nombre en alguna sección de pagos.");
       return null;
     }
 
@@ -776,7 +776,7 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
 
     return {
       companyId,
-      legalRepresentativeId,
+      legalRepresentativeId: legalRepresentativeId || null,
       issuerId,
       scope,
       projectId: scope === "company" ? null : projectId || null,
@@ -1356,16 +1356,22 @@ export function QuoteEditorPage({ companyId, quoteId }: QuoteEditorPageProps) {
               <div className="space-y-1.5">
                 <Label>Representante legal</Label>
                 <Select
-                  items={representativeItems}
-                  value={legalRepresentativeId || null}
+                  items={[
+                    { value: "__none__", label: "Sin representante" },
+                    ...representativeItems,
+                  ]}
+                  value={legalRepresentativeId || "__none__"}
                   onValueChange={(v: string | null) =>
-                    setLegalRepresentativeId(v ?? "")
+                    setLegalRepresentativeId(
+                      !v || v === "__none__" ? "" : v,
+                    )
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar" />
+                    <SelectValue placeholder="Sin representante" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">Sin representante</SelectItem>
                     {representativeItems.map((rep) => (
                       <SelectItem key={rep.value} value={rep.value}>
                         {rep.label}

@@ -298,11 +298,14 @@ export const SQL_FIND_TICKET_CHAIN = `
 export const SQL_QUOTE_DETAIL_EXTRAS = `
   SELECT
     c.tax_id AS "companyTaxId",
-    trim(both FROM concat(lr.first_name, ' ', lr.last_name)) AS "legalRepresentativeName",
+    CASE
+      WHEN lr.id IS NULL THEN NULL
+      ELSE trim(both FROM concat(lr.first_name, ' ', lr.last_name))
+    END AS "legalRepresentativeName",
     lr.identification_number AS "legalRepresentativeTaxId"
   FROM quotes q
   JOIN companies c ON c.id = q.company_id
-  JOIN legal_representatives lr ON lr.id = q.legal_representative_id
+  LEFT JOIN legal_representatives lr ON lr.id = q.legal_representative_id
   WHERE q.id = $1
 `;
 
