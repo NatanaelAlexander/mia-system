@@ -3,7 +3,7 @@ import type { ModuleAccess } from "@/components/app/shared/permissions";
 
 export const permissionsModule = {
   title: "Permisos",
-  href: "/app/permissions",
+  href: "/app/users/permissions",
   icon: KeyRound,
   requiredPermission: "permissions:read",
   internalOnly: true,
