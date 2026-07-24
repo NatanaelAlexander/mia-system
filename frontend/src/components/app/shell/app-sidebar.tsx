@@ -45,6 +45,16 @@ const mainNav = [
   { title: "Dashboard", href: "/app", icon: LayoutDashboard },
 ];
 
+const SIDEBAR_USER_LABEL_MAX = 10;
+
+function truncateSidebarLabel(value: string, max = SIDEBAR_USER_LABEL_MAX) {
+  const trimmed = value.trim();
+  if (trimmed.length <= max) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, max)}...`;
+}
+
 const menuButtonClassName = cn(
   "rounded-lg",
   "data-active:bg-primary data-active:font-medium data-active:text-primary-foreground",
@@ -79,6 +89,13 @@ export function AppSidebar() {
     ? `${claims.firstName[0] ?? ""}${claims.lastName[0] ?? ""}`.toUpperCase()
     : "M";
 
+  const fullName = claims
+    ? `${claims.firstName} ${claims.lastName}`.trim()
+    : "";
+  const fullEmail = claims?.email ?? "";
+  const shortName = truncateSidebarLabel(fullName);
+  const shortEmail = truncateSidebarLabel(fullEmail);
+
   const renderNavItem = (item: NavModule) => (
     <SidebarMenuItem key={item.href}>
       <SidebarMenuButton
@@ -102,7 +119,7 @@ export function AppSidebar() {
                 <img
                   src="/login/team_prime_dg.PNG"
                   alt="Team Prime"
-                  className="h-8 w-auto group-data-[collapsible=icon]:hidden"
+                  className="h-8 max-w-[9.5rem] object-contain object-left group-data-[collapsible=icon]:hidden"
                 />
                 <img
                   src="/login/team_prime_dg.PNG"
@@ -164,21 +181,21 @@ export function AppSidebar() {
                 <Avatar className="size-8 shrink-0">
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
-                <div className="grid min-w-0 flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-medium">
-                    {claims?.firstName} {claims?.lastName}
+                <div className="grid min-w-0 flex-1 overflow-hidden text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-medium" title={fullName}>
+                    {shortName}
                   </span>
-                  <span className="truncate text-xs opacity-75">
-                    {claims?.email}
+                  <span className="truncate text-xs opacity-75" title={fullEmail}>
+                    {shortEmail}
                   </span>
                 </div>
                 <EllipsisVertical className="ml-auto size-4 shrink-0 opacity-75 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                align="start"
-                side="top"
+                align={isMobile ? "start" : "end"}
+                side={isMobile ? "top" : "right"}
                 sideOffset={8}
-                className="w-(--anchor-width) min-w-56 p-0"
+                className="min-w-56 p-0"
               >
                 <div className="flex items-center gap-3 border-b px-3 py-3">
                   <Avatar className="size-10 shrink-0">
