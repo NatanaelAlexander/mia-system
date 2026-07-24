@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, Upload, X } from "lucide-react";
+import { Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   createTicket,
@@ -324,8 +324,10 @@ export function TicketCreateDialog({
                           </div>
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="icon-sm"
+                            aria-label={`Quitar ${getAttachmentLabel(attachment)}`}
+                            title="Quitar"
                             disabled={isSubmitting}
                             onClick={() =>
                               setPendingAttachments((current) =>
@@ -333,7 +335,7 @@ export function TicketCreateDialog({
                               )
                             }
                           >
-                            <X />
+                            <Trash2 />
                           </Button>
                         </div>
                       ))}

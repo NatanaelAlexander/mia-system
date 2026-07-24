@@ -795,6 +795,31 @@ export class TicketsService {
     return this.insertTicketUpload(userId, ticketId, file, displayName);
   }
 
+  async unlinkAssetForPortal(
+    userId: string,
+    ticketId: string,
+    assetId: string,
+  ): Promise<void> {
+    await this.assertPortalTicketAccess(userId, ticketId);
+
+    const result = await this.db.query(SQL_DELETE_TICKET_ASSET, [
+      ticketId,
+      assetId,
+    ]);
+
+    if (!result.rowCount) {
+      throw new VinculoTicketArchivoNoEncontradoException();
+    }
+
+    await this.auditService.log({
+      userId,
+      action: AuditAction.UNLINK,
+      tableName: AUDIT_TABLE.TICKET_ASSETS,
+      recordId: ticketId,
+      oldValues: { ticketId, assetId, scope: 'portal' },
+    });
+  }
+
   private async assertPortalTicketAccess(
     userId: string,
     ticketId: string,

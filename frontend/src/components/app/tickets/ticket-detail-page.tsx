@@ -15,6 +15,8 @@ import {
   Send,
   SquarePen,
   Tag,
+  Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +32,8 @@ import {
   listTicketAssets,
   listTicketCommentAssets,
   listTicketComments,
+  unlinkTicketAsset,
+  uploadTicketAsset,
   uploadTicketCommentAsset,
   type TicketComment,
   type TicketDetail,
@@ -41,6 +45,7 @@ import {
   getAttachmentLabel,
   type PendingAttachment,
 } from "@/components/app/shared/attachment-utils";
+import { ConfirmDialog } from "@/components/app/shared/confirm-dialog";
 import { formatFileSize } from "@/components/app/shared/format";
 import { HelpHint } from "@/components/app/shared/help-hint";
 import { ErrorState } from "@/components/app/shared/list-states";
@@ -298,6 +303,7 @@ export function TicketDetailPage({
   const canComment = hasPermission(claims, "ticket_comments:create");
   const canUpload = hasPermission(claims, "assets:create");
   const canDownload = hasPermission(claims, "assets:read");
+  const canUnlinkAsset = hasPermission(claims, "assets:update");
   const canPostInternal =
     isInternal && hasPermission(claims, "ticket_comments:create");
   const canViewQuotes = canAccessModule(claims, quotesModule);
@@ -306,13 +312,25 @@ export function TicketDetailPage({
 
   const threadEndRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const ticketFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSending, setIsSending] = React.useState(false);
   const [isComposerDragging, setIsComposerDragging] = React.useState(false);
+  const [isTicketAssetsDragging, setIsTicketAssetsDragging] =
+    React.useState(false);
+  const [isUploadingTicketAssets, setIsUploadingTicketAssets] =
+    React.useState(false);
   const [attachmentPickOpen, setAttachmentPickOpen] = React.useState(false);
   const [attachmentInitialFile, setAttachmentInitialFile] =
     React.useState<File | null>(null);
+  const [ticketAttachmentPickOpen, setTicketAttachmentPickOpen] =
+    React.useState(false);
+  const [ticketAttachmentInitialFile, setTicketAttachmentInitialFile] =
+    React.useState<File | null>(null);
+  const [deleteAssetTarget, setDeleteAssetTarget] =
+    React.useState<AssetListItem | null>(null);
+  const [isUnlinkingAsset, setIsUnlinkingAsset] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [authDeniedOpen, setAuthDeniedOpen] = React.useState(false);
   const [ticket, setTicket] = React.useState<TicketDetail | null>(null);
@@ -347,6 +365,11 @@ export function TicketDetailPage({
   const canMutateTicket =
     !isInternal || isSuperAdmin(claims) || isAssignee;
   const canUseComposer = canComment && canMutateTicket;
+  const canManageTicketAssets = canMutateTicket;
+  const canUploadTicketAssets = canUpload && canManageTicketAssets;
+  const canRemoveTicketAssets = canUnlinkAsset && canManageTicketAssets;
+  const showTicketAssetsSection =
+    ticketAssets.length > 0 || canUploadTicketAssets;
   const showDenied = () => setAuthDeniedOpen(true);
 
   const commentsRef = React.useRef(comments);
@@ -454,9 +477,112 @@ export function TicketDetailPage({
     setAttachmentPickOpen(true);
   }, []);
 
+  const openTicketAttachmentPicker = React.useCallback((file?: File | null) => {
+    setTicketAttachmentInitialFile(file ?? null);
+    setTicketAttachmentPickOpen(true);
+  }, []);
+
   const rejectOversized = React.useCallback((file: File) => {
     toast.error(`"${file.name}" supera el límite de 50 MB.`);
   }, []);
+
+  const reloadTicketAssets = React.useCallback(async () => {
+    try {
+      const assets = await listTicketAssets(surface, ticketId);
+      setTicketAssets(assets);
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "No se pudieron cargar los archivos del ticket.";
+      toast.error(message);
+    }
+  }, [surface, ticketId]);
+
+  const uploadTicketAttachments = React.useCallback(
+    async (attachments: PendingAttachment[]) => {
+      if (attachments.length === 0) {
+        return;
+      }
+
+      if (!canUploadTicketAssets) {
+        if (!canMutateTicket) {
+          showDenied();
+        } else {
+          toast.error("No tienes permiso para subir archivos.");
+        }
+        return;
+      }
+
+      setIsUploadingTicketAssets(true);
+      const failed: string[] = [];
+
+      try {
+        for (const attachment of attachments) {
+          try {
+            await uploadTicketAsset(
+              surface,
+              ticketId,
+              attachment.file,
+              attachment.displayName,
+            );
+          } catch {
+            failed.push(getAttachmentLabel(attachment));
+          }
+        }
+
+        await reloadTicketAssets();
+
+        if (failed.length > 0) {
+          toast.error(
+            `Fallaron ${failed.length} archivo(s): ${failed.join(", ")}`,
+          );
+        } else {
+          toast.success(
+            attachments.length === 1
+              ? "Archivo subido al ticket"
+              : `${attachments.length} archivos subidos al ticket`,
+          );
+        }
+      } finally {
+        setIsUploadingTicketAssets(false);
+      }
+    },
+    [
+      canMutateTicket,
+      canUploadTicketAssets,
+      reloadTicketAssets,
+      surface,
+      ticketId,
+    ],
+  );
+
+  const addTicketFiles = React.useCallback(
+    (files: FileList | null) => {
+      if (!canUploadTicketAssets || isUploadingTicketAssets) {
+        return;
+      }
+
+      const collected = collectFiles(files, { onRejected: rejectOversized });
+      if (collected.length === 0) {
+        return;
+      }
+
+      if (collected.length === 1) {
+        openTicketAttachmentPicker(collected[0]);
+        return;
+      }
+
+      void uploadTicketAttachments(filesToPendingAttachments(collected));
+    },
+    [
+      canUploadTicketAssets,
+      isUploadingTicketAssets,
+      openTicketAttachmentPicker,
+      rejectOversized,
+      uploadTicketAttachments,
+    ],
+  );
 
   const addFiles = React.useCallback(
     (files: FileList | null) => {
@@ -760,6 +886,45 @@ export function TicketDetailPage({
     }
   };
 
+  const handleUnlinkTicketAsset = async () => {
+    if (!deleteAssetTarget) {
+      return;
+    }
+
+    if (!canRemoveTicketAssets) {
+      if (!canMutateTicket) {
+        showDenied();
+      } else {
+        toast.error("No tienes permiso para quitar archivos.");
+      }
+      return;
+    }
+
+    setIsUnlinkingAsset(true);
+
+    try {
+      await unlinkTicketAsset(surface, ticketId, deleteAssetTarget.id);
+      setTicketAssets((current) =>
+        current.filter((asset) => asset.id !== deleteAssetTarget.id),
+      );
+      toast.success(`"${deleteAssetTarget.fileName}" eliminado del ticket`);
+      setDeleteAssetTarget(null);
+    } catch (error) {
+      if (isAuthorizationDeniedError(error)) {
+        showDenied();
+        return;
+      }
+
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "No se pudo quitar el archivo del ticket.";
+      toast.error(message);
+    } finally {
+      setIsUnlinkingAsset(false);
+    }
+  };
+
   const handleSend = async () => {
     const trimmed = message.trim();
     if (!trimmed && pendingAttachments.length === 0) {
@@ -955,36 +1120,150 @@ export function TicketDetailPage({
                   <TicketAssigneesControl management={management} />
                 ) : null}
 
-                {ticketAssets.length > 0 ? (
-                  <div className="space-y-2 rounded-xl border border-border/70 p-4">
-                    <p className="text-sm font-medium">Archivos del ticket</p>
-                    <div className="space-y-1">
-                      {ticketAssets.map((asset) => (
-                        <div
-                          key={asset.id}
-                          className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">
-                              {asset.fileName}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {formatFileSize(asset.fileSize)}
-                            </p>
-                          </div>
-                          {canDownload ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon-sm"
-                              onClick={() => void handleDownload(asset)}
-                            >
-                              <Download />
-                            </Button>
-                          ) : null}
+                {showTicketAssetsSection ? (
+                  <div
+                    className={cn(
+                      "relative space-y-2 rounded-xl border border-border/70 p-4 transition-colors",
+                      isTicketAssetsDragging && "ring-2 ring-primary/30",
+                    )}
+                    onDragOver={(event) => {
+                      if (
+                        !canUploadTicketAssets ||
+                        ticketAttachmentPickOpen ||
+                        isUploadingTicketAssets
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      setIsTicketAssetsDragging(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      const nextTarget = event.relatedTarget as Node | null;
+                      if (
+                        nextTarget &&
+                        event.currentTarget.contains(nextTarget)
+                      ) {
+                        return;
+                      }
+                      setIsTicketAssetsDragging(false);
+                    }}
+                    onDrop={(event) => {
+                      if (
+                        !canUploadTicketAssets ||
+                        ticketAttachmentPickOpen ||
+                        isUploadingTicketAssets
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      setIsTicketAssetsDragging(false);
+                      addTicketFiles(event.dataTransfer.files);
+                    }}
+                  >
+                    {isTicketAssetsDragging ? (
+                      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-primary/5">
+                        <div className="rounded-lg border border-primary/40 bg-background px-3 py-2 text-xs font-medium text-primary">
+                          Suelta los archivos para subirlos al ticket
                         </div>
-                      ))}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium">Archivos del ticket</p>
+                      {canUploadTicketAssets ? (
+                        <>
+                          <input
+                            ref={ticketFileInputRef}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            disabled={isUploadingTicketAssets}
+                            onChange={(event) => {
+                              addTicketFiles(event.target.files);
+                              event.target.value = "";
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isUploadingTicketAssets}
+                            onClick={() => {
+                              if (!canMutateTicket) {
+                                showDenied();
+                                return;
+                              }
+                              ticketFileInputRef.current?.click();
+                            }}
+                          >
+                            <Upload />
+                            {isUploadingTicketAssets
+                              ? "Subiendo..."
+                              : "Subir archivos"}
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
+
+                    {ticketAssets.length > 0 ? (
+                      <div className="space-y-1">
+                        {ticketAssets.map((asset) => (
+                          <div
+                            key={asset.id}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">
+                                {asset.fileName}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {formatFileSize(asset.fileSize)}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {canDownload ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon-sm"
+                                  aria-label={`Descargar ${asset.fileName}`}
+                                  title="Descargar"
+                                  onClick={() => void handleDownload(asset)}
+                                >
+                                  <Download />
+                                </Button>
+                              ) : null}
+                              {canRemoveTicketAssets ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon-sm"
+                                  aria-label={`Quitar ${asset.fileName}`}
+                                  title="Quitar del ticket"
+                                  disabled={isUnlinkingAsset}
+                                  onClick={() => {
+                                    if (!canMutateTicket) {
+                                      showDenied();
+                                      return;
+                                    }
+                                    setDeleteAssetTarget(asset);
+                                  }}
+                                >
+                                  <Trash2 />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {canUploadTicketAssets
+                          ? "Aún no hay archivos. Súbelos con el botón o arrastrándolos aquí."
+                          : "Este ticket aún no tiene archivos."}
+                      </p>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -1226,6 +1505,34 @@ export function TicketDetailPage({
           }
         />
       ) : null}
+
+      {canUploadTicketAssets ? (
+        <AttachmentPickDialog
+          open={ticketAttachmentPickOpen}
+          onOpenChange={setTicketAttachmentPickOpen}
+          initialFile={ticketAttachmentInitialFile}
+          title="Subir al ticket"
+          description="Define un nombre visible opcional antes de subir el archivo al ticket."
+          confirmLabel="Subir archivo"
+          onConfirm={(attachment) => {
+            void uploadTicketAttachments([attachment]);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={deleteAssetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteAssetTarget(null);
+          }
+        }}
+        title="Quitar archivo"
+        description={`¿Quitar "${deleteAssetTarget?.fileName ?? "este archivo"}" del ticket?`}
+        confirmLabel="Quitar"
+        onConfirm={handleUnlinkTicketAsset}
+        isConfirming={isUnlinkingAsset}
+      />
 
       {ticket && canEditGeneral ? (
         <TicketEditGeneralDialog

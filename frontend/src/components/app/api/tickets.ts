@@ -280,6 +280,21 @@ export function uploadTicketAsset(
   );
 }
 
+export function unlinkTicketAsset(
+  surface: ResourceSurface,
+  ticketId: string,
+  assetId: string,
+) {
+  return apiFetch<void>(
+    `${ticketsBase(surface)}/desvincular-archivo`,
+    {
+      method: "POST",
+      body: JSON.stringify({ ticketId, assetId }),
+    },
+    true,
+  );
+}
+
 export function listTicketPriorities(surface: ResourceSurface = "internal") {
   return apiFetch<TicketCatalogItem[]>(
     `${ticketsBase(surface)}/catalogos/prioridades`,
