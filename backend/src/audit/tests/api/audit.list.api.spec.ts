@@ -80,6 +80,18 @@ describe('Audit API contract (internal/audit-logs)', () => {
     jest.clearAllMocks();
   });
 
+  it('GET / responde 200 y delega findAll vacío', async () => {
+    auditService.findAll.mockResolvedValue(PAGINATED);
+
+    const response = await request(app.getHttpServer())
+      .get('/internal/audit-logs')
+      .send({})
+      .expect(200);
+
+    expect(response.body).toEqual(PAGINATED);
+    expect(auditService.findAll).toHaveBeenCalledWith({});
+  });
+
   it('POST /listar sin body delega findAll vacío y responde 200', async () => {
     auditService.findAll.mockResolvedValue(PAGINATED);
 

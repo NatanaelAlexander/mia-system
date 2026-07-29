@@ -58,6 +58,22 @@ describe('Assets API contract', () => {
     expect(assetsService.findAll).toHaveBeenCalled();
   });
 
+  it('GET /internal/assets/detalle con id válido', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/assets/detalle')
+      .send({ id: UUID })
+      .expect(200);
+    expect(assetsService.findById).toHaveBeenCalledWith(UUID);
+  });
+
+  it('GET /internal/assets/detalle rechaza id inválido con 400', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/assets/detalle')
+      .send({ id: 'bad' })
+      .expect(400);
+    expect(assetsService.findById).not.toHaveBeenCalled();
+  });
+
   it('POST /internal/assets/descarga con id válido', async () => {
     await request(app.getHttpServer())
       .post('/internal/assets/descarga')
@@ -72,6 +88,14 @@ describe('Assets API contract', () => {
       .send({ id: 'bad' })
       .expect(400);
     expect(assetsService.getDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('GET /internal/assets/descarga con id válido', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/assets/descarga')
+      .send({ id: UUID })
+      .expect(200);
+    expect(assetsService.getDownloadUrl).toHaveBeenCalledWith(UUID);
   });
 
   it('propaga 404 en descarga', async () => {
