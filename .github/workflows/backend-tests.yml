@@ -13,7 +13,33 @@ jobs:
     name: Jest
     # Ubuntu 26.04 LTS (última LTS). Node alineado con Dockerfile: node:22.22-alpine3.22
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mia_user
+          POSTGRES_PASSWORD: pass_testing
+          POSTGRES_DB: mia_system
+          TZ: America/Santiago
+          PGTZ: America/Santiago
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mia_user -d mia_system"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://mia_user:pass_testing@localhost:5432/mia_system
+      JWT_ACCESS_SECRET: ci_access_secret_dev_only_32chars_min!!
+      JWT_REFRESH_SECRET: ci_refresh_secret_dev_only_32chars_min!
+      JWT_ACCESS_EXPIRES_IN_PORTAL: 12h
+      JWT_ACCESS_EXPIRES_IN_INTERNAL: 1d
+      JWT_REFRESH_EXPIRES_IN: 7d
+      TZ: America/Santiago
 
     steps:
       - name: Checkout
@@ -36,3 +62,12 @@ jobs:
 
       - name: Run unit and API tests
         run: pnpm test
+
+      - name: Apply schema migrations
+        run: pnpm run migrate
+
+      - name: Apply data migrations (seeds)
+        run: pnpm run migrate:data
+
+      - name: Run auth integration tests
+        run: pnpm test:auth:integration
