@@ -16,6 +16,16 @@
     "test": "jest",
     "test:auth": "jest --testPathPatterns='auth/tests/(unit|api)'",
     "test:auth:integration": "jest --runInBand --testPathIgnorePatterns=/node_modules/ --testPathPatterns=auth/tests/integration",
+    "test:audit": "jest --testPathPatterns='audit/tests/(unit|api)'",
+    "test:audit:integration": "jest --runInBand --testPathIgnorePatterns=/node_modules/ --testPathPatterns=audit/tests/integration",
+    "test:companies": "jest --testPathPatterns='companies/tests/(unit|api)'",
+    "test:users": "jest --testPathPatterns='users/tests/(unit|api)'",
+    "test:projects": "jest --testPathPatterns='projects/tests/(unit|api)'",
+    "test:tickets": "jest --testPathPatterns='tickets/tests/(unit|api)'",
+    "test:quotes": "jest --testPathPatterns='quotes/tests/(unit|api)'",
+    "test:notifications": "jest --testPathPatterns='notifications/tests/(unit|api)'",
+    "test:company-files": "jest --testPathPatterns='company-files/tests/(unit|api)'",
+    "test:assets": "jest --testPathPatterns='assets/tests/(unit|api)'",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -89,6 +99,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@nestjs/schedule$": "<rootDir>/__mocks__/@nestjs/schedule.ts"
+    },
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/tests/integration/"
