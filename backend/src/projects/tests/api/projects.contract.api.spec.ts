@@ -274,4 +274,18 @@ describe('Projects API contract', () => {
       UUID,
     );
   });
+
+  it('POST /portal/projects/detalle con id válido', async () => {
+    projectsService.findByIdForPortal.mockResolvedValue({ id: UUID });
+
+    await request(app.getHttpServer())
+      .post('/portal/projects/detalle')
+      .send({ id: UUID })
+      .expect(201);
+
+    expect(projectsService.findByIdForPortal).toHaveBeenCalledWith(
+      TEST_USER_ID,
+      UUID,
+    );
+  });
 });

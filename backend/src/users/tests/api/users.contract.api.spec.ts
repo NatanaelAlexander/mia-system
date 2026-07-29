@@ -37,6 +37,7 @@ describe('Users API contract', () => {
     linkCompany: jest.Mock;
     unlinkCompany: jest.Mock;
     updateProfile: jest.Mock;
+    adminChangePassword: jest.Mock;
   };
 
   beforeAll(async () => {
@@ -57,6 +58,7 @@ describe('Users API contract', () => {
       linkCompany: jest.fn().mockResolvedValue({ id: UUID }),
       unlinkCompany: jest.fn().mockResolvedValue({ id: UUID }),
       updateProfile: jest.fn().mockResolvedValue({ id: UUID }),
+      adminChangePassword: jest.fn().mockResolvedValue(undefined),
     };
 
     app = await createApiTestApp({
@@ -312,6 +314,19 @@ describe('Users API contract', () => {
     expect(usersService.changeOwnPassword).toHaveBeenCalledWith(
       TEST_USER_ID,
       expect.objectContaining({ currentPassword: 'x' }),
+    );
+  });
+
+  it('PATCH /internal/users/:id/contrasena admin cambia contraseña', async () => {
+    await request(app.getHttpServer())
+      .patch(`/internal/users/${UUID}/contrasena`)
+      .send({ password: 'Temporal123' })
+      .expect(200);
+
+    expect(usersService.adminChangePassword).toHaveBeenCalledWith(
+      UUID,
+      expect.objectContaining({ password: 'Temporal123' }),
+      TEST_USER_ID,
     );
   });
 });
