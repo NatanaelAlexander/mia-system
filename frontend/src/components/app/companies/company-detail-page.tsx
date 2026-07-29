@@ -497,7 +497,11 @@ export function CompanyDetailPage({ companyId }: CompanyDetailPageProps) {
 
         {allowedTabs.includes("proyectos") ? (
           <TabsPanel value="proyectos">
-            <CompanyProjectsSection companyId={company.id} surface={surface} />
+            <CompanyProjectsSection
+              companyId={company.id}
+              companyName={company.name}
+              surface={surface}
+            />
           </TabsPanel>
         ) : null}
 

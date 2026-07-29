@@ -1,5 +1,5 @@
-import { JobTitlesPage } from "@/components/app/admin/job-titles-page";
+import { redirect } from "next/navigation";
 
-export default function JobTitlesRoutePage() {
-  return <JobTitlesPage />;
+export default function JobTitlesRedirectPage() {
+  redirect("/app/users/job-titles");
 }

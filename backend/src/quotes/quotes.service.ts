@@ -175,7 +175,9 @@ export class QuotesService {
     this.assertHasItems(dto.sections);
     await this.companiesService.findById(actorUserId, dto.companyId);
     await this.assertIssuer(dto.issuerId);
-    await this.assertLegalRep(dto.companyId, dto.legalRepresentativeId);
+    if (dto.legalRepresentativeId) {
+      await this.assertLegalRep(dto.companyId, dto.legalRepresentativeId);
+    }
 
     const scopeIds = await this.resolveScope(
       dto.companyId,
@@ -190,7 +192,7 @@ export class QuotesService {
     const quoteId = await this.db.transaction(async (query) => {
       const { rows } = await query<{ id: string }>(SQL_INSERT_QUOTE, [
         dto.companyId,
-        dto.legalRepresentativeId,
+        dto.legalRepresentativeId ?? null,
         dto.issuerId,
         dto.scope,
         scopeIds.projectId,
@@ -243,7 +245,9 @@ export class QuotesService {
 
     const companyId = previous.companyId;
     const legalRepresentativeId =
-      dto.legalRepresentativeId ?? previous.legalRepresentativeId;
+      dto.legalRepresentativeId !== undefined
+        ? dto.legalRepresentativeId
+        : previous.legalRepresentativeId;
     const issuerId = dto.issuerId ?? previous.issuerId;
     const scope = dto.scope ?? previous.scope;
     const documentType = dto.documentType ?? previous.documentType;
@@ -258,7 +262,7 @@ export class QuotesService {
     const expiresAt = dto.expiresAt ?? previous.expiresAt;
     const status = dto.status ?? previous.status;
 
-    if (dto.legalRepresentativeId) {
+    if (legalRepresentativeId) {
       await this.assertLegalRep(companyId, legalRepresentativeId);
     }
     if (dto.issuerId) {
@@ -547,8 +551,8 @@ export class QuotesService {
         this.assertIssuer(listItem.issuerId),
         this.db.query<{
           companyTaxId: string | null;
-          legalRepresentativeName: string;
-          legalRepresentativeTaxId: string;
+          legalRepresentativeName: string | null;
+          legalRepresentativeTaxId: string | null;
         }>(SQL_QUOTE_DETAIL_EXTRAS, [id]),
         this.loadSections(id),
         this.loadShare(id),

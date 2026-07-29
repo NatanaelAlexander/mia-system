@@ -14,6 +14,7 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -77,9 +78,11 @@ export class CreateQuoteDto {
   @IsUUID('4')
   companyId: string;
 
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsUUID('4')
-  legalRepresentativeId: string;
+  legalRepresentativeId?: string | null;
 
   @ApiProperty({ format: 'uuid' })
   @IsUUID('4')
@@ -164,10 +167,11 @@ export class CreateQuoteDto {
 }
 
 export class UpdateQuoteDto {
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
   @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsUUID('4')
-  legalRepresentativeId?: string;
+  legalRepresentativeId?: string | null;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()

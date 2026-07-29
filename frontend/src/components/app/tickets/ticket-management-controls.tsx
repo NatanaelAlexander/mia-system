@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   changeTicketStatus,
@@ -21,8 +21,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/errors";
+import { cn } from "@/lib/utils";
 import {
   isAuthorizationDeniedError,
 } from "@/components/app/shared/authorization-denied-dialog";
@@ -334,50 +345,131 @@ export function TicketAssigneesControl({
     removeAssignee,
   } = management;
 
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Responsables
-      </p>
+  const [addOpen, setAddOpen] = React.useState(false);
 
-      {isLoading ? (
-        <span className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Cargando...
-        </span>
-      ) : isSuperAdmin ? (
-        <TicketAssigneeCandidateList
-          candidates={candidates}
-          assignees={assignees}
-          isSaving={isSavingAssignees}
-          isMandatory={(userId) =>
-            assignees.some(
-              (assignee) => assignee.id === userId && assignee.isSuperAdmin,
-            )
-          }
-          onAdd={(userId) => void addAssignee(userId)}
-          onRemove={(userId) => void removeAssignee(userId)}
-        />
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {assignees.length > 0 ? (
-            assignees.map((assignee) => (
-              <span
-                key={assignee.id}
-                className="inline-flex h-7 items-center rounded-4xl bg-secondary px-2 text-xs font-medium text-secondary-foreground"
-              >
-                {assignee.firstName} {assignee.lastName}
-                {assignee.isSuperAdmin ? " · Superadmin" : ""}
+  const isMandatory = (userId: string) =>
+    assignees.some(
+      (assignee) => assignee.id === userId && assignee.isSuperAdmin,
+    );
+
+  return (
+    <>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Responsables
+        </p>
+
+        {isLoading ? (
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Cargando...
+          </span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            {assignees.length > 0 ? (
+              assignees.map((assignee) => {
+                const mandatory = isMandatory(assignee.id);
+                const label =
+                  `${assignee.firstName} ${assignee.lastName}`.trim();
+                const roleHint = assignee.isSuperAdmin
+                  ? "Superadmin"
+                  : assignee.roles.includes("admin")
+                    ? "Admin"
+                    : "";
+
+                return (
+                  <Badge
+                    key={assignee.id}
+                    variant="secondary"
+                    className="h-7 gap-1 pr-1"
+                  >
+                    <span className="max-w-[14rem] truncate">
+                      {label}
+                      {roleHint ? ` · ${roleHint}` : ""}
+                    </span>
+                    {isSuperAdmin && !mandatory ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="size-5 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                        disabled={isSavingAssignees}
+                        aria-label={`Quitar a ${label}`}
+                        onClick={() => void removeAssignee(assignee.id)}
+                      >
+                        <X className="size-3!" />
+                      </Button>
+                    ) : null}
+                  </Badge>
+                );
+              })
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Sin responsables
               </span>
-            ))
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              Sin responsables
-            </span>
-          )}
-        </div>
-      )}
-    </div>
+            )}
+
+            {isSuperAdmin ? (
+              <button
+                type="button"
+                disabled={isSavingAssignees}
+                onClick={() => setAddOpen(true)}
+                className={cn(
+                  badgeVariants({ variant: "outline" }),
+                  "h-7 cursor-pointer gap-1 border-dashed text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground",
+                  isSavingAssignees && "pointer-events-none opacity-60",
+                )}
+              >
+                <Plus className="size-3.5" />
+                Agregar responsable
+              </button>
+            ) : null}
+
+            {isSavingAssignees ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Guardando...
+              </span>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {isSuperAdmin ? (
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Agregar responsable</DialogTitle>
+              <DialogDescription>
+                Filtra y selecciona una persona para asignarla a este ticket.
+              </DialogDescription>
+            </DialogHeader>
+
+            <TicketAssigneeCandidateList
+              candidates={candidates}
+              assignees={assignees}
+              isSaving={isSavingAssignees}
+              isMandatory={isMandatory}
+              showAssigned={false}
+              showAddHeading={false}
+              onAdd={(userId) => void addAssignee(userId)}
+              onRemove={(userId) => void removeAssignee(userId)}
+            />
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+                disabled={isSavingAssignees}
+              >
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
   );
 }
 
