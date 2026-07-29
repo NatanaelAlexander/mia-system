@@ -16,6 +16,8 @@
     "test": "jest",
     "test:auth": "jest --testPathPatterns='auth/tests/(unit|api)'",
     "test:auth:integration": "jest --runInBand --testPathIgnorePatterns=/node_modules/ --testPathPatterns=auth/tests/integration",
+    "test:audit": "jest --testPathPatterns='audit/tests/(unit|api)'",
+    "test:audit:integration": "jest --runInBand --testPathIgnorePatterns=/node_modules/ --testPathPatterns=audit/tests/integration",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
