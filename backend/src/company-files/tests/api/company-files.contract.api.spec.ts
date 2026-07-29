@@ -20,12 +20,25 @@ describe('Company-files API contract', () => {
   let companyFilesService: {
     listContents: jest.Mock;
     createFolder: jest.Mock;
+    renameFolder: jest.Mock;
+    deleteFolderCascade: jest.Mock;
+    uploadFile: jest.Mock;
+    getDownloadUrl: jest.Mock;
+    deleteFile: jest.Mock;
   };
 
   beforeAll(async () => {
     companyFilesService = {
       listContents: jest.fn().mockResolvedValue({ folders: [], files: [] }),
       createFolder: jest.fn().mockResolvedValue({ id: UUID, name: 'Docs' }),
+      renameFolder: jest.fn().mockResolvedValue({ id: UUID, name: 'Docs' }),
+      deleteFolderCascade: jest.fn().mockResolvedValue(undefined),
+      uploadFile: jest.fn().mockResolvedValue({ id: UUID, fileName: 'doc.pdf' }),
+      getDownloadUrl: jest.fn().mockResolvedValue({
+        url: 'https://example.test/signed',
+        expiresInSeconds: 60,
+      }),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
     };
     app = await createApiTestApp({
       controllers: [InternalCompanyFilesController],
@@ -77,6 +90,78 @@ describe('Company-files API contract', () => {
       .post('/internal/company-files/carpetas')
       .send({ companyId: UUID, name: '' })
       .expect(400);
+  });
+
+  it('PATCH /carpetas renombra folder', async () => {
+    companyFilesService.renameFolder.mockResolvedValue({ id: UUID, name: 'Nuevo' });
+
+    const response = await request(app.getHttpServer())
+      .patch('/internal/company-files/carpetas')
+      .send({ folderId: UUID, name: 'Nuevo' })
+      .expect(200);
+
+    expect(response.body).toEqual({ id: UUID, name: 'Nuevo' });
+    expect(companyFilesService.renameFolder).toHaveBeenCalledWith(UUID, 'Nuevo');
+  });
+
+  it('PATCH /carpetas rechaza nombre vacío con 400', async () => {
+    await request(app.getHttpServer())
+      .patch('/internal/company-files/carpetas')
+      .send({ folderId: UUID, name: '' })
+      .expect(400);
+
+    expect(companyFilesService.renameFolder).not.toHaveBeenCalled();
+  });
+
+  it('POST /carpetas/eliminar elimina carpeta y responde ok (201)', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/company-files/carpetas/eliminar')
+      .send({ folderId: UUID })
+      .expect(201);
+
+    expect(companyFilesService.deleteFolderCascade).toHaveBeenCalledWith(UUID);
+  });
+
+  it('POST /subir-archivo sube multipart y delega uploadFile (201)', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/company-files/subir-archivo')
+      .field('companyId', UUID)
+      .attach('file', Buffer.from('%PDF-1.4'), 'doc.pdf')
+      .expect(201);
+
+    expect(companyFilesService.uploadFile).toHaveBeenCalled();
+    const [actorUserId, companyId, file, folderId, displayName] =
+      companyFilesService.uploadFile.mock.calls[0];
+
+    expect(actorUserId).toBe(TEST_USER_ID);
+    expect(companyId).toBe(UUID);
+    expect(file).toEqual(
+      expect.objectContaining({
+        originalname: 'doc.pdf',
+      }),
+    );
+    // Como no mandamos displayName, debe ir undefined.
+    expect(displayName).toBeUndefined();
+    // folderId es optional y no lo enviamos.
+    expect(folderId).toBeUndefined();
+  });
+
+  it('POST /archivos/descarga devuelve url firmada (201)', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/company-files/archivos/descarga')
+      .send({ assetId: UUID })
+      .expect(201);
+
+    expect(companyFilesService.getDownloadUrl).toHaveBeenCalledWith(UUID);
+  });
+
+  it('POST /archivos/eliminar elimina archivo y responde ok (201)', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/company-files/archivos/eliminar')
+      .send({ assetId: UUID })
+      .expect(201);
+
+    expect(companyFilesService.deleteFile).toHaveBeenCalledWith(UUID);
   });
 });
 
