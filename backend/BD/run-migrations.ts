@@ -26,6 +26,7 @@ const MIGRATIONS = [
   'quote_status_single',
   'quote_remove_draft',
   'company_files',
+  'quote_legal_rep_optional',
 ] as const;
 
 const SEPARATOR = '----------------------------------------';

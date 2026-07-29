@@ -19,32 +19,63 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { UserForm, type UserFormValues } from "./user-form";
+import {
+  UserForm,
+  filterRolesForAudience,
+  type UserAudience,
+  type UserFormValues,
+} from "./user-form";
 
 interface UserCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  audience: UserAudience;
 }
 
-const emptyValues: UserFormValues = {
-  email: "",
-  password: "",
-  firstName: "",
-  lastName: "",
-  phoneNumber: "",
-  isActive: true,
-  roleIds: [],
-  jobTitleIds: [],
-  companyIds: [],
+const AUDIENCE_COPY: Record<
+  UserAudience,
+  { title: string; description: string; submitLabel: string }
+> = {
+  internal: {
+    title: "Nuevo usuario interno",
+    description:
+      "Crea un usuario del equipo. Asigna rol interno y, si aplica, cargos del equipo.",
+    submitLabel: "Crear usuario interno",
+  },
+  portal: {
+    title: "Nuevo usuario portal",
+    description:
+      "Crea un cliente del portal. Asigna el rol de cliente y las empresas vinculadas.",
+    submitLabel: "Crear usuario portal",
+  },
 };
+
+function emptyValuesForAudience(
+  audience: UserAudience,
+  roleIds: string[],
+): UserFormValues {
+  return {
+    email: "",
+    password: "",
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
+    isActive: true,
+    roleIds,
+    jobTitleIds: [],
+    companyIds: [],
+  };
+}
 
 export function UserCreateDialog({
   open,
   onOpenChange,
   onCreated,
+  audience,
 }: UserCreateDialogProps) {
   const router = useRouter();
+  const copy = AUDIENCE_COPY[audience];
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoadingCatalogs, setIsLoadingCatalogs] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -76,12 +107,14 @@ export function UserCreateDialog({
         ]);
 
         if (!cancelled) {
-          setRoleOptions(roles);
+          setRoleOptions(filterRolesForAudience(roles, audience));
           setJobTitleOptions(jobTitles);
-          setCompanyOptions(companies.map((company) => ({
-            id: company.id,
-            name: company.name,
-          })));
+          setCompanyOptions(
+            companies.map((company) => ({
+              id: company.id,
+              name: company.name,
+            })),
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -103,7 +136,12 @@ export function UserCreateDialog({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [audience, open]);
+
+  const defaultRoleIds = React.useMemo(
+    () => (roleOptions.length === 1 ? [roleOptions[0].id] : []),
+    [roleOptions],
+  );
 
   const handleSubmit = async (values: UserFormValues) => {
     setIsSubmitting(true);
@@ -118,8 +156,14 @@ export function UserCreateDialog({
         phoneNumber: values.phoneNumber?.trim() || undefined,
         isActive: values.isActive,
         roleIds: values.roleIds,
-        jobTitleIds: values.jobTitleIds.length > 0 ? values.jobTitleIds : undefined,
-        companyIds: values.companyIds.length > 0 ? values.companyIds : undefined,
+        jobTitleIds:
+          audience === "internal" && values.jobTitleIds.length > 0
+            ? values.jobTitleIds
+            : undefined,
+        companyIds:
+          audience === "portal" && values.companyIds.length > 0
+            ? values.companyIds
+            : undefined,
       });
 
       toast.success("Usuario creado correctamente");
@@ -142,11 +186,8 @@ export function UserCreateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nuevo usuario</DialogTitle>
-          <DialogDescription>
-            Crea un usuario interno o cliente portal. Asigna rol y cargos del
-            equipo.
-          </DialogDescription>
+          <DialogTitle>{copy.title}</DialogTitle>
+          <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
 
         {errorMessage ? (
@@ -157,16 +198,21 @@ export function UserCreateDialog({
 
         {isLoadingCatalogs ? (
           <p className="text-sm text-muted-foreground">Cargando catálogos...</p>
+        ) : roleOptions.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground">
+            No hay roles disponibles para este tipo de usuario. Revisa el
+            catálogo de roles.
+          </p>
         ) : (
           <UserForm
-            key={open ? "user-create-open" : "user-create-closed"}
+            key={`${audience}-${open ? "open" : "closed"}-${defaultRoleIds.join(",")}`}
             mode="create"
-            defaultValues={emptyValues}
+            defaultValues={emptyValuesForAudience(audience, defaultRoleIds)}
             roleOptions={roleOptions}
             jobTitleOptions={jobTitleOptions}
             companyOptions={companyOptions}
             onSubmit={handleSubmit}
-            submitLabel="Crear usuario"
+            submitLabel={copy.submitLabel}
             isSubmitting={isSubmitting}
           />
         )}

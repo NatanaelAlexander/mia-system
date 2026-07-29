@@ -652,6 +652,21 @@ export class PortalTicketsController {
     );
   }
 
+  @Post('desvincular-archivo')
+  @ApiOperation({ summary: 'Desvincular asset del ticket (portal)' })
+  @ApiBody({ type: UnlinkTicketAssetDto })
+  @ApiOkResponse({ description: 'Desvinculado' })
+  unlinkAsset(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UnlinkTicketAssetDto,
+  ) {
+    return this.ticketsService.unlinkAssetForPortal(
+      userId,
+      dto.ticketId,
+      dto.assetId,
+    );
+  }
+
   @Post('comentarios/archivos/listar')
   @AuthorizeAction('read')
   @ApiOperation({ summary: 'Listar archivos de un comentario (portal)' })

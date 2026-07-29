@@ -20,12 +20,15 @@ interface ProjectCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  /** Prefills and locks the company field (e.g. from company detail). */
+  defaultCompanyId?: string;
 }
 
 export function ProjectCreateDialog({
   open,
   onOpenChange,
   onCreated,
+  defaultCompanyId,
 }: ProjectCreateDialogProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -125,6 +128,10 @@ export function ProjectCreateDialog({
           <ProjectCreateForm
             key={open ? "create-open" : "create-closed"}
             companies={companies}
+            defaultValues={
+              defaultCompanyId ? { companyId: defaultCompanyId } : undefined
+            }
+            lockCompany={Boolean(defaultCompanyId)}
             onSubmit={handleSubmit}
             submitLabel="Crear proyecto"
             isSubmitting={isSubmitting}

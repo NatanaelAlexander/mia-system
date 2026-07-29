@@ -1,5 +1,5 @@
-import { RolesPage } from "@/components/app/admin/roles-page";
+import { redirect } from "next/navigation";
 
-export default function RolesRoutePage() {
-  return <RolesPage />;
+export default function RolesRedirectPage() {
+  redirect("/app/users/roles");
 }

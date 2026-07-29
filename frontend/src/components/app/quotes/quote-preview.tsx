@@ -147,11 +147,11 @@ export function quoteDetailToPreviewModel(
         applyTax: section.applyTax,
         priceInputMode: section.priceInputMode ?? "gross",
         items: (section.items ?? [])
-          .filter((item) => item.title.trim() && Number(item.price) !== 0)
+          .filter((item) => item.title.trim())
           .map((item) => ({
             title: item.title.trim(),
             description: item.description?.trim() ?? "",
-            price: Number(item.price),
+            price: Number(item.price) || 0,
           })),
       }))
       .filter((section) => section.items.length > 0),

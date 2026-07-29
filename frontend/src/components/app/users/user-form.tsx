@@ -14,6 +14,27 @@ import { cn } from "@/lib/utils";
 export const PORTAL_CLIENT_ROLE = "cliente";
 export const INTERNAL_ROLE_NAMES = new Set(["admin", "super_admin"]);
 
+export type UserAudience = "internal" | "portal";
+
+export function isInternalRoleName(name: string) {
+  return INTERNAL_ROLE_NAMES.has(name);
+}
+
+export function isPortalRoleName(name: string) {
+  return name === PORTAL_CLIENT_ROLE;
+}
+
+export function filterRolesForAudience(
+  roles: RoleOption[],
+  audience: UserAudience,
+) {
+  return roles.filter((role) =>
+    audience === "internal"
+      ? isInternalRoleName(role.name)
+      : isPortalRoleName(role.name),
+  );
+}
+
 const userSchema = z.object({
   email: z.string().email("Ingresa un correo válido").max(255),
   password: z
