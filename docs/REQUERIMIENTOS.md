@@ -4,7 +4,53 @@ Documento de contexto funcional para desarrollo. Describe la finalidad del siste
 
 ---
 
-## 1. Descripción general
+## 1. Requisitos previos
+
+Terminal abierta en la carpeta `mia-system/`.
+
+### Windows
+
+1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/) con **WSL2** activado.
+2. Reiniciar el PC si el instalador lo pide.
+3. **Antes de trabajar:** abrir **Docker Desktop** y esperar *Engine running*.
+4. Usar **PowerShell**, **Git Bash** o terminal de VS Code / Cursor.
+
+```powershell
+cd C:\ruta\donde\clonaste\mia-system
+docker ps
+```
+
+Si `docker ps` muestra una tabla (aunque esté vacía), Docker está OK.
+
+### Linux
+
+1. Instalar **Docker Engine** o Docker Desktop.
+2. Levantar el servicio:
+
+```bash
+sudo systemctl start docker
+```
+
+3. Si sale `permission denied` al usar Docker:
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Cerrar sesión y volver a entrar.
+
+4. Ir al proyecto y comprobar:
+
+```bash
+cd ~/ruta/al/mia-system
+docker ps
+```
+
+Arranque del stack (`compose`, migraciones, URLs): ver [`README.md`](../README.md) en la raíz del repo.
+
+---
+
+## 2. Descripción general
 
 **Sistema de gestión de clientes, proyectos y tickets** para una empresa de desarrollo de software.
 
@@ -34,7 +80,7 @@ La información de clientes, documentos, solicitudes y estados de trabajo está 
 
 ---
 
-## 2. Filosofía de diseño
+## 3. Filosofía de diseño
 
 - Base de datos **completamente normalizada**.
 - Cada tabla con **una única responsabilidad**.
@@ -56,7 +102,7 @@ La información de clientes, documentos, solicitudes y estados de trabajo está 
 
 ---
 
-## 3. Usuarios y roles
+## 4. Usuarios y roles
 
 ### Tipos de usuario
 
@@ -76,7 +122,7 @@ Los internos gestionan el sistema global o varias empresas. Los clientes solo ve
 
 ---
 
-## 4. Módulos y tablas
+## 5. Módulos y tablas
 
 ### 4.1 Seguridad
 
@@ -194,7 +240,7 @@ Aprobación → Terminado
 
 ---
 
-## 5. Escalabilidad futura (fuera de v1)
+## 6. Escalabilidad futura (fuera de v1)
 
 Módulos previstos sin romper la arquitectura principal:
 
@@ -213,7 +259,7 @@ Módulos previstos sin romper la arquitectura principal:
 
 ---
 
-## 6. Stack técnico (contexto de implementación)
+## 7. Stack técnico (contexto de implementación)
 
 | Capa | Tecnología |
 |------|------------|
@@ -225,6 +271,6 @@ Módulos previstos sin romper la arquitectura principal:
 
 ---
 
-## 7. Notas para desarrollo
+## 8. Notas para desarrollo
 
 Este documento es la **fuente de verdad funcional**. El MER y las migraciones SQL deben alinearse con estas reglas. Si el esquema actual no incluye aún un campo o regla (ej. estado **Borrador** en `ticket_statuses`, `sort_order`, número interno de ticket, comentarios público/interno), se considera **pendiente de implementación**, no fuera de alcance.
