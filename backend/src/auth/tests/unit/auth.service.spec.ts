@@ -1,17 +1,17 @@
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DatabaseService } from '../common/database/database.service';
-import { AuthService } from './auth.service';
+import { DatabaseService } from '../../../common/database/database.service';
+import { AuthService } from '../../auth.service';
 import {
   TokenAccesoInvalidoException,
   RefreshTokenInvalidoException,
-} from './exceptions/auth.exceptions';
+} from '../../exceptions/auth.exceptions';
 import {
   accessTokenSignOptions,
   refreshTokenSignOptions,
-} from './jwt-token.util';
-import { PermissionsService } from './permissions/permissions.service';
-import { RefreshSessionsService } from './refresh-sessions.service';
+} from '../../jwt-token.util';
+import { PermissionsService } from '../../permissions/permissions.service';
+import { RefreshSessionsService } from '../../refresh-sessions.service';
 
 const ACCESS_SECRET = 'test-access-secret-32-chars-minimum!!';
 const REFRESH_SECRET = 'test-refresh-secret-32-chars-minimum!';
