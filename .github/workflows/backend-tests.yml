@@ -71,3 +71,6 @@ jobs:
 
       - name: Run auth integration tests
         run: pnpm test:auth:integration
+
+      - name: Run audit integration tests
+        run: pnpm test:audit:integration
