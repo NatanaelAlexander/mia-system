@@ -25,6 +25,18 @@ describe('Users API contract', () => {
     findById: jest.Mock;
     create: jest.Mock;
     changeOwnPassword: jest.Mock;
+    findAllRoles: jest.Mock;
+    findAllJobTitles: jest.Mock;
+    findAllJobTitlesWithUsage: jest.Mock;
+    createJobTitle: jest.Mock;
+    updateJobTitle: jest.Mock;
+    deleteJobTitle: jest.Mock;
+    update: jest.Mock;
+    deactivate: jest.Mock;
+    assignRoles: jest.Mock;
+    linkCompany: jest.Mock;
+    unlinkCompany: jest.Mock;
+    updateProfile: jest.Mock;
   };
 
   beforeAll(async () => {
@@ -33,12 +45,24 @@ describe('Users API contract', () => {
       findById: jest.fn().mockResolvedValue({ id: UUID, email: 'a@mia.local' }),
       create: jest.fn().mockResolvedValue({ id: UUID }),
       changeOwnPassword: jest.fn().mockResolvedValue(undefined),
+      findAllRoles: jest.fn().mockResolvedValue([{ id: UUID, name: 'admin' }]),
+      findAllJobTitles: jest.fn().mockResolvedValue([{ id: UUID, name: 'Dev' }]),
+      findAllJobTitlesWithUsage: jest.fn().mockResolvedValue([{ id: UUID, name: 'Dev', userCount: 1 }]),
+      createJobTitle: jest.fn().mockResolvedValue({ id: UUID }),
+      updateJobTitle: jest.fn().mockResolvedValue({ id: UUID }),
+      deleteJobTitle: jest.fn().mockResolvedValue({ id: UUID }),
+      update: jest.fn().mockResolvedValue({ id: UUID }),
+      deactivate: jest.fn().mockResolvedValue({ id: UUID }),
+      assignRoles: jest.fn().mockResolvedValue({ id: UUID }),
+      linkCompany: jest.fn().mockResolvedValue({ id: UUID }),
+      unlinkCompany: jest.fn().mockResolvedValue({ id: UUID }),
+      updateProfile: jest.fn().mockResolvedValue({ id: UUID }),
     };
 
     app = await createApiTestApp({
       controllers: [
-        InternalUsersController,
         InternalUserProfileController,
+        InternalUsersController,
         PortalUserProfileController,
       ],
       providers: [{ provide: UsersService, useValue: usersService }],
@@ -115,5 +139,179 @@ describe('Users API contract', () => {
     usersService.findById.mockResolvedValue({ id: TEST_USER_ID });
     await request(app.getHttpServer()).get('/portal/users/perfil').expect(200);
     expect(usersService.findById).toHaveBeenCalledWith(TEST_USER_ID);
+  });
+
+  it('GET /internal/users lista usuarios', async () => {
+    usersService.findAll.mockResolvedValue([{ id: UUID }]);
+    await request(app.getHttpServer())
+      .get('/internal/users')
+      .send({})
+      .expect(200);
+    expect(usersService.findAll).toHaveBeenCalledWith({});
+  });
+
+  it('GET /internal/users/detalle con id válido', async () => {
+    usersService.findById.mockResolvedValue({ id: UUID });
+    await request(app.getHttpServer())
+      .get('/internal/users/detalle')
+      .send({ id: UUID })
+      .expect(200);
+    expect(usersService.findById).toHaveBeenCalledWith(UUID);
+  });
+
+  it('GET /internal/users/catalogos/roles', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/users/catalogos/roles')
+      .expect(200);
+    expect(usersService.findAllRoles).toHaveBeenCalled();
+  });
+
+  it('GET /internal/users/catalogos/cargos', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/users/catalogos/cargos')
+      .expect(200);
+    expect(usersService.findAllJobTitles).toHaveBeenCalled();
+  });
+
+  it('POST /internal/users/catalogos/cargos/listar', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/users/catalogos/cargos/listar')
+      .send({})
+      .expect(201);
+    expect(usersService.findAllJobTitlesWithUsage).toHaveBeenCalled();
+  });
+
+  it('GET /internal/users/catalogos/cargos/admin', async () => {
+    await request(app.getHttpServer())
+      .get('/internal/users/catalogos/cargos/admin')
+      .expect(200);
+    expect(usersService.findAllJobTitlesWithUsage).toHaveBeenCalled();
+  });
+
+  it('POST /internal/users/catalogos/cargos crea cargo', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/users/catalogos/cargos')
+      .send({ name: 'Backend Dev' })
+      .expect(201);
+    expect(usersService.createJobTitle).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Backend Dev' }),
+      TEST_USER_ID,
+    );
+  });
+
+  it('PATCH /internal/users/catalogos/cargos/:id actualiza cargo', async () => {
+    await request(app.getHttpServer())
+      .patch(`/internal/users/catalogos/cargos/${UUID}`)
+      .send({ name: 'Frontend Dev' })
+      .expect(200);
+    expect(usersService.updateJobTitle).toHaveBeenCalledWith(
+      UUID,
+      expect.objectContaining({ name: 'Frontend Dev' }),
+      TEST_USER_ID,
+    );
+  });
+
+  it('DELETE /internal/users/catalogos/cargos/:id elimina cargo', async () => {
+    await request(app.getHttpServer())
+      .delete(`/internal/users/catalogos/cargos/${UUID}`)
+      .expect(200);
+    expect(usersService.deleteJobTitle).toHaveBeenCalledWith(UUID, TEST_USER_ID);
+  });
+
+  it('PATCH /internal/users/:id actualiza usuario (admin)', async () => {
+    await request(app.getHttpServer())
+      .patch(`/internal/users/${UUID}`)
+      .send({ firstName: 'Nuevo' })
+      .expect(200);
+    expect(usersService.update).toHaveBeenCalledWith(
+      UUID,
+      expect.objectContaining({ firstName: 'Nuevo' }),
+      TEST_USER_ID,
+      { asAdmin: true },
+    );
+  });
+
+  it('DELETE /internal/users/:id desactiva usuario', async () => {
+    await request(app.getHttpServer())
+      .delete(`/internal/users/${UUID}`)
+      .expect(200);
+    expect(usersService.deactivate).toHaveBeenCalledWith(UUID, TEST_USER_ID);
+  });
+
+  it('PATCH /internal/users/:id/roles asigna roles', async () => {
+    await request(app.getHttpServer())
+      .patch(`/internal/users/${UUID}/roles`)
+      .send({ roleIds: [UUID] })
+      .expect(200);
+    expect(usersService.assignRoles).toHaveBeenCalledWith(
+      UUID,
+      expect.objectContaining({ roleIds: [UUID] }),
+      TEST_USER_ID,
+    );
+  });
+
+  it('POST /internal/users/vincular-empresa vincula usuario', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/users/vincular-empresa')
+      .send({ userId: UUID, companyId: UUID })
+      .expect(201);
+    expect(usersService.linkCompany).toHaveBeenCalledWith(
+      UUID,
+      expect.objectContaining({ userId: UUID, companyId: UUID }),
+      TEST_USER_ID,
+    );
+  });
+
+  it('POST /internal/users/desvincular-empresa desvincula usuario', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/users/desvincular-empresa')
+      .send({ userId: UUID, companyId: UUID })
+      .expect(201);
+    expect(usersService.unlinkCompany).toHaveBeenCalledWith(
+      UUID,
+      UUID,
+      TEST_USER_ID,
+    );
+  });
+
+  it('GET /internal/users/perfil ver mi perfil', async () => {
+    usersService.findById.mockResolvedValue({ id: TEST_USER_ID });
+    await request(app.getHttpServer())
+      .get('/internal/users/perfil')
+      .expect(200);
+    expect(usersService.findById).toHaveBeenCalledWith(TEST_USER_ID);
+  });
+
+  it('PATCH /internal/users/perfil actualiza mi perfil', async () => {
+    await request(app.getHttpServer())
+      .patch('/internal/users/perfil')
+      .send({ firstName: 'MiNombre' })
+      .expect(200);
+    expect(usersService.updateProfile).toHaveBeenCalledWith(
+      TEST_USER_ID,
+      expect.objectContaining({ firstName: 'MiNombre' }),
+    );
+  });
+
+  it('PATCH /portal/users/perfil actualiza mi perfil (portal)', async () => {
+    await request(app.getHttpServer())
+      .patch('/portal/users/perfil')
+      .send({ lastName: 'MiApellido' })
+      .expect(200);
+    expect(usersService.updateProfile).toHaveBeenCalledWith(
+      TEST_USER_ID,
+      expect.objectContaining({ lastName: 'MiApellido' }),
+    );
+  });
+
+  it('PATCH /portal/users/perfil/contrasena cambia contraseña (portal)', async () => {
+    await request(app.getHttpServer())
+      .patch('/portal/users/perfil/contrasena')
+      .send({ currentPassword: 'x', newPassword: 'NuevaClave123' })
+      .expect(200);
+    expect(usersService.changeOwnPassword).toHaveBeenCalledWith(
+      TEST_USER_ID,
+      expect.objectContaining({ currentPassword: 'x' }),
+    );
   });
 });
